@@ -4,7 +4,7 @@
  * 職責：
  * 1. 從 localStorage 讀取 API Key
  * 2. 組裝 System Prompt 與使用者訊息（支援動態科目附加提示）
- * 3. 依 taskType 智慧路由至 v4-flash / v4-flash(thinking) / v4-pro
+ * 3. 依 taskType 強制路由至 v4-flash / chat / reasoner / v4-pro
  * 4. 發送 fetch 請求並強制回傳 JSON 格式（過濾 <think> 標籤）
  * 5. 解析並回傳結構化結果（寫作 L1/L2/L3 / 閱讀 L1/L2/L3）
  */
@@ -21,6 +21,12 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 /** DeepSeek V4：日常任務預設（最省 Token） */
 const DEEPSEEK_MODEL_FLASH = 'deepseek-v4-flash';
 
+/** 長篇故事／文獻：高穩定度 chat 模型 */
+const DEEPSEEK_MODEL_CHAT = 'deepseek-chat';
+
+/** 倫理兩難／測驗挑戰：推理模型（直接切換 model，勿再塞 thinking 參數） */
+const DEEPSEEK_MODEL_REASONER = 'deepseek-reasoner';
+
 /** DeepSeek V4：高價值旗艦任務 */
 const DEEPSEEK_MODEL_PRO = 'deepseek-v4-pro';
 
@@ -28,29 +34,41 @@ const DEEPSEEK_MODEL_PRO = 'deepseek-v4-pro';
 const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
 
 /**
- * 依任務類型決定模型與額外 body 參數（智慧路由）
+ * 依任務類型強制決定模型字串（智慧路由）
  *
- * - standard：v4-flash 非思考模式（翻譯／單字等日常任務）
- * - complex_logic：v4-flash + thinking（倫理兩難、深度挑戰題）
- * - ultimate_celebration / deep_correction：v4-pro（滿卡慶祝信、長文深度批改）
+ * - standard：deepseek-v4-flash（翻譯／單字等日常任務）
+ * - story / literature：deepseek-chat（長篇故事與文獻）
+ * - complex_logic / ethics / challenge：deepseek-reasoner（倫理兩難、測驗題）
+ * - ultimate_celebration / deep_correction：deepseek-v4-pro（滿卡慶祝信、長文深度批改）
  *
  * @param {string} [taskType='standard']
  * @returns {{ modelName: string, extraBody: Object }}
  */
 function resolveDeepSeekRouting(taskType = 'standard') {
-  let modelName = DEEPSEEK_MODEL_FLASH;
-  let extraBody = {};
+  // 預設使用最便宜的 flash 模型
+  let targetModel = DEEPSEEK_MODEL_FLASH;
 
-  if (taskType === 'complex_logic') {
-    extraBody = { thinking: { type: 'enabled' } };
+  // 根據任務類型強制切換模型字串
+  if (taskType === 'story' || taskType === 'literature') {
+    // 生成長篇故事與文獻，需要高穩定度的 chat 模型
+    targetModel = DEEPSEEK_MODEL_CHAT;
+  } else if (
+    taskType === 'complex_logic' ||
+    taskType === 'ethics' ||
+    taskType === 'challenge'
+  ) {
+    // 倫理兩難、測驗題生成，需要強大的邏輯推理
+    targetModel = DEEPSEEK_MODEL_REASONER;
   } else if (
     taskType === 'ultimate_celebration' ||
     taskType === 'deep_correction'
   ) {
-    modelName = DEEPSEEK_MODEL_PRO;
+    // 滿卡慶祝信、長文深度批改等需要最高品質文字的場景
+    targetModel = DEEPSEEK_MODEL_PRO;
   }
 
-  return { modelName, extraBody };
+  // 不再附加 thinking 參數；推理能力改由 model: deepseek-reasoner 直接切換
+  return { modelName: targetModel, extraBody: {} };
 }
 
 /**
@@ -267,7 +285,7 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
   const { modelName, extraBody } = resolveDeepSeekRouting(taskType);
 
   const requestBody = {
-    model: modelName,
+    model: modelName, // 必須依 taskType 動態帶入
     messages,
     temperature,
     max_tokens: maxTokens,
@@ -278,7 +296,12 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
     requestBody.response_format = { type: 'json_object' };
   }
 
-  // 右下角輔助提示：顯示當前 Flash / Thinking / Pro（不取代各功能自己的 Loading）
+  // 發送請求前確認目前使用的模型（除錯用）
+  console.log(
+    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`
+  );
+
+  // 右下角輔助提示：顯示當前 Flash / Chat / Reasoner / Pro（不取代各功能自己的 Loading）
   if (typeof showAiIndicator === 'function') {
     showAiIndicator(taskType);
   }
@@ -536,11 +559,11 @@ async function generateL1Story(lengthMode = 'long') {
       `內容必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
     );
 
-  // 倫理與價值：啟用 Flash 思考模式以處理兩難邏輯
+  // 倫理與價值 → reasoner；其他科目故事 → chat
   const taskType =
     normalizeSubjectId(subject.id) === 'ethics_and_values'
-      ? 'complex_logic'
-      : 'standard';
+      ? 'ethics'
+      : 'story';
 
   const result = await requestDeepSeekJSON(
     systemPrompt,
@@ -726,7 +749,13 @@ async function generateSimulatedLiteratureAPI(keyword, subjectName) {
   const userContent =
     `科目：${subject.name}\n關鍵字：${safeKeyword}\n請依上述格式生成結合學術理論與前線實務的教材。`;
 
-  const result = await requestDeepSeekJSON(systemPrompt, userContent, 1600);
+  // 文獻生成：使用 deepseek-chat
+  const result = await requestDeepSeekJSON(
+    systemPrompt,
+    userContent,
+    1600,
+    'literature'
+  );
 
   const {
     original_title,
@@ -1145,12 +1174,12 @@ async function generateArticleChallengeAPI(articleContext) {
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
-  // AI 深度挑戰：啟用思考模式確保解析具備深度
+  // AI 深度挑戰：使用 deepseek-reasoner 確保解析具備深度
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,
     1200,
-    'complex_logic'
+    'challenge'
   );
 
   const mcq = result && result.mcq;

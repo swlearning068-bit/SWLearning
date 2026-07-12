@@ -130,7 +130,7 @@ let hideAiIndicatorTimer = null;
 
 /**
  * 顯示右下角 AI 模式懸浮標籤
- * @param {string} [mode='standard'] - taskType：standard / complex_logic / ultimate_celebration / deep_correction
+ * @param {string} [mode='standard'] - taskType：standard / story / literature / ethics / challenge / complex_logic / ultimate_celebration / deep_correction
  */
 function showAiIndicator(mode) {
   const indicator = document.getElementById('ai-mode-indicator');
@@ -145,13 +145,21 @@ function showAiIndicator(mode) {
 
   aiIndicatorDepth += 1;
 
-  indicator.classList.remove('mode-flash', 'mode-thinking', 'mode-pro');
+  indicator.classList.remove('mode-flash', 'mode-thinking', 'mode-pro', 'mode-chat');
 
   switch (mode) {
+    case 'ethics':
+    case 'challenge':
     case 'complex_logic':
       icon.textContent = '🧠';
-      text.textContent = '深度思考中 (Thinking)...';
+      text.textContent = '推理模式 (Reasoner)...';
       indicator.classList.add('mode-thinking');
+      break;
+    case 'story':
+    case 'literature':
+      icon.textContent = '✍️';
+      text.textContent = '穩定寫作 (Chat)...';
+      indicator.classList.add('mode-chat');
       break;
     case 'ultimate_celebration':
     case 'deep_correction':

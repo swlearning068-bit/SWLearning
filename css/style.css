@@ -4426,6 +4426,10 @@ body {
   color: #3B82F6;
 }
 
+.ai-indicator.mode-chat {
+  color: #059669;
+}
+
 .ai-indicator.mode-thinking {
   color: #8B5CF6;
 }
