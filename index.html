@@ -1078,7 +1078,9 @@
       <p class="modal-desc sync-modal-note">
         登入前請確認：① Authentication 已啟用 Google；② Authorized domains 含
         <code class="settings-code">localhost</code>
-        （若用 127.0.0.1 也要另外加入）；③ 用本機伺服器開啟，不要用 file://。
+        （若用 127.0.0.1 也要另外加入）；③ 用本機伺服器開啟，不要用 file://；
+        ④ 已建立 Firestore Database，並允許登入者讀寫
+        <code class="settings-code">users/{userId}</code>。
       </p>
       <p id="firebase-status" class="firebase-status firebase-status--off" role="status">
         尚未連線 Firebase
@@ -1221,6 +1223,6 @@
   <script src="js/reward.js?v=4"></script>
   <script src="js/app.js?v=18"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=4"></script>
+  <script type="module" src="js/sync.js?v=5"></script>
 </body>
 </html>

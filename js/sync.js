@@ -16,7 +16,7 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=6';
+} from './firebase-init.js?v=7';
 
 /** 不同步敏感／裝置設定鍵 */
 const EXCLUDE_KEYS = new Set([
@@ -71,17 +71,110 @@ function syncToast(message) {
 }
 
 function requireFirebaseServices() {
-  if (!isFirebaseReady()) {
+  let ready = false;
+  try {
+    ready = typeof isFirebaseReady === 'function' ? isFirebaseReady() : false;
+  } catch (_) {
+    ready = false;
+  }
+
+  let auth =
+    (typeof getFirebaseAuth === 'function' ? getFirebaseAuth() : null) ||
+    window.firebaseAuth ||
+    null;
+  let db =
+    (typeof getFirebaseDb === 'function' ? getFirebaseDb() : null) ||
+    window.firebaseDb ||
+    null;
+
+  // 後備：若模組狀態異常，但 window 上仍有可用實例
+  if ((!auth || !db) && typeof window.isFirebaseReady === 'function') {
+    ready = window.isFirebaseReady() || ready;
+    auth = auth || (window.getFirebaseAuth && window.getFirebaseAuth()) || window.firebaseAuth;
+    db = db || (window.getFirebaseDb && window.getFirebaseDb()) || window.firebaseDb;
+  }
+
+  if (!ready && !(auth && db)) {
     syncToast('請先到「設定」連上 Firebase');
     return null;
   }
-  const auth = getFirebaseAuth();
-  const db = getFirebaseDb();
   if (!auth || !db) {
-    syncToast('Firebase 尚未就緒，請重新連線');
+    syncToast('Firebase 尚未就緒，請到設定重新連線');
     return null;
   }
   return { auth, db };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {{ code: string, toast: string, detail: string }}
+ */
+function describeFirestoreError(error) {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String(/** @type {{ code: string }} */ (error).code)
+      : '';
+  const message =
+    error && typeof error === 'object' && 'message' in error
+      ? String(/** @type {{ message: string }} */ (error).message)
+      : String(error || '');
+
+  if (code === 'permission-denied' || /permission/i.test(message)) {
+    return {
+      code,
+      toast: '⚠️ Firestore 權限不足，請設定安全規則',
+      detail: [
+        '雲端讀取被拒絕（permission-denied）。',
+        '',
+        '請到 Firebase Console → Firestore Database → Rules，改成：',
+        '',
+        'rules_version = \'2\';',
+        'service cloud.firestore {',
+        '  match /databases/{database}/documents {',
+        '    match /users/{userId} {',
+        '      allow read, write: if request.auth != null',
+        '        && request.auth.uid == userId;',
+        '    }',
+        '  }',
+        '}',
+        '',
+        '儲存規則後等幾秒再同步。'
+      ].join('\n')
+    };
+  }
+
+  if (
+    code === 'not-found' ||
+    code === 'failed-precondition' ||
+    /cloud firestore .+ has not been (used|created)|does not exist/i.test(
+      message
+    )
+  ) {
+    return {
+      code,
+      toast: '⚠️ 請先在 Firebase 建立 Firestore 資料庫',
+      detail: [
+        '專案尚未建立 Firestore Database。',
+        '',
+        '請到 Firebase Console → Build → Firestore Database → 建立資料庫',
+        '（可先選測試模式，稍後再改成上方安全規則）。'
+      ].join('\n')
+    };
+  }
+
+  if (code === 'unavailable' || code === 'deadline-exceeded') {
+    return {
+      code,
+      toast: '❌ 暫時無法連上 Firestore，請稍後再試',
+      detail: '網路不穩或 Firebase 服務忙碌，請稍後再開一次雲端同步。'
+    };
+  }
+
+  return {
+    code,
+    toast: `❌ 讀取雲端失敗${code ? `（${code}）` : ''}`,
+    detail: message || '未知錯誤。請打開瀏覽器 Console 查看詳細訊息。'
+  };
 }
 
 /**
@@ -149,32 +242,49 @@ async function getCloudSyncSummary(uid) {
       hasData: false,
       keyCount: 0,
       lastUpdated: null,
-      missing: true
+      missing: true,
+      error: 'Firebase 尚未就緒'
     };
   }
 
-  const snap = await getDoc(doc(services.db, 'users', uid));
-  if (!snap.exists()) {
+  try {
+    const snap = await getDoc(doc(services.db, 'users', uid));
+    if (!snap.exists()) {
+      return {
+        hasData: false,
+        keyCount: 0,
+        lastUpdated: null,
+        missing: false,
+        error: null
+      };
+    }
+
+    const remote = snap.data() || {};
+    const data =
+      remote.data && typeof remote.data === 'object' ? remote.data : {};
+    const keys = Object.keys(data).filter(shouldSyncKey);
+    const lastUpdated = toDateOrNull(remote.lastUpdated);
+
+    return {
+      hasData: keys.length > 0,
+      keyCount: keys.length,
+      lastUpdated,
+      missing: false,
+      error: null
+    };
+  } catch (error) {
+    console.error('[sync] 讀取雲端狀態失敗：', error);
+    const tip = describeFirestoreError(error);
     return {
       hasData: false,
       keyCount: 0,
       lastUpdated: null,
-      missing: false
+      missing: false,
+      error: tip.toast,
+      errorDetail: tip.detail,
+      errorCode: tip.code
     };
   }
-
-  const remote = snap.data() || {};
-  const data =
-    remote.data && typeof remote.data === 'object' ? remote.data : {};
-  const keys = Object.keys(data).filter(shouldSyncKey);
-  const lastUpdated = toDateOrNull(remote.lastUpdated);
-
-  return {
-    hasData: keys.length > 0,
-    keyCount: keys.length,
-    lastUpdated,
-    missing: false
-  };
 }
 
 /**
@@ -184,7 +294,7 @@ async function getCloudSyncSummary(uid) {
 async function compareLocalAndCloud(uid) {
   const local = getLocalSyncSummary();
   const cloud = await getCloudSyncSummary(uid);
-  const bothHaveData = local.hasData && cloud.hasData;
+  const bothHaveData = local.hasData && cloud.hasData && !cloud.error;
   const result = { local, cloud, bothHaveData };
   lastCompareResult = result;
   return result;
@@ -203,10 +313,29 @@ function renderSyncComparison(result, errorMessage) {
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
 
+  // 即使雲端失敗，也盡量顯示本機狀態
+  const localFallback = result && result.local ? result.local : getLocalSyncSummary();
+
   if (errorMessage) {
-    if (localEl) localEl.textContent = '無法取得';
+    if (localEl) {
+      localEl.textContent = localFallback.hasData
+        ? `${localFallback.keyCount} 筆學習資料`
+        : '尚無學習資料';
+    }
     if (cloudEl) cloudEl.textContent = errorMessage;
     if (conflictEl) conflictEl.classList.add('hidden');
+    if (uploadBtn) {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = '⬆️ 上傳覆蓋雲端';
+    }
+    if (downloadBtn) {
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = '⬇️ 下載覆蓋本機';
+    }
+    if (hintEl) {
+      hintEl.textContent =
+        '雲端狀態讀取失敗。若要先備份本機，仍可嘗試上傳；請先確認已建立 Firestore 並設定規則。';
+    }
     return;
   }
 
@@ -226,7 +355,9 @@ function renderSyncComparison(result, errorMessage) {
   }
 
   if (cloudEl) {
-    if (cloud.hasData) {
+    if (cloud.error) {
+      cloudEl.textContent = cloud.error;
+    } else if (cloud.hasData) {
       cloudEl.textContent = `${cloud.keyCount} 筆（更新於 ${formatDateTime(
         cloud.lastUpdated
       )}）`;
@@ -240,7 +371,10 @@ function renderSyncComparison(result, errorMessage) {
   }
 
   if (hintEl) {
-    if (bothHaveData) {
+    if (cloud.error) {
+      hintEl.textContent =
+        '雲端讀取失敗：請確認已建立 Firestore，並允許登入使用者讀寫自己的 users/{uid} 文件。';
+    } else if (bothHaveData) {
       hintEl.textContent =
         '兩邊都有資料：請明確選擇「以本機為準上傳」或「以雲端為準下載」。連線本身不會自動覆蓋任一方。';
     } else if (local.hasData && !cloud.hasData) {
@@ -255,13 +389,14 @@ function renderSyncComparison(result, errorMessage) {
   }
 
   if (uploadBtn) {
+    // 雲端讀取失敗時仍允許上傳（可首次建立文件）
     uploadBtn.disabled = false;
     uploadBtn.textContent = cloud.hasData
       ? '⬆️ 以本機覆蓋雲端'
       : '⬆️ 上傳到雲端';
   }
   if (downloadBtn) {
-    downloadBtn.disabled = !cloud.hasData;
+    downloadBtn.disabled = !cloud.hasData || Boolean(cloud.error);
     downloadBtn.textContent = local.hasData
       ? '⬇️ 以雲端覆蓋本機'
       : '⬇️ 下載到本機';
@@ -429,11 +564,39 @@ async function openSyncModal() {
   try {
     const result = await compareLocalAndCloud(uid);
     renderSyncComparison(result);
+
+    if (result.cloud && result.cloud.errorDetail) {
+      syncToast(result.cloud.error || '讀取雲端狀態失敗');
+      window.alert(
+        [
+          '無法讀取雲端狀態',
+          '',
+          result.cloud.errorDetail,
+          result.cloud.errorCode ? `\n錯誤代碼：${result.cloud.errorCode}` : ''
+        ].join('\n')
+      );
+    }
   } catch (error) {
     console.error('[sync] 比對失敗：', error);
-    renderSyncComparison(null, '讀取雲端狀態失敗');
+    const tip = describeFirestoreError(error);
+    const local = getLocalSyncSummary();
+    renderSyncComparison(
+      {
+        local,
+        cloud: {
+          hasData: false,
+          keyCount: 0,
+          lastUpdated: null,
+          error: tip.toast
+        },
+        bothHaveData: false
+      },
+      tip.toast
+    );
+    syncToast(tip.toast);
+    window.alert(['無法讀取雲端狀態', '', tip.detail].join('\n'));
     if (uploadBtn) uploadBtn.disabled = false;
-    if (downloadBtn) downloadBtn.disabled = false;
+    if (downloadBtn) downloadBtn.disabled = true;
   }
 }
 
