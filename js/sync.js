@@ -6,6 +6,7 @@
  * 2. 之後裝置登入且雲端已有資料 → 二選一（上傳覆蓋／沿用雲端）
  * 3. 本機標記已對齊後 → 學習資料變更防抖自動上傳
  * 4. 監聽雲端變更 → 其他裝置更新時自動下載並重新載入
+ * 5. 已對齊時開啟／登入 → 先以雲端資料 hydrate 本機（雲端為準）
  */
 
 import {
@@ -18,7 +19,7 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=11';
+} from './firebase-init.js?v=13';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
@@ -41,7 +42,7 @@ let lastCompareResult = null;
 /** @type {string | null | undefined} */
 let previousAuthUid = undefined;
 
-/** @type {'first-seed' | 'choose' | 'manual' | null} */
+/** @type {'first-seed' | 'choose' | 'manual' | 'conflict' | null} */
 let syncModalMode = null;
 
 let suppressAutoPush = false;
@@ -57,6 +58,14 @@ let cloudPullUnsubscribe = null;
 let cloudPullUid = null;
 let remoteApplyInFlight = false;
 let visibilityPullBound = false;
+/** 本機有尚未成功上傳的學習資料變更 */
+let localDirty = false;
+/** 衝突處理中，避免重複彈窗 */
+let conflictDialogOpen = false;
+/** @type {{ uid: string, remote: Record<string, unknown> } | null} */
+let pendingRemoteConflict = null;
+/** 使用者選擇稍後處理時，略過同一個雲端時間戳 */
+let ignoredRemoteUpdatedMs = 0;
 
 /**
  * @param {string} key
@@ -390,7 +399,7 @@ async function compareLocalAndCloud(uid) {
 }
 
 /**
- * @param {'first-seed' | 'choose' | 'manual'} mode
+ * @param {'first-seed' | 'choose' | 'manual' | 'conflict'} mode
  * @param {{ local: object, cloud: object, bothHaveData: boolean } | null} result
  * @param {string} [errorMessage]
  */
@@ -414,6 +423,7 @@ function renderSyncComparison(mode, result, errorMessage) {
   if (titleEl) {
     if (mode === 'first-seed') titleEl.textContent = '☁️ 建立雲端儲存庫';
     else if (mode === 'choose') titleEl.textContent = '☁️ 雲端已有資料';
+    else if (mode === 'conflict') titleEl.textContent = '⚠️ 同步衝突';
     else titleEl.textContent = '☁️ 雲端儲存庫';
   }
 
@@ -424,6 +434,9 @@ function renderSyncComparison(mode, result, errorMessage) {
     } else if (mode === 'choose') {
       descEl.textContent =
         '此帳號的雲端已有資料。請選擇要以本機覆蓋雲端，或沿用雲端資料覆蓋本機。';
+    } else if (mode === 'conflict') {
+      descEl.textContent =
+        '其他裝置已更新雲端，但此裝置仍有尚未上傳的變更。請選擇要以哪一邊為準，避免資料被默默覆蓋。';
     } else {
       descEl.textContent =
         '此裝置已對齊雲端儲存庫。本機學習資料變更會自動上傳；也可手動重新載入或推送。';
@@ -431,7 +444,9 @@ function renderSyncComparison(mode, result, errorMessage) {
   }
 
   if (closeBtn) {
-    closeBtn.textContent = mode === 'manual' ? '關閉' : '稍後再說';
+    if (mode === 'manual') closeBtn.textContent = '關閉';
+    else if (mode === 'conflict') closeBtn.textContent = '稍後再說';
+    else closeBtn.textContent = '稍後再說';
   }
 
   const showClear =
@@ -515,6 +530,10 @@ function renderSyncComparison(mode, result, errorMessage) {
       bannerEl.classList.remove('hidden');
       bannerEl.textContent =
         '⚠️ 上傳會改寫雲端真相；沿用雲端會覆蓋此裝置本機學習資料。';
+    } else if (mode === 'conflict') {
+      bannerEl.classList.remove('hidden');
+      bannerEl.textContent =
+        '⚠️ 兩邊都有較新變更。請明確選擇，系統不會自動覆蓋任一方。';
     } else {
       bannerEl.classList.add('hidden');
     }
@@ -531,9 +550,12 @@ function renderSyncComparison(mode, result, errorMessage) {
     } else if (mode === 'choose') {
       hintEl.textContent =
         '選「沿用雲端」後會重新載入頁面；選「上傳覆蓋」會以本機改寫雲端。';
+    } else if (mode === 'conflict') {
+      hintEl.textContent =
+        '「保留本機」會上傳覆蓋雲端；「採用雲端」會下載覆蓋本機並重新載入。';
     } else {
       hintEl.textContent =
-        '已對齊後：本機變更會自動上傳；其他裝置更新雲端時會自動同步並重新載入。也可手動推送／重新載入／清除雲端。';
+        '已對齊後以雲端為準：開啟頁面會先載入雲端；本機變更約 2.5 秒後上傳；他機更新時若本機也有未上傳變更會先詢問。';
     }
   }
 
@@ -542,6 +564,7 @@ function renderSyncComparison(mode, result, errorMessage) {
     uploadBtn.disabled = false;
     if (mode === 'first-seed') uploadBtn.textContent = '確定建立（上傳本機）';
     else if (mode === 'choose') uploadBtn.textContent = '⬆️ 上傳覆蓋雲端';
+    else if (mode === 'conflict') uploadBtn.textContent = '⬆️ 保留本機並上傳';
     else uploadBtn.textContent = '⬆️ 將本機推上雲端';
   }
 
@@ -552,8 +575,9 @@ function renderSyncComparison(mode, result, errorMessage) {
     } else {
       downloadBtn.classList.remove('hidden');
       downloadBtn.disabled = !cloud.hasData || Boolean(cloud.error);
-      downloadBtn.textContent =
-        mode === 'choose' ? '⬇️ 沿用雲端資料' : '⬇️ 從雲端重新載入';
+      if (mode === 'choose') downloadBtn.textContent = '⬇️ 沿用雲端資料';
+      else if (mode === 'conflict') downloadBtn.textContent = '⬇️ 採用雲端並覆蓋本機';
+      else downloadBtn.textContent = '⬇️ 從雲端重新載入';
     }
   }
 }
@@ -584,6 +608,8 @@ async function uploadToCloud(uid, options = {}) {
   );
 
   markCloudBound(uid, now);
+  localDirty = false;
+  ignoredRemoteUpdatedMs = 0;
   if (!options.silent) {
     syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
   }
@@ -615,6 +641,7 @@ function applyRemotePayloadToLocal(uid, remote) {
     });
     const remoteUpdated = toDateOrNull(remote.lastUpdated) || new Date();
     markCloudBound(uid, remoteUpdated);
+    localDirty = false;
   } finally {
     suppressAutoPush = false;
   }
@@ -669,6 +696,7 @@ function applyRemoteFromOtherDevice(uid, remote) {
   remoteApplyInFlight = true;
   try {
     const keyCount = applyRemotePayloadToLocal(uid, remote);
+    localDirty = false;
     syncToast(`☁️ 偵測到其他裝置更新，已同步 ${keyCount} 筆，即將重新載入…`);
     setTimeout(() => {
       location.reload();
@@ -678,6 +706,124 @@ function applyRemoteFromOtherDevice(uid, remote) {
     console.error('[sync] 套用遠端更新失敗：', error);
     syncToast('❌ 同步其他裝置資料失敗');
   }
+}
+
+/**
+ * 其他裝置更新雲端後的處理：無本機未上傳變更則自動套用；有則詢問
+ * @param {string} uid
+ * @param {Record<string, unknown>} remote
+ */
+function handleRemoteCloudUpdate(uid, remote) {
+  if (remoteApplyInFlight || conflictDialogOpen) return;
+
+  const remoteUpdated = toDateOrNull(remote.lastUpdated);
+  if (
+    remoteUpdated &&
+    ignoredRemoteUpdatedMs &&
+    remoteUpdated.getTime() === ignoredRemoteUpdatedMs
+  ) {
+    return;
+  }
+
+  if (localDirty || autoPushTimer || autoPushInFlight) {
+    // 有未上傳／即將上傳的本機變更 → 不要直接覆蓋
+    if (autoPushTimer) {
+      clearTimeout(autoPushTimer);
+      autoPushTimer = null;
+    }
+    openConflictModal(uid, remote);
+    return;
+  }
+
+  applyRemoteFromOtherDevice(uid, remote);
+}
+
+/**
+ * @param {string} uid
+ * @param {Record<string, unknown>} remote
+ */
+function openConflictModal(uid, remote) {
+  pendingRemoteConflict = { uid, remote };
+  conflictDialogOpen = true;
+  syncToast('⚠️ 偵測到同步衝突，請選擇要以哪一邊為準');
+
+  const remoteData =
+    remote.data && typeof remote.data === 'object'
+      ? /** @type {Record<string, unknown>} */ (remote.data)
+      : {};
+  const cloudKeys = Object.keys(remoteData).filter(shouldSyncKey);
+  const local = getLocalSyncSummary();
+
+  const modal = document.getElementById('sync-modal');
+  if (!modal) {
+    const keepLocal = window.confirm(
+      [
+        '其他裝置已更新雲端，但此裝置有尚未上傳的變更。',
+        '',
+        '按「確定」：保留本機並上傳覆蓋雲端',
+        '按「取消」：採用雲端並覆蓋本機'
+      ].join('\n')
+    );
+    resolveConflict(keepLocal ? 'keep-local' : 'use-cloud');
+    return;
+  }
+
+  renderSyncComparison('conflict', {
+    local,
+    cloud: {
+      hasData: cloudKeys.length > 0,
+      keyCount: cloudKeys.length,
+      lastUpdated: toDateOrNull(remote.lastUpdated),
+      error: null
+    },
+    bothHaveData: local.hasData && cloudKeys.length > 0
+  });
+  modal.classList.remove('hidden');
+}
+
+/**
+ * @param {'keep-local' | 'use-cloud' | 'dismiss'} choice
+ */
+async function resolveConflict(choice) {
+  const pending = pendingRemoteConflict;
+  conflictDialogOpen = false;
+
+  if (!pending) {
+    closeSyncModal();
+    return;
+  }
+
+  const { uid, remote } = pending;
+  pendingRemoteConflict = null;
+
+  if (choice === 'dismiss') {
+    const remoteUpdated = toDateOrNull(remote.lastUpdated);
+    ignoredRemoteUpdatedMs = remoteUpdated ? remoteUpdated.getTime() : 0;
+    closeSyncModal();
+    syncToast('已暫緩處理衝突；之後仍可手動同步');
+    return;
+  }
+
+  if (choice === 'keep-local') {
+    closeSyncModal();
+    try {
+      await uploadToCloud(uid);
+      localDirty = false;
+      ignoredRemoteUpdatedMs = 0;
+      syncToast('✅ 已保留本機並覆蓋雲端');
+    } catch (error) {
+      console.error('[sync] 衝突處理上傳失敗：', error);
+      syncToast('❌ 上傳失敗，衝突尚未解決');
+      localDirty = true;
+    }
+    return;
+  }
+
+  // use-cloud
+  closeSyncModal();
+  localDirty = false;
+  ignoredRemoteUpdatedMs = 0;
+  applyRemoteFromOtherDevice(uid, remote);
 }
 
 function stopCloudPullListener() {
@@ -739,13 +885,13 @@ function startCloudPullListener(uid) {
         isFirstEvent = false;
         // 訂閱當下若雲端明顯較新（例如他機先改完），立刻同步
         if (cloudIsNewer) {
-          applyRemoteFromOtherDevice(uid, remote);
+          handleRemoteCloudUpdate(uid, remote);
         }
         return;
       }
 
       if (cloudIsNewer) {
-        applyRemoteFromOtherDevice(uid, remote);
+        handleRemoteCloudUpdate(uid, remote);
       }
     },
     (error) => {
@@ -779,7 +925,7 @@ async function pullIfCloudNewerOnFocus() {
       remoteUpdated &&
       (!localSynced || remoteUpdated.getTime() > localSynced.getTime() + 800)
     ) {
-      applyRemoteFromOtherDevice(uid, remote);
+      handleRemoteCloudUpdate(uid, remote);
     }
   } catch (error) {
     console.error('[sync] 前景檢查雲端失敗：', error);
@@ -905,7 +1051,7 @@ function closeSyncModal() {
 }
 
 /**
- * @param {'first-seed' | 'choose' | 'manual'} mode
+ * @param {'first-seed' | 'choose' | 'manual' | 'conflict'} mode
  */
 async function openSyncModal(mode = 'manual') {
   const modal = document.getElementById('sync-modal');
@@ -966,6 +1112,16 @@ async function runSyncAction(action) {
   if (!uid) return;
 
   const mode = syncModalMode || 'manual';
+
+  if (mode === 'conflict') {
+    if (action === 'upload') {
+      await resolveConflict('keep-local');
+    } else {
+      await resolveConflict('use-cloud');
+    }
+    return;
+  }
+
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
   const buttons = [uploadBtn, downloadBtn].filter(Boolean);
@@ -1100,6 +1256,7 @@ function installAutoPush() {
     localStorage.setItem = function patchedSetItem(key, value) {
       originalSetItem(key, value);
       if (!suppressAutoPush && shouldSyncKey(String(key))) {
+        localDirty = true;
         scheduleAutoPush();
       }
     };
@@ -1122,6 +1279,92 @@ function uninstallAutoPush() {
     autoPushTimer = null;
   }
   stopCloudPullListener();
+}
+
+/**
+ * 已對齊時以雲端為準載入：開啟／登入後先讀雲端，若與本機不同則覆蓋本機並重整
+ * @param {string} uid
+ */
+async function hydrateFromCloud(uid) {
+  if (!uid || remoteApplyInFlight) return;
+
+  installAutoPush();
+
+  let services = null;
+  try {
+    services = requireFirebaseServices();
+  } catch (_) {
+    services = null;
+  }
+  if (!services) return;
+
+  try {
+    const snap = await getDoc(doc(services.db, 'users', uid));
+    if (!snap.exists()) {
+      // 雲端空了但本機仍標記對齊：把本機推回雲端重建
+      scheduleAutoPush();
+      return;
+    }
+
+    const remote = snap.data() || {};
+    const remoteData =
+      remote.data && typeof remote.data === 'object' ? remote.data : {};
+    const remoteKeys = Object.keys(remoteData).filter(shouldSyncKey);
+    if (remoteKeys.length === 0) {
+      scheduleAutoPush();
+      return;
+    }
+
+    const localFp = fingerprintLocalPayload();
+    const remoteFp = fingerprintRemotePayload(remote);
+    if (localFp === remoteFp) {
+      const remoteUpdated = toDateOrNull(remote.lastUpdated);
+      if (remoteUpdated) markCloudBound(uid, remoteUpdated);
+      else markCloudBound(uid);
+      return;
+    }
+
+    // 已對齊裝置：存取以雲端為準
+    if (remoteApplyInFlight) return;
+    remoteApplyInFlight = true;
+    try {
+      const keyCount = applyRemotePayloadToLocal(uid, remote);
+      syncToast(`☁️ 已從雲端載入 ${keyCount} 筆最新資料，即將重新載入…`);
+      setTimeout(() => {
+        location.reload();
+      }, 700);
+    } catch (error) {
+      remoteApplyInFlight = false;
+      console.error('[sync] 從雲端載入套用失敗：', error);
+      syncToast('❌ 從雲端載入失敗');
+    }
+  } catch (error) {
+    console.error('[sync] 從雲端載入失敗：', error);
+  }
+}
+
+/**
+ * @returns {string}
+ */
+function fingerprintLocalPayload() {
+  const data = collectLocalStoragePayload();
+  const keys = Object.keys(data).sort();
+  return JSON.stringify(keys.map((key) => [key, data[key]]));
+}
+
+/**
+ * @param {Record<string, unknown>} remote
+ * @returns {string}
+ */
+function fingerprintRemotePayload(remote) {
+  const data =
+    remote && remote.data && typeof remote.data === 'object'
+      ? /** @type {Record<string, unknown>} */ (remote.data)
+      : {};
+  const keys = Object.keys(data).filter(shouldSyncKey).sort();
+  return JSON.stringify(
+    keys.map((key) => [key, data[key] == null ? '' : String(data[key])])
+  );
 }
 
 /**
@@ -1150,7 +1393,7 @@ async function handleAuthCloudDecision(user, options = {}) {
   }
 
   if (isCloudBound(uid) && !forceDecision) {
-    installAutoPush();
+    await hydrateFromCloud(uid);
     return;
   }
 
@@ -1210,12 +1453,24 @@ function bindSyncUI() {
   }
 
   if (closeBtn) {
-    closeBtn.addEventListener('click', closeSyncModal);
+    closeBtn.addEventListener('click', () => {
+      if (syncModalMode === 'conflict') {
+        resolveConflict('dismiss');
+      } else {
+        closeSyncModal();
+      }
+    });
   }
 
   if (modal) {
     modal.addEventListener('click', (event) => {
-      if (event.target === modal) closeSyncModal();
+      if (event.target === modal) {
+        if (syncModalMode === 'conflict') {
+          resolveConflict('dismiss');
+        } else {
+          closeSyncModal();
+        }
+      }
     });
   }
 
@@ -1253,7 +1508,7 @@ function bindSyncUI() {
   } else {
     const existingUid = requireUidQuiet();
     if (existingUid && isCloudBound(existingUid)) {
-      installAutoPush();
+      hydrateFromCloud(existingUid);
     }
   }
 }
