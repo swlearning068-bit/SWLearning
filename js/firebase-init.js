@@ -400,22 +400,127 @@ async function handleLogin() {
     return;
   }
 
+  const pageOrigin = window.location.origin || '';
+  const pageHost = window.location.hostname || '';
+
+  if (pageOrigin.startsWith('file:')) {
+    authToast('⚠️ 請用本機伺服器開啟網頁（勿直接用檔案路徑），Firebase 登入才會成功');
+    window.alert(
+      'Google 登入無法在 file:// 底下使用。\n\n請改用本機伺服器，例如：\n  npx serve .\n或 VS Code / Cursor 的 Live Server，\n再開 http://localhost:xxxx'
+    );
+    return;
+  }
+
   try {
     await signInWithPopup(auth, googleProvider);
     authToast('✅ 已登入，可進行雲端同步');
   } catch (error) {
     console.error('[firebase-init] 登入失敗：', error);
     const code = error && error.code ? String(error.code) : '';
-    if (code === 'auth/popup-closed-by-user') {
-      authToast('已取消登入');
-      return;
-    }
-    if (code === 'auth/unauthorized-domain') {
-      authToast('⚠️ 此網域未在 Firebase 授權，請到 Console 加入網域');
-      return;
-    }
-    authToast('❌ 登入失敗，請確認已啟用 Google 登入');
+    const message = error && error.message ? String(error.message) : '';
+    const tip = describeLoginError(code, pageHost, pageOrigin);
+
+    authToast(tip.toast);
+    // 詳細說明用 alert，方便對照 Console 設定
+    window.alert(
+      [
+        tip.title,
+        '',
+        tip.detail,
+        '',
+        `目前網址：${pageOrigin || '(未知)'}`,
+        `錯誤代碼：${code || '(無)'}`,
+        message ? `訊息：${message}` : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
   }
+}
+
+/**
+ * 把 Firebase Auth 錯誤轉成可執行的中文說明
+ * @param {string} code
+ * @param {string} host
+ * @param {string} origin
+ */
+function describeLoginError(code, host, origin) {
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return {
+      toast: '已取消登入',
+      title: '登入已取消',
+      detail: '你關閉了 Google 登入視窗。若要同步，請再按一次「登入以同步」。'
+    };
+  }
+
+  if (code === 'auth/popup-blocked') {
+    return {
+      toast: '⚠️ 瀏覽器封鎖了登入彈窗，請允許後再試',
+      title: '登入彈窗被封鎖',
+      detail: '請允許此網站的彈出式視窗，然後再按「登入以同步」。'
+    };
+  }
+
+  if (code === 'auth/unauthorized-domain') {
+    const domainHint = host || '你目前的網域';
+    return {
+      toast: `⚠️ 請把「${domainHint}」加入 Firebase 授權網域`,
+      title: '網域尚未授權',
+      detail: [
+        `Firebase 不允許在「${domainHint}」進行登入。`,
+        '',
+        '請到 Firebase Console：',
+        'Authentication → Settings → Authorized domains',
+        `新增：${domainHint}`,
+        '',
+        '注意：',
+        '- 不要加 http:// 或埠號',
+        '- 若用 127.0.0.1，請另外加入 127.0.0.1（localhost 不會自動涵蓋）',
+        '- 本機測試通常需要 localhost'
+      ].join('\n')
+    };
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    return {
+      toast: '⚠️ 請在 Firebase 啟用 Google 登入',
+      title: '尚未啟用 Google 登入',
+      detail: [
+        '請到 Firebase Console：',
+        'Authentication → Sign-in method → Google → 啟用',
+        '並填寫專案公開名稱後儲存。'
+      ].join('\n')
+    };
+  }
+
+  if (code === 'auth/configuration-not-found' || code === 'auth/invalid-api-key') {
+    return {
+      toast: '⚠️ Firebase 設定無效，請到設定重新貼上 firebaseConfig',
+      title: 'Firebase 設定有誤',
+      detail:
+        '請確認設定頁的 firebaseConfig（apiKey、authDomain、projectId、appId）來自同一個專案，並重新「儲存並連線」。'
+    };
+  }
+
+  if (code === 'auth/network-request-failed') {
+    return {
+      toast: '❌ 網路連線失敗，請檢查網路後再試',
+      title: '網路錯誤',
+      detail: '無法連到 Google / Firebase。請檢查網路、VPN 或防火牆後再試。'
+    };
+  }
+
+  return {
+    toast: `❌ 登入失敗${code ? `（${code}）` : ''}`,
+    title: '登入失敗',
+    detail: [
+      '常見檢查：',
+      '1. Authentication → Sign-in method → Google 已啟用',
+      `2. Authorized domains 已加入：${host || '目前網域'}`,
+      '3. 用 http://localhost 開啟，不要用檔案路徑 (file://)',
+      `4. 目前網址：${origin || '(未知)'}`
+    ].join('\n')
+  };
 }
 
 async function handleLogout() {

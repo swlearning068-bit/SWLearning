@@ -1075,6 +1075,11 @@
         <code class="settings-code">firebaseConfig</code>
         貼到下方，即可連上你自己的雲端。
       </p>
+      <p class="modal-desc sync-modal-note">
+        登入前請確認：① Authentication 已啟用 Google；② Authorized domains 含
+        <code class="settings-code">localhost</code>
+        （若用 127.0.0.1 也要另外加入）；③ 用本機伺服器開啟，不要用 file://。
+      </p>
       <p id="firebase-status" class="firebase-status firebase-status--off" role="status">
         尚未連線 Firebase
       </p>
@@ -1216,7 +1221,7 @@
   <script src="js/reward.js?v=4"></script>
   <script src="js/app.js?v=18"></script>
   <!-- Firebase v10 模組化 SDK（ES module）+ 雲端同步引擎 -->
-  <script type="module" src="js/firebase-init.js?v=4"></script>
+  <script type="module" src="js/firebase-init.js?v=5"></script>
   <script type="module" src="js/sync.js?v=3"></script>
 </body>
 </html>
