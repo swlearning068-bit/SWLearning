@@ -68,7 +68,7 @@
     {
       "id": "ethics_and_values",
       "name": "社會工作倫理與價值",
-      "prompt_context": "你的核心任務是生動描繪香港前線實務的『社工倫理兩難 (Ethical Dilemmas)』。⚠️【嚴格禁止事項】：絕對不允許在文章中出現「SWRB」、「工作守則」、「Code of Practice」、「倫理守則」等任何直接點名規範的字眼！\n請徹底貫徹『Show, Don't Tell』：不要寫「她根據守則考慮保密原則」，你必須直接描寫她的行為與痛苦。例如：「她深知一旦向家屬透露案主的病情，將徹底摧毀兩人辛苦建立的信任；但面對案主潛在的自殘風險，她陷入了極度的掙扎...」。請將情境聚焦於：知情決定受限時的自主權、法庭或生命威脅下的保密原則極限、或醫療/教育跨專業小組中的價值觀碰撞。請著重於呈現『道德抉擇的掙扎過程』。"
+      "prompt_context": "你的核心任務是生動描繪香港前線實務的『社工倫理兩難 (Ethical Dilemmas)』。⚠️【最高級別寫作禁令】：1. 絕對禁止出現「SWRB」、「Code of Practice」、「Guidelines」、「守則」、「原則」等名詞。 2. 絕對禁止描述「參照條文的動作」，例如嚴禁使用「consulting, referring to, according to, guided by, recalling」等字眼！\n\n請徹底貫徹『Show, Don't Tell』，將焦點完全放在社工內心的「價值觀拉扯」與「人性的重量」。\n✅【正確示範】：\"She was deeply torn between the heavy burden of protecting the adolescent's life and the sacred trust they had built over months of counseling.\"\n❌【錯誤示範】：\"After consulting the guidelines, she weighed the limits of confidentiality...\"\n\n請直接描寫真實的危機情境（例如：知情決定受限時的自主權剝奪感、法庭或生命威脅下的私隱保密極限、醫療/教育跨專業小組中的價值觀碰撞），呈現出深刻的道德掙扎。"
     }
   ]
 }
