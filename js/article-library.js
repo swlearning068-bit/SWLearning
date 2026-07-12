@@ -249,17 +249,15 @@ function renderArticlesList(filterType = 'all') {
   }
 
   filtered.forEach((item) => {
-    const row = document.createElement('button');
-    row.type = 'button';
+    // 用 div 而非 button：行動版 Safari/WebKit 對 button 高度計算常讓小標題溢到邊框上
+    const row = document.createElement('div');
     row.className = 'library-item article-library-item';
     row.dataset.id = String(item.id);
     row.dataset.type = item.type || '';
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
 
-    // 內層包一層：避免 <button> 當 flex 容器時高度算錯，小標題溢到卡片邊框上
-    const body = document.createElement('span');
-    body.className = 'library-item-body';
-
-    const topRow = document.createElement('span');
+    const topRow = document.createElement('div');
     topRow.className = 'article-item-top';
 
     const badge = document.createElement('span');
@@ -274,17 +272,16 @@ function renderArticlesList(filterType = 'all') {
     titleSpan.textContent = getArticleListTitle(item);
     topRow.appendChild(titleSpan);
 
-    const subjectSpan = document.createElement('span');
+    const subjectSpan = document.createElement('div');
     subjectSpan.className = 'library-item-subject';
     const themePart =
       item.type === 'story' && item.theme ? ` · ${item.theme}` : '';
     subjectSpan.textContent = `${item.subjectName || '未指定科目'}${themePart}`;
 
-    body.appendChild(topRow);
-    body.appendChild(subjectSpan);
-    row.appendChild(body);
+    row.appendChild(topRow);
+    row.appendChild(subjectSpan);
 
-    row.addEventListener('click', () => {
+    const activate = () => {
       const id = item.id;
       if (String(activeArticleId) === String(id) && !clozeModeActive) {
         activeArticleId = null;
@@ -300,6 +297,14 @@ function renderArticlesList(filterType = 'all') {
         el.classList.toggle('is-active', el.dataset.id === String(id));
       });
       renderArticleDetail(item);
+    };
+
+    row.addEventListener('click', activate);
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activate();
+      }
     });
 
     listEl.appendChild(row);
