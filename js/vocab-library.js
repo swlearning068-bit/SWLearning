@@ -57,6 +57,9 @@ function getLearningProgress() {
  */
 function saveLearningProgress(progress) {
   localStorage.setItem(STORAGE_KEY_PROGRESS, JSON.stringify(progress));
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_PROGRESS);
+  }
 }
 
 /**
@@ -113,6 +116,9 @@ function getCustomTerms() {
  */
 function saveCustomTerms(terms) {
   localStorage.setItem(STORAGE_KEY_CUSTOM_TERMS, JSON.stringify(terms));
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_CUSTOM_TERMS);
+  }
 }
 
 /**
@@ -136,6 +142,9 @@ function getAiCustomTerms() {
  */
 function saveAiCustomTerms(terms) {
   localStorage.setItem(STORAGE_KEY_AI_CUSTOM_TERMS, JSON.stringify(terms));
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_AI_CUSTOM_TERMS);
+  }
 }
 
 /**

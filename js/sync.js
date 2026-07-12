@@ -19,7 +19,7 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=15';
+} from './firebase-init.js?v=16';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
@@ -36,7 +36,9 @@ const EXCLUDE_KEYS = new Set([
   STORAGE_KEY_DEVICE_ID
 ]);
 
-const AUTO_PUSH_DEBOUNCE_MS = 1500;
+const AUTO_PUSH_DEBOUNCE_MS = 800;
+/** 他機更新備援輪詢（onSnapshot 之外） */
+const CLOUD_PULL_POLL_MS = 3000;
 
 /** @type {{ local: object, cloud: object } | null} */
 let lastCompareResult = null;
@@ -60,6 +62,11 @@ let originalProtoRemoveItem = null;
 let lastPushedFingerprint = '';
 /** @type {ReturnType<typeof setInterval> | null} */
 let dirtyPollTimer = null;
+/** @type {ReturnType<typeof setInterval> | null} */
+let cloudPullPollTimer = null;
+/** 上傳進行中又有新變更時，結束後再排一次 */
+let autoPushQueued = false;
+let dataChangedListenerBound = false;
 
 /** @type {(() => void) | null} */
 let cloudPullUnsubscribe = null;
@@ -594,7 +601,7 @@ function renderSyncComparison(mode, result, errorMessage) {
         '「保留本機」會上傳覆蓋雲端；「採用雲端」會下載覆蓋本機並重新載入。';
     } else {
       hintEl.textContent =
-        '已對齊後以雲端為準：開啟頁面會先載入雲端；本機變更約 2.5 秒後上傳；他機更新時若本機也有未上傳變更會先詢問。';
+        '已對齊後以雲端為準：開啟頁面會先載入雲端；本機變更約 1 秒後自動上傳；他機更新時若本機也有未上傳變更會先詢問。';
     }
   }
 
@@ -631,6 +638,7 @@ async function uploadToCloud(uid, options = {}) {
   if (!services) throw new Error('Firebase 未連線');
 
   const payload = collectLocalStoragePayload();
+  const uploadedFp = fingerprintFromData(payload);
   const keyCount = Object.keys(payload).length;
   const now = new Date();
   const deviceId = getDeviceId();
@@ -643,17 +651,27 @@ async function uploadToCloud(uid, options = {}) {
       keyCount,
       updatedBy: deviceId
     },
-    { merge: true }
+    { merge: false }
   );
 
   markCloudBound(uid, now);
-  setLocalDirty(false);
   ignoredRemoteUpdatedMs = 0;
+  lastPushedFingerprint = uploadedFp;
+
+  // 上傳期間若又有本機寫入，指紋會不同 → 保持 dirty 並排隊再傳
+  let currentFp = uploadedFp;
   try {
-    lastPushedFingerprint = fingerprintLocalPayload();
+    currentFp = fingerprintLocalPayload();
   } catch (_) {
-    lastPushedFingerprint = '';
+    currentFp = uploadedFp;
   }
+  if (currentFp !== uploadedFp) {
+    setLocalDirty(true);
+    autoPushQueued = true;
+  } else {
+    setLocalDirty(false);
+  }
+
   if (!options.silent) {
     syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
   } else {
@@ -1257,10 +1275,27 @@ async function runSyncAction(action) {
   }
 }
 
+/**
+ * 本機學習資料變更（由 early hook／Storage prototype／save* 通知）
+ * @param {string} [key]
+ */
+function onLocalDataChanged(key) {
+  if (suppressAutoPush) return;
+  if (key && !shouldSyncKey(String(key))) return;
+  setLocalDirty(true);
+  scheduleAutoPush();
+}
+
 function scheduleAutoPush() {
-  if (suppressAutoPush || autoPushInFlight) return;
+  if (suppressAutoPush) return;
   const uid = requireUidQuiet();
   if (!uid || !isCloudBound(uid)) return;
+
+  // 上傳中又有變更：結束後再排一次，避免這次變更被吞掉
+  if (autoPushInFlight) {
+    autoPushQueued = true;
+    return;
+  }
 
   if (autoPushTimer) clearTimeout(autoPushTimer);
   autoPushTimer = setTimeout(async () => {
@@ -1277,14 +1312,20 @@ function scheduleAutoPush() {
     }
 
     autoPushInFlight = true;
+    autoPushQueued = false;
     try {
       await uploadToCloud(currentUid, { silent: true });
       console.log('[sync] 已自動上傳至雲端');
     } catch (error) {
       console.error('[sync] 自動上傳失敗：', error);
       setLocalDirty(true);
+      autoPushQueued = true;
     } finally {
       autoPushInFlight = false;
+      if (autoPushQueued || isLocalDirty()) {
+        autoPushQueued = false;
+        scheduleAutoPush();
+      }
     }
   }, AUTO_PUSH_DEBOUNCE_MS);
 }
@@ -1308,9 +1349,17 @@ function requireUidQuiet() {
 }
 
 /**
- * 攔截所有 localStorage 寫入（用 prototype，比覆寫 localStorage.setItem 可靠）
+ * 攔截 localStorage 寫入（prototype 備援；主路徑靠 index 早期 hook + sw-local-data-changed）
  */
 function installStorageHooks() {
+  if (!dataChangedListenerBound) {
+    dataChangedListenerBound = true;
+    window.addEventListener('sw-local-data-changed', (event) => {
+      const detail = /** @type {CustomEvent} */ (event).detail || {};
+      onLocalDataChanged(detail.key);
+    });
+  }
+
   if (storageHookInstalled) return;
   storageHookInstalled = true;
 
@@ -1319,18 +1368,22 @@ function installStorageHooks() {
 
   Storage.prototype.setItem = function patchedStorageSetItem(key, value) {
     originalProtoSetItem.call(this, key, value);
-    if (this !== localStorage || suppressAutoPush) return;
-    if (!shouldSyncKey(String(key))) return;
-    setLocalDirty(true);
-    scheduleAutoPush();
+    try {
+      if (this === sessionStorage || suppressAutoPush) return;
+    } catch (_) {
+      if (suppressAutoPush) return;
+    }
+    onLocalDataChanged(String(key));
   };
 
   Storage.prototype.removeItem = function patchedStorageRemoveItem(key) {
     originalProtoRemoveItem.call(this, key);
-    if (this !== localStorage || suppressAutoPush) return;
-    if (!shouldSyncKey(String(key))) return;
-    setLocalDirty(true);
-    scheduleAutoPush();
+    try {
+      if (this === sessionStorage || suppressAutoPush) return;
+    } catch (_) {
+      if (suppressAutoPush) return;
+    }
+    onLocalDataChanged(String(key));
   };
 }
 
@@ -1362,9 +1415,24 @@ function stopDirtyPoll() {
   }
 }
 
+function startCloudPullPoll() {
+  if (cloudPullPollTimer) return;
+  cloudPullPollTimer = setInterval(() => {
+    pullIfCloudNewerOnFocus();
+  }, CLOUD_PULL_POLL_MS);
+}
+
+function stopCloudPullPoll() {
+  if (cloudPullPollTimer) {
+    clearInterval(cloudPullPollTimer);
+    cloudPullPollTimer = null;
+  }
+}
+
 function installAutoPush() {
   installStorageHooks();
   startDirtyPoll();
+  startCloudPullPoll();
 
   if (isLocalDirty()) {
     localDirty = true;
@@ -1396,6 +1464,7 @@ function uninstallAutoPush() {
     autoPushTimer = null;
   }
   stopDirtyPoll();
+  stopCloudPullPoll();
   stopCloudPullListener();
   // 保留 Storage.prototype hook，登出後再寫入也不會上傳（scheduleAutoPush 會因未登入直接 return）
 }
@@ -1516,12 +1585,19 @@ async function hydrateFromCloud(uid) {
 }
 
 /**
+ * @param {Record<string, string>} data
+ * @returns {string}
+ */
+function fingerprintFromData(data) {
+  const keys = Object.keys(data || {}).sort();
+  return JSON.stringify(keys.map((key) => [key, data[key]]));
+}
+
+/**
  * @returns {string}
  */
 function fingerprintLocalPayload() {
-  const data = collectLocalStoragePayload();
-  const keys = Object.keys(data).sort();
-  return JSON.stringify(keys.map((key) => [key, data[key]]));
+  return fingerprintFromData(collectLocalStoragePayload());
 }
 
 /**

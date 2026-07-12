@@ -114,6 +114,9 @@ function getQuizTerms() {
 function saveQuizHistory() {
   try {
     localStorage.setItem(STORAGE_KEY_QUIZ_HISTORY, JSON.stringify(recentQuizHistory));
+    if (typeof window.__swNotifyDataChanged === 'function') {
+      window.__swNotifyDataChanged(STORAGE_KEY_QUIZ_HISTORY);
+    }
   } catch (err) {
     console.warn('[quiz.js] 無法寫入測驗冷卻期紀錄', err);
   }

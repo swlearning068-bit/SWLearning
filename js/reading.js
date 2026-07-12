@@ -75,6 +75,9 @@ function saveTagsStateToStorage() {
     localStorage.setItem(STORAGE_KEY_TAGS_POOL, JSON.stringify(tagsPool));
     localStorage.setItem(STORAGE_KEY_TAGS_HISTORY, JSON.stringify(generatedTagsHistory));
     localStorage.setItem(STORAGE_KEY_CURRENT_TAGS_SUBJECT, currentTagsSubject || '');
+    if (typeof window.__swNotifyDataChanged === 'function') {
+      window.__swNotifyDataChanged(STORAGE_KEY_TAGS_POOL);
+    }
   } catch (_) {
     // QuotaExceeded 等寫入失敗時略過，不中斷閱讀流程
   }
@@ -293,6 +296,9 @@ function migrateLegacyArticlesIfNeeded() {
   localStorage.setItem(STORAGE_KEY_SAVED_ARTICLES, JSON.stringify(articles));
   localStorage.removeItem(LEGACY_KEY_SAVED_LITERATURES);
   localStorage.removeItem(LEGACY_KEY_SAVED_STORIES);
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_SAVED_ARTICLES);
+  }
   return articles;
 }
 
@@ -346,6 +352,9 @@ function saveArticleToLibrary(article) {
 
   list.unshift(article);
   localStorage.setItem(STORAGE_KEY_SAVED_ARTICLES, JSON.stringify(list));
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_SAVED_ARTICLES);
+  }
   return { ok: true, already: false };
 }
 

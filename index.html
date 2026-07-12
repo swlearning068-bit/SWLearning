@@ -1216,19 +1216,58 @@
 
   <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app → Firebase） -->
   <!-- ?v= 用來避免瀏覽器快取舊版 JS -->
+  <!-- 必須在其他腳本之前攔截 localStorage，ES module 延遲載入會漏掉寫入 -->
+  <script>
+    (function () {
+      if (window.__swEarlyStorageHook) return;
+      window.__swEarlyStorageHook = true;
+
+      window.__swNotifyDataChanged = function (key) {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('sw-local-data-changed', {
+              detail: { key: key == null ? '' : String(key), t: Date.now() }
+            })
+          );
+        } catch (_) {
+          // ignore
+        }
+      };
+
+      function wrapStorageMethod(storage, methodName) {
+        var original = storage[methodName].bind(storage);
+        storage[methodName] = function (key, value) {
+          if (methodName === 'setItem') original(key, value);
+          else original(key);
+          try {
+            window.__swNotifyDataChanged(key);
+          } catch (_) {
+            // ignore
+          }
+        };
+      }
+
+      try {
+        wrapStorageMethod(window.localStorage, 'setItem');
+        wrapStorageMethod(window.localStorage, 'removeItem');
+      } catch (_) {
+        // ignore
+      }
+    })();
+  </script>
   <script src="js/utils.js?v=4"></script>
   <script src="js/deepseek.js?v=23"></script>
-  <script src="js/vocab-library.js?v=8"></script>
+  <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=10"></script>
-  <script src="js/reading.js?v=18"></script>
+  <script src="js/reading.js?v=19"></script>
   <script src="js/article-library.js?v=9"></script>
-  <script src="js/quiz.js?v=7"></script>
+  <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="js/reward.js?v=4"></script>
+  <script src="js/reward.js?v=5"></script>
   <script src="js/app.js?v=18"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=13"></script>
+  <script type="module" src="js/sync.js?v=14"></script>
 </body>
 </html>

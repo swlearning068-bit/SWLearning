@@ -88,6 +88,9 @@ function saveCompletedChallenges() {
       STORAGE_KEY_COMPLETED_CHALLENGES,
       JSON.stringify(completedChallenges)
     );
+    if (typeof window.__swNotifyDataChanged === 'function') {
+      window.__swNotifyDataChanged(STORAGE_KEY_COMPLETED_CHALLENGES);
+    }
   } catch (err) {
     console.warn('[reward.js] 無法寫入挑戰快取', err);
   }
@@ -287,6 +290,9 @@ function loadRewardState() {
 function saveRewardState() {
   try {
     localStorage.setItem(STORAGE_KEY_REWARD, JSON.stringify(rewardState));
+    if (typeof window.__swNotifyDataChanged === 'function') {
+      window.__swNotifyDataChanged(STORAGE_KEY_REWARD);
+    }
   } catch (err) {
     console.warn('[reward.js] 無法寫入獎勵狀態', err);
   }
