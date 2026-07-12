@@ -218,8 +218,8 @@ function setL1LengthMode(mode) {
   currentL1LengthMode = mode === 'short' ? 'short' : 'long';
   const ui = L1_LENGTH_UI[currentL1LengthMode];
 
-  document.querySelectorAll('#l1-length-switch .level-btn').forEach((btn) => {
-    const isActive = btn.dataset.length === currentL1LengthMode;
+  document.querySelectorAll('#l1-length-switch .l1-length-btn').forEach((btn) => {
+    const isActive = btn.getAttribute('data-story-length') === currentL1LengthMode;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
@@ -1774,9 +1774,11 @@ function initReadingModule() {
 
   if (lengthSwitch) {
     lengthSwitch.addEventListener('click', (event) => {
-      const btn = event.target.closest('.level-btn');
-      if (!btn || !btn.dataset.length) return;
-      setL1LengthMode(btn.dataset.length);
+      const btn = event.target.closest('.l1-length-btn');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-story-length');
+      if (mode !== 'long' && mode !== 'short') return;
+      setL1LengthMode(mode);
     });
     setL1LengthMode(currentL1LengthMode);
   }

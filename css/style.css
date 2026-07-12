@@ -2732,7 +2732,7 @@ body {
   border-radius: 12px;
 }
 
-#reading-section .l1-length-switch .level-btn {
+#reading-section .l1-length-switch .l1-length-btn {
   flex: 1;
   min-height: 36px;
   padding: 6px 10px;
@@ -2742,15 +2742,17 @@ body {
   color: #6B7280;
   font-size: 0.82rem;
   font-weight: 500;
+  font-family: var(--font-base);
   cursor: pointer;
+  touch-action: manipulation;
 }
 
-#reading-section .l1-length-switch .level-btn:hover {
+#reading-section .l1-length-switch .l1-length-btn:hover {
   color: #111827;
   background-color: rgba(17, 24, 39, 0.06);
 }
 
-#reading-section .l1-length-switch .level-btn.active {
+#reading-section .l1-length-switch .l1-length-btn.active {
   background-color: #111827;
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);

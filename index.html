@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=27">
+  <link rel="stylesheet" href="css/style.css?v=28">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -468,21 +468,21 @@
             <div class="l1-length-switch" id="l1-length-switch" role="tablist" aria-label="故事長度切換">
               <button
                 id="btn-l1-length-long"
-                class="level-btn active"
+                class="l1-length-btn active"
                 type="button"
                 role="tab"
                 aria-selected="true"
-                data-length="long"
+                data-story-length="long"
               >
                 📄 長文
               </button>
               <button
                 id="btn-l1-length-short"
-                class="level-btn"
+                class="l1-length-btn"
                 type="button"
                 role="tab"
                 aria-selected="false"
-                data-length="short"
+                data-story-length="short"
               >
                 📝 短文
               </button>
@@ -1083,11 +1083,11 @@
   <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app） -->
   <!-- ?v= 用來避免瀏覽器快取舊版 JS -->
   <script src="js/utils.js?v=1"></script>
-  <script src="js/deepseek.js?v=16"></script>
+  <script src="js/deepseek.js?v=17"></script>
   <script src="js/vocab-library.js?v=8"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=10"></script>
-  <script src="js/reading.js?v=16"></script>
+  <script src="js/reading.js?v=17"></script>
   <script src="js/article-library.js?v=8"></script>
   <script src="js/quiz.js?v=7"></script>
   <script src="js/writing.js?v=6"></script>
