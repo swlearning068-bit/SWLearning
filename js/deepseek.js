@@ -4,8 +4,9 @@
  * 職責：
  * 1. 從 localStorage 讀取 API Key
  * 2. 組裝 System Prompt 與使用者訊息（支援動態科目附加提示）
- * 3. 發送 fetch 請求並強制回傳 JSON 格式
- * 4. 解析並回傳結構化結果（寫作 L1/L2/L3 / 閱讀 L1/L2/L3）
+ * 3. 依 taskType 智慧路由至 v4-flash / v4-flash(thinking) / v4-pro
+ * 4. 發送 fetch 請求並強制回傳 JSON 格式（過濾 <think> 標籤）
+ * 5. 解析並回傳結構化結果（寫作 L1/L2/L3 / 閱讀 L1/L2/L3）
  */
 
 // localStorage 中用來儲存 API Key 的鍵名（與 app.js 保持一致）
@@ -17,8 +18,49 @@ const STORAGE_KEY_SUBJECT = 'swlearning_current_subject';
 // DeepSeek API 端點（OpenAI 相容格式）
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 
-// 使用的模型名稱
-const DEEPSEEK_MODEL = 'deepseek-chat';
+/** DeepSeek V4：日常任務預設（最省 Token） */
+const DEEPSEEK_MODEL_FLASH = 'deepseek-v4-flash';
+
+/** DeepSeek V4：高價值旗艦任務 */
+const DEEPSEEK_MODEL_PRO = 'deepseek-v4-pro';
+
+/** 相容舊常數名稱（預設指向 Flash） */
+const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
+
+/**
+ * 依任務類型決定模型與額外 body 參數（智慧路由）
+ *
+ * - standard：v4-flash 非思考模式（翻譯／單字等日常任務）
+ * - complex_logic：v4-flash + thinking（倫理兩難、深度挑戰題）
+ * - ultimate_celebration / deep_correction：v4-pro（滿卡慶祝信、長文深度批改）
+ *
+ * @param {string} [taskType='standard']
+ * @returns {{ modelName: string, extraBody: Object }}
+ */
+function resolveDeepSeekRouting(taskType = 'standard') {
+  let modelName = DEEPSEEK_MODEL_FLASH;
+  let extraBody = {};
+
+  if (taskType === 'complex_logic') {
+    extraBody = { thinking: { type: 'enabled' } };
+  } else if (
+    taskType === 'ultimate_celebration' ||
+    taskType === 'deep_correction'
+  ) {
+    modelName = DEEPSEEK_MODEL_PRO;
+  }
+
+  return { modelName, extraBody };
+}
+
+/**
+ * 過濾模型思考過程標籤，避免破壞 UI／JSON 解析
+ * @param {string} content
+ * @returns {string}
+ */
+function stripThinkTags(content) {
+  return String(content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
 
 /** 找不到科目時的通用社工場景（防呆） */
 const DEFAULT_SUBJECT = {
@@ -205,30 +247,36 @@ vocabulary 請挑選 5 到 8 個對於該科目最重要的單字。`;
 const L1_STORY_SYSTEM_PROMPT = L1_STORY_LONG_SYSTEM_PROMPT;
 
 /**
- * 底層：發送 DeepSeek Chat Completions 請求並解析 JSON 物件
+ * 呼叫 DeepSeek Chat Completions（含智慧模型路由）
  *
- * @param {string} systemPrompt - System Prompt
- * @param {string} userContent - 使用者訊息
- * @param {number} maxTokens - 最大 token 數
- * @returns {Promise<Object>} 解析後的 JSON 物件
- * @throws {Error} API Key 缺失、網路錯誤、或回傳格式異常時拋出
+ * @param {Array<{role: string, content: string}>} messages
+ * @param {string} [taskType='standard'] - 路由任務類型
+ * @param {Object} [options]
+ * @param {number} [options.maxTokens=2500]
+ * @param {number} [options.temperature=0.7]
+ * @param {boolean} [options.jsonObject=true] - 是否強制 JSON Object 回傳
+ * @returns {Promise<string>} 已過濾 <think> 標籤的訊息內容
  */
-async function requestDeepSeekJSON(systemPrompt, userContent, maxTokens = 300) {
+async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}) {
   const apiKey = getApiKey();
+  const maxTokens = Number(options.maxTokens) > 0 ? Number(options.maxTokens) : 2500;
+  const temperature =
+    typeof options.temperature === 'number' ? options.temperature : 0.7;
+  const jsonObject = options.jsonObject !== false;
 
-  // 動態附加當前科目的角色設定
-  const finalSystemPrompt = withSubjectContext(systemPrompt);
+  const { modelName, extraBody } = resolveDeepSeekRouting(taskType);
 
   const requestBody = {
-    model: DEEPSEEK_MODEL,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: finalSystemPrompt },
-      { role: 'user',   content: userContent }
-    ],
-    temperature: 0.7,
-    max_tokens: maxTokens
+    model: modelName,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+    ...extraBody
   };
+
+  if (jsonObject) {
+    requestBody.response_format = { type: 'json_object' };
+  }
 
   let response;
 
@@ -237,11 +285,11 @@ async function requestDeepSeekJSON(systemPrompt, userContent, maxTokens = 300) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify(requestBody)
     });
-  } catch (networkError) {
+  } catch (_) {
     throw new Error('網路連線失敗，請檢查您的網路後再試。');
   }
 
@@ -275,6 +323,46 @@ async function requestDeepSeekJSON(systemPrompt, userContent, maxTokens = 300) {
   if (!rawContent) {
     throw new Error('API 回傳內容為空，請稍後再試。');
   }
+
+  // 思考模式可能夾帶 <think>...</think>，回傳前必須過濾
+  return stripThinkTags(rawContent);
+}
+
+/**
+ * 組裝 System／User 訊息並呼叫 DeepSeek，強制解析為 JSON
+ *
+ * @param {string} systemPrompt
+ * @param {string} userContent
+ * @param {number} [maxTokens=300]
+ * @param {string} [taskType='standard']
+ * @param {Object} [options]
+ * @param {boolean} [options.skipSubjectContext=false]
+ * @param {number} [options.temperature]
+ * @returns {Promise<Object>}
+ */
+async function requestDeepSeekJSON(
+  systemPrompt,
+  userContent,
+  maxTokens = 300,
+  taskType = 'standard',
+  options = {}
+) {
+  const finalSystemPrompt = options.skipSubjectContext
+    ? systemPrompt
+    : withSubjectContext(systemPrompt);
+
+  const rawContent = await callDeepSeekChatAPI(
+    [
+      { role: 'system', content: finalSystemPrompt },
+      { role: 'user', content: userContent }
+    ],
+    taskType,
+    {
+      maxTokens,
+      temperature: options.temperature,
+      jsonObject: true
+    }
+  );
 
   let result;
   try {
@@ -353,7 +441,13 @@ ${blanksText}
 async function callL3WritingAPI(caseNotes) {
   const userContent = `以下是學生撰寫的個案紀錄，請依指示提供三個版本與說明：\n\n${caseNotes}`;
 
-  const result = await requestDeepSeekJSON(L3_WRITING_SYSTEM_PROMPT, userContent, 1200);
+  // 長文深度批改：動用 Pro 旗艦模型
+  const result = await requestDeepSeekJSON(
+    L3_WRITING_SYSTEM_PROMPT,
+    userContent,
+    1200,
+    'deep_correction'
+  );
 
   const {
     grammar_version,
@@ -431,7 +525,18 @@ async function generateL1Story(lengthMode = 'long') {
       `內容必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
     );
 
-  const result = await requestDeepSeekJSON(systemPrompt, userContent, maxTokens);
+  // 倫理與價值：啟用 Flash 思考模式以處理兩難邏輯
+  const taskType =
+    normalizeSubjectId(subject.id) === 'ethics_and_values'
+      ? 'complex_logic'
+      : 'standard';
+
+  const result = await requestDeepSeekJSON(
+    systemPrompt,
+    userContent,
+    maxTokens,
+    taskType
+  );
 
   const { story_en, story_zh } = result;
   // 新 schema：vocabulary[{term, zh, part_of_speech}]；舊版相容：keywords[{word, zh}]
@@ -1029,10 +1134,12 @@ async function generateArticleChallengeAPI(articleContext) {
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
+  // AI 深度挑戰：啟用思考模式確保解析具備深度
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,
-    1200
+    1200,
+    'complex_logic'
   );
 
   const mcq = result && result.mcq;
@@ -1154,9 +1261,14 @@ async function generateLiteratureTagsAPI(subjectName, excludeTags = []) {
  *
  * @param {number} totalDays - 挑戰天數
  * @param {string} rewardGoal - 使用者自訂獎勵
+ * @param {string} [taskType='ultimate_celebration'] - 模型路由（預設 Pro）
  * @returns {Promise<{message_en: string, message_zh: string}>}
  */
-async function generateCelebrationLetterAPI(totalDays, rewardGoal) {
+async function generateCelebrationLetterAPI(
+  totalDays,
+  rewardGoal,
+  taskType = 'ultimate_celebration'
+) {
   const days = Math.max(1, Number(totalDays) || 1);
   const goal = String(rewardGoal || '').trim() || 'a well-deserved reward';
 
@@ -1171,52 +1283,14 @@ async function generateCelebrationLetterAPI(totalDays, rewardGoal) {
   const userContent =
     `請為完成 ${days} 天社工英文學習挑戰、自訂獎勵為「${goal}」的學生撰寫督導祝賀信。`;
 
-  // 不注入科目鎖定前綴，避免祝賀信被科目主題綁架
-  const apiKey = getApiKey();
-  const requestBody = {
-    model: DEEPSEEK_MODEL,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent }
-    ],
-    temperature: 0.8,
-    max_tokens: 350
-  };
-
-  let response;
-  try {
-    response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-  } catch (_) {
-    throw new Error('網路連線失敗，請檢查您的網路後再試。');
-  }
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('API Key 無效或已過期，請重新設定。');
-    }
-    throw new Error(`API 回應錯誤（狀態碼 ${response.status}）`);
-  }
-
-  const data = await response.json();
-  const rawContent = data?.choices?.[0]?.message?.content;
-  if (!rawContent) {
-    throw new Error('API 回傳內容為空，請稍後再試。');
-  }
-
-  let result;
-  try {
-    result = JSON.parse(rawContent);
-  } catch (_) {
-    throw new Error('AI 回傳的 JSON 格式有誤，請再試一次。');
-  }
+  // 滿卡慶祝：動用 Pro；不注入科目鎖定前綴，避免祝賀信被科目主題綁架
+  const result = await requestDeepSeekJSON(
+    systemPrompt,
+    userContent,
+    350,
+    taskType,
+    { skipSubjectContext: true, temperature: 0.8 }
+  );
 
   const message_en = String(result.message_en || '').trim();
   const message_zh = String(result.message_zh || '').trim();
@@ -1241,6 +1315,9 @@ window.generateNewVocabAPI = generateNewVocabAPI;
 window.generateLiteratureTagsAPI = generateLiteratureTagsAPI;
 window.generateArticleChallengeAPI = generateArticleChallengeAPI;
 window.generateCelebrationLetterAPI = generateCelebrationLetterAPI;
+window.callDeepSeekChatAPI = callDeepSeekChatAPI;
+window.resolveDeepSeekRouting = resolveDeepSeekRouting;
+window.stripThinkTags = stripThinkTags;
 window.STORAGE_KEY_SUBJECT = STORAGE_KEY_SUBJECT;
 window.withSubjectContext = withSubjectContext;
 window.SUBJECT_ID_ALIASES = SUBJECT_ID_ALIASES;

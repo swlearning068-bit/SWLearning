@@ -529,7 +529,8 @@ async function triggerUltimateCelebration() {
 
     const letter = await generateCelebrationLetterAPI(
       rewardState.totalDays,
-      rewardState.rewardGoal
+      rewardState.rewardGoal,
+      'ultimate_celebration'
     );
 
     if (loading) loading.classList.add('hidden');

@@ -3,7 +3,7 @@
 
 const CONFIG = {
   DEEPSEEK_API_KEY: 'your_api_key_here',
-  MODEL: 'deepseek-chat',
+  MODEL: 'deepseek-v4-flash',
   MAX_TOKENS: 600,
   TEMPERATURE: 0.4
 };
