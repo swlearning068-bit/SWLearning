@@ -1,0 +1,32 @@
+[
+  {
+    "id": "sw_001",
+    "term": "Empathy",
+    "pos": "n.",
+    "translation_zh": "同理心",
+    "definition_en": "The ability to understand and share another person's feelings.",
+    "example_en": "The social worker showed empathy when the client talked about losing her job.",
+    "example_zh": "當案主談到失業時，社工展現了同理心。",
+    "common_mistake": "不要把 Empathy（同理心）和 Sympathy（同情）搞混。Empathy 是「理解對方感受」，Sympathy 是「為對方感到難過」。"
+  },
+  {
+    "id": "sw_002",
+    "term": "Intervention",
+    "pos": "n.",
+    "translation_zh": "介入／干預",
+    "definition_en": "An action taken to help improve a person's or family's situation.",
+    "example_en": "Early intervention can prevent the family crisis from getting worse.",
+    "example_zh": "及早介入可以防止家庭危機惡化。",
+    "common_mistake": "Intervention 在社工語境是中性／正面的「專業介入」，不是「干涉別人私事」。避免說成 interference。"
+  },
+  {
+    "id": "sw_003",
+    "term": "Assessment",
+    "pos": "n.",
+    "translation_zh": "評估",
+    "definition_en": "A careful review of a client's needs, strengths, and risks.",
+    "example_en": "We completed a risk assessment before arranging the home visit.",
+    "example_zh": "我們在安排家訪前完成了風險評估。",
+    "common_mistake": "Assessment 是「評估過程／結果」，不是考試分數。不要和 evaluation（成效評鑑）完全畫上等號；兩者在社工文件中常有不同用途。"
+  }
+]

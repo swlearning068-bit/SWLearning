@@ -1,0 +1,320 @@
+/* ============================================================
+   生字複習 — 單字卡 3D 翻轉樣式（Manus / Linear 極簡風）
+   設計原則：Mobile-first、按鈕高度 ≥ 44px、翻面後評估鈕完整可見
+   ============================================================ */
+
+/* ---------- 學習模組區塊 ---------- */
+.learn-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.learn-status {
+  text-align: center;
+  padding: 36px 24px;
+  background-color: var(--surface-color, #FFFFFF);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #111827);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: -0.02em;
+}
+
+.learn-status--done {
+  border-left: none;
+  color: #166534;
+}
+
+.learn-status--empty {
+  border-left: none;
+  color: var(--text-secondary, #6B7280);
+  font-weight: 500;
+}
+
+.learn-progress-text {
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6B7280);
+  font-weight: 500;
+}
+
+/* ---------- Flashcard 容器 ---------- */
+.flashcard-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.flashcard {
+  perspective: 1200px;
+  width: 100%;
+}
+
+.flashcard-inner {
+  display: grid;
+  width: 100%;
+  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.flashcard.is-flipped .flashcard-inner {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 36px 28px;
+  background-color: var(--surface-color, #FFFFFF);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03));
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  min-height: 100%;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.flashcard:hover .flashcard-face {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+.flashcard-front {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(249, 250, 251, 1) 0%, #FFFFFF 55%);
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+  justify-content: center;
+}
+
+/* ---------- 卡片正面內容 ---------- */
+.fc-term {
+  font-size: 1.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.3;
+  letter-spacing: -0.04em;
+}
+
+.fc-front-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.fc-front-actions .btn {
+  flex: 1;
+  width: auto;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* ---------- 卡片背面內容 ---------- */
+.fc-translation {
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.fc-pos {
+  font-size: 0.88rem;
+  color: var(--text-secondary, #6B7280);
+  font-style: italic;
+}
+
+.fc-example-block {
+  width: 100%;
+  background-color: #F9FAFB;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fc-example-en {
+  font-size: 0.92rem;
+  color: var(--text-primary, #111827);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.fc-example-zh {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6B7280);
+  line-height: 1.45;
+}
+
+/* ---------- 自我評估按鈕 ---------- */
+.fc-rate-btns {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.btn-rate {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-height: 56px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: var(--font-base, 'Inter', system-ui, sans-serif);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+.btn-rate-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.btn-rate-label {
+  text-align: center;
+}
+
+.btn-rate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.btn-rate:active {
+  transform: scale(0.97);
+}
+
+.btn-rate--again {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border-color: #FECACA;
+}
+
+.btn-rate--again:hover {
+  background-color: #FEE2E2;
+  border-color: #F87171;
+}
+
+.btn-rate--hard {
+  background-color: #FFFBEB;
+  color: #D97706;
+  border-color: #FDE68A;
+}
+
+.btn-rate--hard:hover {
+  background-color: #FEF3C7;
+  border-color: #FBBF24;
+}
+
+.btn-rate--easy {
+  background-color: #F0FDF4;
+  color: #16A34A;
+  border-color: #BBF7D0;
+}
+
+.btn-rate--easy:hover {
+  background-color: #DCFCE7;
+  border-color: #4ADE80;
+}
+
+/* ---------- 詞彙庫「加入學習」按鈕 ---------- */
+.btn-add-learn {
+  width: 100%;
+  margin-top: 4px;
+  background-color: #F3F4F6;
+  color: var(--text-primary, #111827);
+  border: 1px solid transparent;
+  min-height: var(--btn-min-height, 44px);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-add-learn:hover:not(:disabled) {
+  background-color: #E5E7EB;
+}
+
+.btn-add-learn:disabled {
+  background-color: #F0FDF4;
+  color: var(--color-success, #16a34a);
+  border-color: #BBF7D0;
+}
+
+/* ---------- 窄螢幕微調 ---------- */
+@media (max-width: 375px) {
+  .learn-section .section-desc {
+    font-size: 0.85rem;
+  }
+
+  .fc-term {
+    font-size: 1.6rem;
+  }
+
+  .fc-translation {
+    font-size: 1.25rem;
+  }
+
+  .btn-rate {
+    min-height: 48px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ---------- 較寬螢幕 ---------- */
+@media (min-width: 480px) {
+  .btn-rate {
+    flex-direction: row;
+    gap: 6px;
+    font-size: 0.9rem;
+    min-height: var(--btn-min-height, 44px);
+    padding: 10px 8px;
+  }
+
+  .fc-front-actions {
+    max-width: 360px;
+    align-self: center;
+  }
+}
+
+/* ---------- 大螢幕：單字卡質感微調 ---------- */
+@media (min-width: 1024px) {
+  .flashcard-face {
+    padding: 48px 36px;
+    min-height: 320px;
+  }
+
+  .fc-term {
+    font-size: 2.2rem;
+  }
+
+  .fc-translation {
+    font-size: 1.6rem;
+  }
+}

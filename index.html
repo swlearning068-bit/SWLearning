@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <!-- 字元編碼：確保繁體中文正確顯示 -->
+  <meta charset="UTF-8">
+  <!-- 響應式設計：讓頁面在手機上自動縮放適配 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>社工英文學習助手</title>
+  <!-- Manus / Linear 風格：Inter 字體 -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- 引入全域樣式表 -->
+  <link rel="stylesheet" href="css/style.css?v=27">
+  <!-- 生字複習單字卡 3D 翻轉樣式 -->
+  <link rel="stylesheet" href="css/flashcard.css?v=8">
+</head>
+<body>
+
+  <!-- ==================== 頂部導覽列 ==================== -->
+  <header class="top-nav">
+    <h1 class="app-title">社工英文學習助手</h1>
+    <!-- 點擊此按鈕會開啟 API Key 設定視窗 -->
+    <button id="btn-open-settings" class="btn btn-secondary" type="button" aria-label="開啟設定">
+      ⚙️ 設定
+    </button>
+  </header>
+
+  <!-- ==================== 科目選擇器（14 個社工科目動態切換） ==================== -->
+  <div class="subject-bar">
+    <label class="subject-label" for="subject-selector">📚 目前科目</label>
+    <select id="subject-selector" class="subject-selector" aria-label="選擇社工科目">
+      <option value="">載入中…</option>
+    </select>
+  </div>
+
+  <!-- ==================== 主內容區 ==================== -->
+  <main class="main-content">
+
+    <!-- ---------- Tab 導覽：寫作 / 閱讀 / 詞彙庫 / 生字複習 / 測驗 / 文獻庫 ---------- -->
+    <nav class="tab-nav" role="tablist" aria-label="功能模組切換">
+      <!-- 寫作練習 Tab（預設啟用） -->
+      <button
+        id="tab-writing"
+        class="tab-btn active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="writing-section"
+        data-tab="writing"
+      >
+        ✍️ 寫作練習
+      </button>
+      <!-- 閱讀練習 Tab -->
+      <button
+        id="tab-reading"
+        class="tab-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="reading-section"
+        data-tab="reading"
+      >
+        📖 閱讀練習
+      </button>
+      <!-- 專業詞彙庫 Tab -->
+      <button
+        id="tab-vocab"
+        class="tab-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="vocab-section"
+        data-tab="vocab"
+      >
+        🗂️ 專業詞彙庫
+      </button>
+      <!-- 生字複習 Tab（間隔複習系統） -->
+      <button
+        id="tab-learn"
+        class="tab-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="learn-section"
+        data-tab="learn"
+      >
+        🧠 生字複習
+      </button>
+      <!-- 測驗模式 Tab -->
+      <button
+        id="tab-quiz"
+        class="tab-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="quiz-section"
+        data-tab="quiz"
+      >
+        🧪 測驗模式
+      </button>
+      <!-- 文章庫 Tab（統一收藏：學術文獻＋社工小故事） -->
+      <button
+        id="nav-article-library"
+        class="tab-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="article-library-section"
+        data-tab="articles"
+      >
+        📚 文章庫
+      </button>
+      <!-- 學習目標／印花卡 Tab -->
+      <button
+        id="nav-reward"
+        class="tab-btn nav-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="reward-section"
+        data-tab="reward"
+      >
+        🏆 學習目標
+      </button>
+    </nav>
+
+    <!-- ==================== 模組：寫作練習（L1 / L2 / L3） ==================== -->
+    <section id="writing-section" role="tabpanel" aria-labelledby="tab-writing">
+
+      <!-- 尚未設定 API Key 時的提示（預設顯示；有 Key 時由 JS 隱藏） -->
+      <div id="api-key-warning" class="warning-card">
+        <p>⚠️ 請先點擊右上角「⚙️ 設定」，輸入您的 DeepSeek API Key，才能開始練習。</p>
+      </div>
+
+      <!-- 寫作練習總容器（有 API Key 時才顯示） -->
+      <div id="writing-practice" class="practice-section hidden">
+
+        <div class="layout-container">
+          <!-- 左欄：難度切換 + 各等級控制區 -->
+          <div class="layout-left">
+
+            <!-- 難度切換：L1 破冰 / L2 結構 / L3 專業 -->
+            <div class="level-switch" id="writing-level-switch" role="tablist" aria-label="寫作難度切換">
+              <button
+                id="btn-level-l1"
+                class="level-btn active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                data-level="l1"
+              >
+                🌱 L1 破冰
+              </button>
+              <button
+                id="btn-level-l2"
+                class="level-btn"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-level="l2"
+              >
+                🌿 L2 結構
+              </button>
+              <button
+                id="btn-level-l3"
+                class="level-btn"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-level="l3"
+              >
+                🌳 L3 專業
+              </button>
+            </div>
+
+            <!-- ---------- L1 破冰期（控制區） ---------- -->
+            <div id="l1-practice" class="writing-level-panel" data-level-panel="l1">
+
+              <h2 class="section-title">L1 破冰期 — 敢說就好</h2>
+              <p class="section-desc">不用擔心文法！選一個情境，或自己輸入零碎英文單字，AI 會幫你組成完整句子。</p>
+
+              <!-- 情境標籤區：點擊後自動填入預設英文碎片 -->
+              <div class="scenario-area">
+                <div class="scenario-header">
+                  <p class="label-text">選擇情境（可選）：</p>
+                  <button
+                    id="btn-shuffle-l1"
+                    class="shuffle-btn"
+                    type="button"
+                    aria-label="換一組 L1 情境"
+                  >
+                    🔄 換一組
+                  </button>
+                </div>
+                <div class="scenario-chips" id="scenario-chips">
+                  <button class="chip" type="button"
+                    data-fragments="elderly, refuse medicine, angry">
+                    長者拒絕服藥
+                  </button>
+                  <button class="chip" type="button"
+                    data-fragments="apply subsidy, fail, disappointed">
+                    申請津貼失敗
+                  </button>
+                  <button class="chip" type="button"
+                    data-fragments="client, emotional breakdown, crying">
+                    案主情緒崩潰
+                  </button>
+                  <button class="chip" type="button"
+                    data-fragments="family conflict, mediation, stressed">
+                    家庭衝突調解
+                  </button>
+                  <button class="chip" type="button"
+                    data-fragments="home visit, no answer, worried">
+                    家訪無人應門
+                  </button>
+                </div>
+              </div>
+
+              <div class="input-area">
+                <label class="label-text" for="user-input">輸入你的英文碎片：</label>
+                <textarea
+                  id="user-input"
+                  class="user-textarea"
+                  rows="4"
+                  placeholder="例如：elderly, refuse medicine, angry"
+                ></textarea>
+              </div>
+
+              <button id="btn-submit" class="btn btn-primary" type="button">
+                送出給 AI
+              </button>
+
+            </div><!-- /#l1-practice -->
+
+            <!-- ---------- L2 結構期（控制區） ---------- -->
+            <div id="l2-practice" class="writing-level-panel hidden" data-level-panel="l2">
+
+              <h2 class="section-title">L2 結構期 — 把句子寫完整</h2>
+              <p class="section-desc">選擇一個句型，填入空格。AI 會溫和指出文法問題，並幫你修正句子結構。</p>
+
+              <div class="input-area">
+                <div class="scenario-header">
+                  <label class="label-text" for="l2-pattern-select">選擇句型：</label>
+                  <button
+                    id="btn-shuffle-l2"
+                    class="shuffle-btn"
+                    type="button"
+                    aria-label="換一組 L2 句型"
+                  >
+                    🔄 換一組
+                  </button>
+                </div>
+                <select id="l2-pattern-select" class="l2-pattern-select" aria-label="L2 句型選擇">
+                  <!-- 選項由 writing.js 動態填入 -->
+                </select>
+              </div>
+
+              <!-- 句型預覽 + 填空欄位（由 writing.js 依選中句型渲染） -->
+              <p id="l2-pattern-preview" class="l2-pattern-preview" aria-live="polite"></p>
+              <div id="l2-blanks" class="l2-blanks"></div>
+
+              <button id="btn-l2-submit" class="btn btn-primary" type="button">
+                送出給 AI
+              </button>
+
+            </div><!-- /#l2-practice -->
+
+            <!-- ---------- L3 專業期（控制區） ---------- -->
+            <div id="l3-practice" class="writing-level-panel hidden" data-level-panel="l3">
+
+              <h2 class="section-title">L3 專業期 — 個案紀錄批改</h2>
+              <p class="section-desc">寫一段完整的個案紀錄，AI 會給你三種改寫版本：日常版、專業 Case Notes、同理心溝通版。</p>
+
+              <div class="input-area">
+                <label class="label-text" for="l3-input">輸入你的個案紀錄（英文）：</label>
+                <textarea
+                  id="l3-input"
+                  class="user-textarea l3-textarea"
+                  rows="8"
+                  placeholder="例如：Today I visited Mrs. Chan. She looked sad and said she has no money for medicine. I told her I will help her apply for subsidy."
+                ></textarea>
+              </div>
+
+              <button id="btn-l3-submit" class="btn btn-primary" type="button">
+                送出給 AI 批改
+              </button>
+
+            </div><!-- /#l3-practice -->
+
+          </div><!-- /.layout-left -->
+
+          <!-- 右欄：各等級 AI 結果區（與左欄共用 data-level-panel 切換） -->
+          <div class="layout-right">
+
+            <div class="writing-results-panel" data-level-panel="l1">
+              <div class="layout-placeholder" aria-hidden="true">
+                <p class="layout-placeholder-title">AI 回覆區</p>
+                <p class="layout-placeholder-desc">選擇情境並送出後，完整英文句與中文翻譯會顯示在這裡。</p>
+              </div>
+
+              <div id="loading-skeleton" class="skeleton-card hidden" aria-live="polite">
+                <div class="skeleton-line skeleton-line--short"></div>
+                <div class="skeleton-line skeleton-line--long"></div>
+                <div class="skeleton-line skeleton-line--medium"></div>
+                <p class="loading-text">思考中...</p>
+              </div>
+
+              <article id="result-card" class="result-card hidden" aria-live="polite">
+                <p class="result-encouragement" id="result-encouragement"></p>
+                <div class="result-sentence-block">
+                  <span class="result-label">完整英文句：</span>
+                  <p class="result-sentence-en" id="result-sentence-en"></p>
+                </div>
+                <div class="result-sentence-block">
+                  <span class="result-label">中文翻譯：</span>
+                  <p class="result-translation" id="result-translation"></p>
+                </div>
+              </article>
+
+              <div id="error-message" class="error-card hidden" role="alert"></div>
+            </div><!-- /L1 results -->
+
+            <div class="writing-results-panel hidden" data-level-panel="l2">
+              <div class="layout-placeholder" aria-hidden="true">
+                <p class="layout-placeholder-title">AI 批改區</p>
+                <p class="layout-placeholder-desc">填完句型空格並送出後，修正句子與文法提示會顯示在這裡。</p>
+              </div>
+
+              <div id="l2-loading" class="skeleton-card hidden" aria-live="polite">
+                <div class="skeleton-line skeleton-line--short"></div>
+                <div class="skeleton-line skeleton-line--long"></div>
+                <div class="skeleton-line skeleton-line--medium"></div>
+                <p class="loading-text">批改中...</p>
+              </div>
+
+              <article id="l2-result-card" class="result-card hidden" aria-live="polite">
+                <div class="result-sentence-block">
+                  <span class="result-label">修正後的句子：</span>
+                  <p class="result-sentence-en" id="l2-corrected"></p>
+                </div>
+                <div class="result-sentence-block">
+                  <span class="result-label">需注意的地方：</span>
+                  <ul id="l2-issues" class="l2-issues-list"></ul>
+                </div>
+                <div class="result-sentence-block">
+                  <span class="result-label">文法提示：</span>
+                  <p id="l2-grammar-tip" class="l2-grammar-tip"></p>
+                </div>
+              </article>
+
+              <div id="l2-error" class="error-card hidden" role="alert"></div>
+            </div><!-- /L2 results -->
+
+            <div class="writing-results-panel hidden" data-level-panel="l3">
+              <div class="layout-placeholder" aria-hidden="true">
+                <p class="layout-placeholder-title">個案紀錄改寫區</p>
+                <p class="layout-placeholder-desc">送出個案紀錄後，日常版／專業版／同理心版會顯示在這裡。</p>
+              </div>
+
+              <div id="l3-loading" class="skeleton-card hidden" aria-live="polite">
+                <div class="skeleton-line skeleton-line--short"></div>
+                <div class="skeleton-line skeleton-line--long"></div>
+                <div class="skeleton-line skeleton-line--medium"></div>
+                <div class="skeleton-line skeleton-line--long"></div>
+                <p class="loading-text">正在批改個案紀錄...</p>
+              </div>
+
+              <!-- L3 結果：內部小 Tabs（手機端不垂直堆疊三版本） -->
+              <article id="l3-result-card" class="result-card l3-result-card hidden" aria-live="polite">
+                <div class="l3-result-tabs" role="tablist" aria-label="改寫版本切換">
+                  <button
+                    class="l3-tab-btn active"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    data-l3-tab="grammar"
+                  >
+                    日常版
+                  </button>
+                  <button
+                    class="l3-tab-btn"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    data-l3-tab="professional"
+                  >
+                    專業版
+                  </button>
+                  <button
+                    class="l3-tab-btn"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    data-l3-tab="empathy"
+                  >
+                    同理心版
+                  </button>
+                </div>
+
+                <div class="l3-version-panel">
+                  <span class="result-label" id="l3-version-label">文法正確的日常版</span>
+                  <p class="l3-version-text" id="l3-version-text"></p>
+                </div>
+
+                <div class="result-sentence-block l3-explanation-block">
+                  <span class="result-label">三者差異說明：</span>
+                  <p id="l3-explanation" class="l3-explanation"></p>
+                </div>
+              </article>
+
+              <div id="l3-error" class="error-card hidden" role="alert"></div>
+            </div><!-- /L3 results -->
+
+          </div><!-- /.layout-right -->
+        </div><!-- /.layout-container -->
+
+      </div><!-- /#writing-practice -->
+    </section><!-- /#writing-section -->
+
+    <!-- ==================== 模組 4：漸進式閱讀理解 (L1 / L2 / L3) ==================== -->
+    <!-- 預設隱藏，點擊「閱讀練習」Tab 後由 JS 顯示 -->
+    <section id="reading-section" class="reading-section hidden" role="tabpanel" aria-labelledby="tab-reading">
+
+      <div class="layout-container">
+        <!-- 左欄：難度切換 + 各等級控制區 -->
+        <div class="layout-left">
+
+          <!-- 難度切換：L1 故事 / L2 文獻 / L3 個案 -->
+          <div class="level-switch" id="reading-level-switch" role="tablist" aria-label="閱讀難度切換">
+            <button
+              id="btn-reading-l1"
+              class="level-btn active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              data-level="l1"
+            >
+              🌱 L1 故事
+            </button>
+            <button
+              id="btn-reading-l2"
+              class="level-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-level="l2"
+            >
+              🌿 L2 文獻
+            </button>
+            <button
+              id="btn-reading-l3"
+              class="level-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-level="l3"
+            >
+              🌳 L3 個案
+            </button>
+          </div>
+
+          <!-- ---------- L1：社工小故事（控制區） ---------- -->
+          <div id="reading-l1-panel" class="reading-level-panel" data-reading-panel="l1">
+
+            <h2 class="section-title">L1 漸進式閱讀 — 社工小故事</h2>
+            <p class="section-desc">隨機生成香港社工日常短文。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。</p>
+
+            <!-- 生成故事按鈕 -->
+            <button id="btn-generate-story" class="btn btn-primary" type="button">
+              🎲 隨機生成社工小故事
+            </button>
+
+          </div><!-- /#reading-l1-panel -->
+
+          <!-- ---------- L2：學術文獻簡化（控制區） ---------- -->
+          <div id="reading-l2-panel" class="reading-level-panel hidden" data-reading-panel="l2">
+
+            <h2 class="section-title">L2 學術文獻 — 搜尋與簡化</h2>
+            <p class="section-desc">輸入關鍵字後，可搜尋 OpenAlex 真實論文，或由 AI 依目前科目生成模擬文獻摘要，再改寫成學習用短文並抽出生字。</p>
+
+            <div class="input-area">
+              <label class="label-text" for="l2-keyword-input">搜尋關鍵字：</label>
+              <input
+                id="l2-keyword-input"
+                class="l2-keyword-input"
+                type="text"
+                placeholder="例如：attachment theory"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="suggested-tags-area">
+              <div class="suggested-tags-header">
+                <span class="label-text">推薦搜尋關鍵字</span>
+                <div class="suggested-tags-actions">
+                  <button id="btn-shuffle-tags" class="text-btn" type="button" aria-label="換一組推薦關鍵字">
+                    🔄 換一組關鍵字
+                  </button>
+                  <button id="btn-view-tag-history" class="text-btn text-gray" type="button" aria-label="查看已生成的標籤歷史">
+                    👁️ 查看已生成的標籤歷史
+                  </button>
+                </div>
+              </div>
+              <div id="suggested-tags-container" class="tags-container" aria-live="polite"></div>
+            </div>
+
+            <div class="l2-action-buttons">
+              <button id="btn-l2-search" class="btn btn-primary" type="button">
+                🔍 搜尋真實文獻
+              </button>
+              <button id="btn-generate-simulated" class="btn btn-secondary" type="button">
+                ✨ AI 生成模擬文獻
+              </button>
+            </div>
+
+          </div><!-- /#reading-l2-panel -->
+
+          <!-- ---------- L3：個案紀錄與是非題（控制區） ---------- -->
+          <div id="reading-l3-panel" class="reading-level-panel hidden" data-reading-panel="l3">
+
+            <h2 class="section-title">L3 個案閱讀 — 任務式理解</h2>
+            <p class="section-desc">依目前科目生成專業個案紀錄，並以是非題測試閱讀理解。</p>
+
+            <button id="btn-l3-generate" class="btn btn-primary" type="button">
+              📝 生成個案紀錄任務
+            </button>
+
+          </div><!-- /#reading-l3-panel -->
+
+        </div><!-- /.layout-left -->
+
+        <!-- 右欄：各等級結果區（與左欄共用 data-reading-panel 切換） -->
+        <div class="layout-right">
+
+          <div class="reading-results-panel" data-reading-panel="l1">
+            <div class="layout-placeholder" aria-hidden="true">
+              <p class="layout-placeholder-title">故事閱讀區</p>
+              <p class="layout-placeholder-desc">點左側「隨機生成」後，英文故事與翻譯會顯示在這裡。</p>
+            </div>
+
+            <!-- 載入中骨架屏（預設隱藏） -->
+            <div id="reading-loading" class="skeleton-card hidden" aria-live="polite">
+              <div class="skeleton-line skeleton-line--short"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <div class="skeleton-line skeleton-line--medium"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <p class="loading-text">正在創作故事...</p>
+            </div>
+
+            <!-- 故事展示區（預設隱藏，生成成功後顯示） -->
+            <div id="story-display" class="story-display hidden" aria-live="polite">
+
+              <!-- 英文原文區（關鍵字會被包成 .hover-word） -->
+              <div class="story-en-block">
+                <span class="result-label">英文故事</span>
+                <p id="story-en" class="story-en"></p>
+              </div>
+
+              <!-- 顯示完整翻譯按鈕 -->
+              <button id="btn-show-translation" class="btn btn-secondary" type="button">
+                👀 顯示完整翻譯
+              </button>
+
+              <!-- 中文翻譯區（預設隱藏，點擊上方按鈕後才顯示） -->
+              <div id="story-zh-block" class="story-zh-block hidden">
+                <span class="result-label">中文翻譯</span>
+                <p id="story-zh" class="story-zh"></p>
+              </div>
+
+              <!-- 收藏至文章庫（由 reading.js 控制狀態） -->
+              <div class="save-story-wrap">
+                <button id="btn-save-story" class="save-story-btn btn btn-primary" type="button">
+                  💾 收藏此故事
+                </button>
+              </div>
+
+            </div><!-- /#story-display -->
+
+            <!-- 閱讀模組錯誤訊息（預設隱藏） -->
+            <div id="reading-error" class="error-card hidden" role="alert"></div>
+          </div><!-- /L1 results -->
+
+          <div class="reading-results-panel hidden" data-reading-panel="l2">
+            <div class="layout-placeholder" aria-hidden="true">
+              <p class="layout-placeholder-title">文獻結果區</p>
+              <p class="layout-placeholder-desc">搜尋或生成文獻後，簡化摘要與生字會顯示在這裡。</p>
+            </div>
+
+            <div id="l2-reading-loading" class="skeleton-card hidden" aria-live="polite">
+              <div class="skeleton-line skeleton-line--short"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <div class="skeleton-line skeleton-line--medium"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <p class="loading-text">正在從 OpenAlex 搜尋真實文獻...</p>
+            </div>
+
+            <!-- 文獻簡化結果（由 reading.js 動態填入） -->
+            <div id="l2-reading-results" class="l2-reading-results hidden" aria-live="polite"></div>
+
+            <div id="l2-reading-error" class="error-card hidden" role="alert"></div>
+          </div><!-- /L2 results -->
+
+          <div class="reading-results-panel hidden" data-reading-panel="l3">
+            <div class="layout-placeholder" aria-hidden="true">
+              <p class="layout-placeholder-title">個案任務區</p>
+              <p class="layout-placeholder-desc">生成個案紀錄後，英文 Case Note 與是非題會顯示在這裡。</p>
+            </div>
+
+            <div id="l3-reading-loading" class="skeleton-card hidden" aria-live="polite">
+              <div class="skeleton-line skeleton-line--short"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <div class="skeleton-line skeleton-line--medium"></div>
+              <div class="skeleton-line skeleton-line--long"></div>
+              <p class="loading-text">正在生成個案紀錄...</p>
+            </div>
+
+            <div id="l3-reading-display" class="l3-reading-display hidden" aria-live="polite">
+
+              <div class="story-en-block">
+                <span class="result-label">Case Note（英文）</span>
+                <p id="l3-case-en" class="l3-case-en"></p>
+              </div>
+
+              <div class="story-zh-block">
+                <span class="result-label">中文翻譯</span>
+                <p id="l3-case-zh" class="l3-case-zh"></p>
+              </div>
+
+              <div class="l3-tf-task">
+                <span class="result-label">閱讀理解 — True / False</span>
+                <p id="l3-question-en" class="l3-question-en"></p>
+                <p id="l3-question-zh" class="l3-question-zh"></p>
+
+                <div class="l3-tf-buttons" role="group" aria-label="是非題作答">
+                  <button id="btn-l3-true" class="btn-tf btn-tf--true" type="button">
+                    True
+                  </button>
+                  <button id="btn-l3-false" class="btn-tf btn-tf--false" type="button">
+                    False
+                  </button>
+                </div>
+
+                <p id="l3-tf-feedback" class="l3-tf-feedback hidden" role="status"></p>
+              </div>
+
+            </div><!-- /#l3-reading-display -->
+
+            <div id="l3-reading-error" class="error-card hidden" role="alert"></div>
+          </div><!-- /L3 results -->
+
+        </div><!-- /.layout-right -->
+      </div><!-- /.layout-container -->
+
+    </section><!-- /#reading-section -->
+
+    <!-- ==================== 模組 5：專業詞彙庫 ==================== -->
+    <!-- 預設隱藏，點擊「專業詞彙庫」Tab 後由 JS 顯示 -->
+    <section id="vocab-section" class="vocab-section hidden" role="tabpanel" aria-labelledby="tab-vocab">
+
+      <div class="layout-container">
+        <div class="layout-left">
+          <h2 class="section-title">社工專業詞彙庫</h2>
+          <p class="section-desc">瀏覽常見社工英文詞彙，點擊發音按鈕可聽美式英語讀音。</p>
+
+          <div class="vocab-actions">
+            <button
+              id="generate-vocab-btn"
+              class="btn btn-secondary"
+              type="button"
+            >
+              ✨ AI 探索新詞彙 (基於目前科目)
+            </button>
+          </div>
+
+          <!-- 搜尋框：即時過濾單字或中文翻譯 -->
+          <div class="vocab-search-area">
+            <label class="label-text" for="vocab-search">搜尋詞彙：</label>
+            <input
+              id="vocab-search"
+              class="vocab-search-input"
+              type="text"
+              placeholder="輸入英文單字或中文翻譯…"
+              autocomplete="off"
+            >
+          </div>
+        </div><!-- /.layout-left -->
+
+        <div class="layout-right">
+          <!-- 詞彙卡片列表（由 vocab-library.js 動態渲染） -->
+          <div id="vocab-card-list" class="vocab-card-list" aria-live="polite">
+            <!-- 載入中提示（JS 讀取 JSON 後會替換） -->
+            <p class="vocab-loading">詞彙載入中…</p>
+          </div>
+
+          <!-- 搜尋無結果時顯示（預設隱藏） -->
+          <p id="vocab-empty" class="vocab-empty hidden">找不到符合的詞彙，請試試其他關鍵字。</p>
+        </div><!-- /.layout-right -->
+      </div><!-- /.layout-container -->
+
+    </section><!-- /#vocab-section -->
+
+    <!-- ==================== 模組 6：生字學習（間隔複習） ==================== -->
+    <!-- 預設隱藏，點擊「生字複習」Tab 後由 JS 顯示 -->
+    <section id="learn-section" class="learn-section hidden" role="tabpanel" aria-labelledby="tab-learn">
+
+      <div class="layout-container">
+        <div class="layout-left">
+          <h2 class="section-title">生字複習 — 間隔重複</h2>
+          <p class="section-desc">複習今日到期的生字。先看英文，翻面後自我評估，系統會安排下次複習時間。</p>
+
+          <!-- 進度提示（例如：還剩 3 張） -->
+          <p id="learn-progress-text" class="learn-progress-text" aria-live="polite"></p>
+        </div><!-- /.layout-left -->
+
+        <div class="layout-right">
+          <!-- 今日任務完成 -->
+          <div id="learn-done" class="learn-status learn-status--done hidden" aria-live="polite">
+            🎉 今日任務完成！休息一下吧
+          </div>
+
+          <!-- 尚未加入任何生字 -->
+          <div id="learn-empty" class="learn-status learn-status--empty hidden" aria-live="polite">
+            尚未加入任何生字。<br>請先到「專業詞彙庫」點「➕ 加入學習」。
+          </div>
+
+          <!-- 單字卡區域 -->
+          <div id="flashcard-area" class="flashcard-area hidden">
+            <div id="flashcard" class="flashcard" aria-live="polite">
+              <div class="flashcard-inner">
+
+                <!-- 正面：英文單字 + 發音 + 翻面 -->
+                <div class="flashcard-face flashcard-front">
+                  <p id="fc-term" class="fc-term"></p>
+                  <div class="fc-front-actions">
+                    <button id="btn-fc-speak" class="btn btn-secondary" type="button" aria-label="朗讀單字">
+                      🔊 發音
+                    </button>
+                    <button id="btn-fc-flip" class="btn btn-primary" type="button">
+                      點擊翻面
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 背面：中文、詞性、例句（評估按鈕移到卡片外，避免被裁切） -->
+                <div class="flashcard-face flashcard-back">
+                  <p id="fc-translation" class="fc-translation"></p>
+                  <p id="fc-pos" class="fc-pos"></p>
+                  <div class="fc-example-block">
+                    <p id="fc-example-en" class="fc-example-en"></p>
+                    <p id="fc-example-zh" class="fc-example-zh"></p>
+                  </div>
+                </div>
+
+              </div><!-- /.flashcard-inner -->
+            </div><!-- /#flashcard -->
+
+            <!-- 自我評估：放在卡片下方，翻面後才顯示，確保三顆按鈕完整可見 -->
+            <div id="fc-rate-btns" class="fc-rate-btns hidden" role="group" aria-label="自我評估">
+              <button id="btn-rate-again" class="btn-rate btn-rate--again" type="button" data-rating="again">
+                <span class="btn-rate-icon" aria-hidden="true">🔴</span>
+                <span class="btn-rate-label">不認識</span>
+              </button>
+              <button id="btn-rate-hard" class="btn-rate btn-rate--hard" type="button" data-rating="hard">
+                <span class="btn-rate-icon" aria-hidden="true">🟡</span>
+                <span class="btn-rate-label">有點熟</span>
+              </button>
+              <button id="btn-rate-easy" class="btn-rate btn-rate--easy" type="button" data-rating="easy">
+                <span class="btn-rate-icon" aria-hidden="true">🟢</span>
+                <span class="btn-rate-label">完全掌握</span>
+              </button>
+            </div>
+          </div><!-- /#flashcard-area -->
+        </div><!-- /.layout-right -->
+      </div><!-- /.layout-container -->
+
+    </section><!-- /#learn-section -->
+
+    <!-- ==================== 模組 7：測驗模式 ==================== -->
+    <!-- 預設隱藏，點擊「測驗模式」Tab 後由 JS 顯示 -->
+    <section id="quiz-section" class="quiz-section hidden" role="tabpanel" aria-labelledby="tab-quiz">
+
+      <h2 class="section-title">測驗模式 — 四選一</h2>
+      <p class="section-desc">隨機 10 題英翻中／中翻英混合測驗。答錯的單字會自動排入明天的複習清單。</p>
+
+      <!-- 初始畫面：開始測驗 -->
+      <div id="quiz-start" class="quiz-start">
+        <p class="quiz-start-hint">準備好了嗎？每次會抽出 10 題混合題型。</p>
+        <button id="btn-quiz-start" class="btn btn-primary" type="button">
+          🚀 開始測驗
+        </button>
+      </div>
+
+      <!-- 作答中畫面（預設隱藏） -->
+      <div id="quiz-play" class="quiz-play hidden">
+        <div class="layout-container">
+          <div class="layout-left">
+            <!-- 頂部狀態列：題號 + 分數 -->
+            <div class="quiz-status-bar" aria-live="polite">
+              <span id="quiz-progress" class="quiz-progress">1 / 10</span>
+              <span id="quiz-score" class="quiz-score">分數：0</span>
+            </div>
+
+            <!-- 題型標籤（英翻中 / 中翻英） -->
+            <p id="quiz-type-label" class="quiz-type-label"></p>
+
+            <!-- 題目顯示區 -->
+            <div class="quiz-question-area">
+              <p id="quiz-question" class="quiz-question"></p>
+            </div>
+          </div><!-- /.layout-left -->
+
+          <div class="layout-right">
+            <!-- 選項區：四個按鈕（由 quiz.js 動態填入；大螢幕為 2×2） -->
+            <div id="quiz-options" class="quiz-options" role="group" aria-label="選項">
+              <button class="quiz-option-btn" type="button" data-index="0"></button>
+              <button class="quiz-option-btn" type="button" data-index="1"></button>
+              <button class="quiz-option-btn" type="button" data-index="2"></button>
+              <button class="quiz-option-btn" type="button" data-index="3"></button>
+            </div>
+
+            <!-- 底部控制：答題後才顯示「下一題」 -->
+            <button id="btn-quiz-next" class="btn btn-primary hidden" type="button">
+              下一題 →
+            </button>
+          </div><!-- /.layout-right -->
+        </div><!-- /.layout-container -->
+      </div><!-- /#quiz-play -->
+
+      <!-- 結算畫面（預設隱藏） -->
+      <div id="quiz-result" class="quiz-result hidden" aria-live="polite">
+        <p id="quiz-result-score" class="quiz-result-score"></p>
+        <p id="quiz-result-message" class="quiz-result-message"></p>
+        <button id="btn-quiz-retry" class="btn btn-primary" type="button">
+          🔄 再測一次
+        </button>
+      </div>
+
+    </section><!-- /#quiz-section -->
+
+    <!-- ==================== 模組 8.5：文章庫（文獻＋小故事統一收藏） ==================== -->
+    <section
+      id="article-library-section"
+      class="article-library-section hidden"
+      role="tabpanel"
+      aria-labelledby="nav-article-library"
+    >
+
+      <h2 class="section-title">📚 文章庫</h2>
+      <p class="section-desc">統一管理已收藏的學術文獻與社工小故事。左側分類瀏覽，右側閱讀學習（填空挑戰不消耗 API）。</p>
+
+      <p id="article-library-empty" class="library-empty hidden">
+        尚未收藏任何文章。<br>
+        請先到「閱讀練習」生成 L1 小故事或 L2 文獻後，點「收藏至文章庫」。
+      </p>
+
+      <div class="layout-container">
+        <div class="layout-left">
+          <div class="library-filters" role="group" aria-label="文章類型篩選">
+            <button class="filter-chip active" type="button" data-type="all" aria-pressed="true">🗂️ 全部</button>
+            <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 學術文獻</button>
+            <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📖 社工故事</button>
+          </div>
+          <div id="library-articles-list" class="library-list list-container" aria-live="polite"></div>
+        </div>
+
+        <div class="layout-right">
+          <div id="library-article-detail" class="library-detail detail-card" aria-live="polite">
+            <div class="article-library-placeholder">
+              <p class="article-library-placeholder-title">選擇一篇文章</p>
+              <p class="article-library-placeholder-desc">從左側列表點選文獻或故事，即可在此閱讀、翻譯與進行填空挑戰。</p>
+            </div>
+          </div>
+        </div>
+      </div><!-- /.layout-container -->
+
+    </section><!-- /#article-library-section -->
+
+    <!-- ==================== 模組 9：學習目標／印花卡 ==================== -->
+    <section
+      id="reward-section"
+      class="reward-section hidden"
+      role="tabpanel"
+      aria-labelledby="nav-reward"
+    >
+
+      <h2 class="section-title">🏆 學習目標與印花卡</h2>
+      <p class="section-desc">
+        設定屬於你的獎勵，每天透過實質學習（測驗高分、文章挑戰答對）收集 3 顆寶石，蓋上今日印花。滿卡即可領取獎勵！
+      </p>
+
+      <!-- 未設定目標：設定表單 -->
+      <div id="reward-setup" class="reward-setup">
+        <form id="reward-setup-form" class="reward-setup-form">
+          <div class="input-area">
+            <label class="label-text" for="reward-goal-input">想要的獎勵：</label>
+            <input
+              id="reward-goal-input"
+              class="reward-goal-input"
+              type="text"
+              maxlength="80"
+              placeholder="例如：吃一頓大餐、看一場電影、買一本新書…"
+              autocomplete="off"
+              required
+            >
+          </div>
+
+          <div class="input-area">
+            <label class="label-text" for="reward-days-select">目標天數（印花卡格數）：</label>
+            <select id="reward-days-select" class="reward-days-select" aria-label="選擇目標天數">
+              <option value="7">7 天</option>
+              <option value="14" selected>14 天</option>
+              <option value="21">21 天</option>
+            </select>
+          </div>
+
+          <button id="btn-reward-start" class="btn btn-primary" type="submit">
+            🚀 開始挑戰
+          </button>
+        </form>
+      </div>
+
+      <!-- 已設定目標：印花卡看板 -->
+      <div id="reward-board" class="reward-board hidden">
+        <p id="reward-goal-display" class="reward-goal-display" aria-live="polite"></p>
+        <p id="reward-progress-meta" class="reward-progress-meta" aria-live="polite"></p>
+        <div
+          id="stamp-grid"
+          class="stamp-grid"
+          role="list"
+          aria-label="每日印花卡"
+        ></div>
+        <p class="reward-hint">
+          💎 寶石來源：測驗得分 &gt; 80%，或文章庫「AI 深度挑戰」選擇題答對。<br>
+          每日僅能蓋一枚印花，明日再來繼續挑戰！
+        </p>
+      </div>
+
+      <!-- 開發者調試：重設獎勵／印花／挑戰快取 -->
+      <div class="reward-debug-reset mt-8 pt-4 border-t" style="border-color: var(--border-color);">
+        <button
+          id="btn-debug-reset-reward"
+          class="text-btn text-small"
+          type="button"
+          style="color: #EF4444;"
+        >
+          🛠️ [開發者調試] 重設所有獎勵與印花進度
+        </button>
+      </div>
+
+    </section><!-- /#reward-section -->
+
+  </main>
+
+  <!-- ==================== 設定 Modal（彈出視窗） ==================== -->
+  <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <h2 id="modal-title" class="modal-title">API Key 設定</h2>
+      <p class="modal-desc">
+        請輸入您的 DeepSeek API Key。金鑰只會儲存在本機瀏覽器，不會上傳到任何伺服器。
+      </p>
+
+      <label class="label-text" for="api-key-input">DeepSeek API Key：</label>
+      <input
+        id="api-key-input"
+        class="api-key-input"
+        type="password"
+        placeholder="sk-xxxxxxxxxxxxxxxx"
+        autocomplete="off"
+      >
+
+      <div class="modal-actions">
+        <button id="btn-save-key" class="btn btn-primary" type="button">保存</button>
+        <button id="btn-close-modal" class="btn btn-secondary" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 標籤探索歷史 Modal ==================== -->
+  <div id="tag-history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tag-history-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="tag-history-title">📚 標籤探索歷史</h3>
+        <button class="close-modal-btn" id="btn-close-history" type="button" aria-label="關閉標籤歷史">✖</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-small text-gray">以下是系統為避免重複，目前記住的歷史標籤（最多 30 個）。</p>
+        <div id="history-tags-list" class="tags-container">
+          <!-- JavaScript 將在這裡動態塞入標籤 -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-clear-tag-history" class="danger-btn" type="button">🗑️ 清空歷史 (讓 AI 重新發揮)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 今日印花達成 Modal ==================== -->
+  <div
+    id="stamp-earned-modal"
+    class="modal-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="stamp-earned-title"
+  >
+    <div class="modal-box stamp-earned-box">
+      <h2 id="stamp-earned-title" class="modal-title">🌸 今日印花</h2>
+      <p id="stamp-earned-text" class="stamp-earned-text"></p>
+      <div class="modal-actions">
+        <button id="btn-close-stamp-modal" class="btn btn-primary" type="button">
+          太棒了！
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 終極慶祝 Modal（滿卡） ==================== -->
+  <div
+    id="celebration-modal"
+    class="modal-overlay celebration-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="celebration-title"
+  >
+    <div class="modal-box celebration-box">
+      <div class="celebration-confetti" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <h2 id="celebration-title" class="modal-title celebration-title">
+        🎉 挑戰完成！
+      </h2>
+      <p id="celebration-goal-label" class="celebration-goal-label"></p>
+
+      <div id="celebration-loading" class="celebration-loading" aria-live="polite">
+        <div class="skeleton-line skeleton-line--long"></div>
+        <div class="skeleton-line skeleton-line--medium"></div>
+        <p class="loading-text">督導正在寫祝賀信…</p>
+      </div>
+
+      <div
+        id="celebration-letter-body"
+        class="celebration-letter-body hidden"
+        aria-live="polite"
+      ></div>
+
+      <div class="modal-actions celebration-actions">
+        <button id="btn-claim-reward" class="btn btn-primary" type="button" disabled>
+          🎁 領取獎勵並開啟下一輪目標
+        </button>
+        <button id="btn-close-celebration" class="btn btn-secondary" type="button">
+          稍後再看
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 浮動提示（切換科目等操作的短暫視覺回饋） -->
+  <div id="toast-notification" class="toast-hidden" role="status" aria-live="polite"></div>
+
+  <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app） -->
+  <!-- ?v= 用來避免瀏覽器快取舊版 JS -->
+  <script src="js/utils.js?v=1"></script>
+  <script src="js/deepseek.js?v=16"></script>
+  <script src="js/vocab-library.js?v=8"></script>
+  <script src="js/vocab-learn.js?v=4"></script>
+  <script src="js/literature.js?v=10"></script>
+  <script src="js/reading.js?v=16"></script>
+  <script src="js/article-library.js?v=8"></script>
+  <script src="js/quiz.js?v=7"></script>
+  <script src="js/writing.js?v=6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="js/reward.js?v=3"></script>
+  <script src="js/app.js?v=17"></script>
+</body>
+</html>

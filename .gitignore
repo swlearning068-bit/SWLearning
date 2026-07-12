@@ -1,0 +1,11 @@
+# 本機設定（含 API Key 佔位／真實金鑰）
+social-work-english/config.js
+
+# 系統與編輯器
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.swp
+*~

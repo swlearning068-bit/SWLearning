@@ -1,0 +1,74 @@
+{
+  "subjects": [
+    {
+      "id": "intro_psych",
+      "name": "心理學導論",
+      "prompt_context": "此情境必須高度關聯心理學，請使用諸如 defense mechanism, cognitive behavioral therapy, trauma 等心理學專有名詞。"
+    },
+    {
+      "id": "community_work",
+      "name": "社區工作技巧",
+      "prompt_context": "此情境必須聚焦於宏觀的社區介入，請使用 empowerment, community resources, advocacy 等社區發展專有名詞。"
+    },
+    {
+      "id": "family_social_work",
+      "name": "家庭社工實務",
+      "prompt_context": "此情境必須針對家庭系統與微觀介入，請使用 family dynamics, parenting style, domestic violence 等家庭相關專有名詞。"
+    },
+    {
+      "id": "general_practice",
+      "name": "通用社工實務",
+      "prompt_context": "此情境為香港通用社工實務，請使用 casework, home visit, resource referral, follow-up 等前線社工日常專有名詞。"
+    },
+    {
+      "id": "social_policy",
+      "name": "社會政策",
+      "prompt_context": "此情境必須圍繞香港社會政策與福利制度，請使用 social welfare, housing policy, means test, poverty alleviation 等政策專有名詞。"
+    },
+    {
+      "id": "casework",
+      "name": "個案工作",
+      "prompt_context": "此情境必須聚焦一對一個案工作，請使用 intake, assessment, intervention plan, case closure 等個案工作專有名詞。"
+    },
+    {
+      "id": "group_work",
+      "name": "小組工作",
+      "prompt_context": "此情境必須圍繞小組動力與帶領技巧，請使用 group dynamics, facilitation, cohesion, group process 等小組工作專有名詞。"
+    },
+    {
+      "id": "children_youth",
+      "name": "兒童及青少年服務",
+      "prompt_context": "此情境必須以兒童保護與青少年發展為核心，請使用 child protection, developmental needs, school social work, at-risk youth 等專有名詞。"
+    },
+    {
+      "id": "elderly",
+      "name": "長者服務",
+      "prompt_context": "此情境必須圍繞長者照顧與社區安老，請使用 elderly care, dementia, carer support, ageing in place 等長者服務專有名詞。"
+    },
+    {
+      "id": "mental_health",
+      "name": "精神健康",
+      "prompt_context": "此情境必須聚焦精神健康復元與去污名化，請使用 recovery, emotional support, stigma, mental health crisis 等專有名詞。"
+    },
+    {
+      "id": "disability",
+      "name": "殘疾人士服務",
+      "prompt_context": "此情境必須以殘疾人士權利與賦權為核心，請使用 accessibility, empowerment, inclusion, disability rights 等專有名詞。"
+    },
+    {
+      "id": "sw_admin",
+      "name": "社會福利行政",
+      "prompt_context": "此情境必須圍繞機構管理與服務規劃，請使用 supervision, service planning, resource allocation, organizational management 等行政專有名詞。"
+    },
+    {
+      "id": "sw_research",
+      "name": "社會工作研究",
+      "prompt_context": "此情境必須融入社工研究概念，請使用 evidence-based practice, qualitative interview, data analysis, evaluation 等研究專有名詞。"
+    },
+    {
+      "id": "ethics_and_values",
+      "name": "社會工作倫理與價值",
+      "prompt_context": "你的唯一核心任務是生動描繪『社工倫理兩難 (Ethical Dilemmas)』與『道德抉擇的掙扎』。請以香港前線實務為背景，並【隨機抽選 1 到 2 個】以下元素作為引發衝突的導火線，絕對不要每次都把所有元素塞進去：1. Loewenberg & Dolgoff 倫理順序原則的內在衝突 (如生命保護 vs. 自主決定)。2. 遵循香港社會工作者註冊局工作守則 (SWRB) 時的困難。3. 遇上香港特定法例 (如《精神健康條例》) 時的限制。4. 華人傳統社會價值觀的施壓。5. 案主強烈的宗教信仰。請將篇幅完全著重於『衝突的本質』，並精準使用相關的社工倫理英文術語 (如 dilemma, autonomy, confidentiality, informed consent, paternalism 等)。"
+    }
+  ]
+}
