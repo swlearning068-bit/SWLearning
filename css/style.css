@@ -2268,10 +2268,7 @@ body {
 }
 
 .library-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  display: block;
   width: 100%;
   min-height: var(--btn-min-height);
   padding: 16px 18px;
@@ -2284,6 +2281,15 @@ body {
   cursor: pointer;
   touch-action: manipulation;
   transition: var(--transition-fast);
+}
+
+.library-item-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
 }
 
 .library-item:hover {
@@ -2305,7 +2311,10 @@ body {
 }
 
 .library-item-subject {
+  display: block;
+  width: 100%;
   font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--color-text-light);
 }
 
@@ -3482,6 +3491,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   width: 100%;
+  min-width: 0;
 }
 
 .article-type-badge {
@@ -3513,8 +3523,11 @@ body {
   border: 1px solid #E5E7EB;
   background-color: #FFFFFF;
   box-shadow: none;
-  gap: 6px;
   transition: var(--transition-fast);
+}
+
+#article-library-section .library-item-body {
+  gap: 6px;
 }
 
 #article-library-section .library-item:hover,
@@ -3551,6 +3564,8 @@ body {
 }
 
 #article-library-section .library-item-title {
+  flex: 1;
+  min-width: 0;
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -3560,6 +3575,7 @@ body {
 
 #article-library-section .library-item-subject {
   font-size: 0.8rem;
+  line-height: 1.45;
   color: #9CA3AF;
 }
 

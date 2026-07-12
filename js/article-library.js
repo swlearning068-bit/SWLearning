@@ -255,6 +255,10 @@ function renderArticlesList(filterType = 'all') {
     row.dataset.id = String(item.id);
     row.dataset.type = item.type || '';
 
+    // 內層包一層：避免 <button> 當 flex 容器時高度算錯，小標題溢到卡片邊框上
+    const body = document.createElement('span');
+    body.className = 'library-item-body';
+
     const topRow = document.createElement('span');
     topRow.className = 'article-item-top';
 
@@ -276,8 +280,9 @@ function renderArticlesList(filterType = 'all') {
       item.type === 'story' && item.theme ? ` · ${item.theme}` : '';
     subjectSpan.textContent = `${item.subjectName || '未指定科目'}${themePart}`;
 
-    row.appendChild(topRow);
-    row.appendChild(subjectSpan);
+    body.appendChild(topRow);
+    body.appendChild(subjectSpan);
+    row.appendChild(body);
 
     row.addEventListener('click', () => {
       const id = item.id;
