@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=29">
+  <link rel="stylesheet" href="css/style.css?v=32">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -18,10 +18,20 @@
   <!-- ==================== 頂部導覽列 ==================== -->
   <header class="top-nav">
     <h1 class="app-title">社工英文學習助手</h1>
-    <!-- 點擊此按鈕會開啟 API Key 設定視窗 -->
-    <button id="btn-open-settings" class="btn btn-secondary" type="button" aria-label="開啟設定">
-      ⚙️ 設定
-    </button>
+    <div class="top-nav-actions">
+      <!-- Firebase 帳號／雲端同步 -->
+      <button id="btn-login" class="nav-btn" type="button">登入以同步</button>
+      <div id="user-profile" class="user-profile hidden">
+        <img id="user-avatar" class="user-avatar hidden" alt="" width="28" height="28" referrerpolicy="no-referrer">
+        <span id="user-email" class="user-email"></span>
+        <button id="btn-sync" class="primary-btn" type="button">☁️ 雲端同步</button>
+        <button id="btn-logout" class="text-btn" type="button">登出</button>
+      </div>
+      <!-- 點擊此按鈕會開啟 API Key 設定視窗 -->
+      <button id="btn-open-settings" class="btn btn-secondary" type="button" aria-label="開啟設定">
+        ⚙️ 設定
+      </button>
+    </div>
   </header>
 
   <!-- ==================== 科目選擇器（14 個社工科目動態切換） ==================== -->
@@ -974,12 +984,66 @@
 
   </main>
 
+  <!-- ==================== 雲端同步選擇 Modal ==================== -->
+  <div
+    id="sync-modal"
+    class="modal-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sync-modal-title"
+  >
+    <div class="modal-box sync-modal-box">
+      <h2 id="sync-modal-title" class="modal-title">☁️ 雲端同步</h2>
+      <p class="modal-desc">
+        連上 Firebase 不會自動搬移資料。請先比對兩邊狀態，再選擇要以哪一邊為準。
+      </p>
+
+      <div id="sync-summary" class="sync-summary" aria-live="polite">
+        <div class="sync-summary-row">
+          <span class="sync-summary-label">本機</span>
+          <span id="sync-local-meta" class="sync-summary-value">檢查中…</span>
+        </div>
+        <div class="sync-summary-row">
+          <span class="sync-summary-label">雲端</span>
+          <span id="sync-cloud-meta" class="sync-summary-value">檢查中…</span>
+        </div>
+      </div>
+
+      <div
+        id="sync-conflict-banner"
+        class="sync-conflict-banner hidden"
+        role="status"
+      >
+        ⚠️ 本機與雲端都有資料。上傳會覆蓋雲端；下載會覆蓋本機。請確認後再操作。
+      </div>
+
+      <p id="sync-hint" class="modal-desc sync-modal-note">
+        上傳會覆蓋雲端；下載會覆蓋本機學習資料（不含 API Key／Firebase 設定），並重新載入頁面。
+      </p>
+
+      <div class="modal-actions sync-modal-actions">
+        <button id="btn-sync-upload" class="btn btn-primary" type="button">
+          ⬆️ 上傳覆蓋雲端
+        </button>
+        <button id="btn-sync-download" class="btn btn-secondary" type="button">
+          ⬇️ 下載覆蓋本機
+        </button>
+        <button id="btn-close-sync-modal" class="text-btn" type="button">
+          取消
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== 設定 Modal（彈出視窗） ==================== -->
   <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-box">
-      <h2 id="modal-title" class="modal-title">API Key 設定</h2>
+    <div class="modal-box settings-modal-box">
+      <h2 id="modal-title" class="modal-title">設定</h2>
+
+      <!-- DeepSeek API Key -->
+      <h3 class="settings-subtitle">DeepSeek API Key</h3>
       <p class="modal-desc">
-        請輸入您的 DeepSeek API Key。金鑰只會儲存在本機瀏覽器，不會上傳到任何伺服器。
+        請輸入您的 DeepSeek API Key。金鑰只會儲存在本機瀏覽器，不會上傳到雲端。
       </p>
 
       <label class="label-text" for="api-key-input">DeepSeek API Key：</label>
@@ -992,8 +1056,53 @@
       >
 
       <div class="modal-actions">
-        <button id="btn-save-key" class="btn btn-primary" type="button">保存</button>
-        <button id="btn-close-modal" class="btn btn-secondary" type="button">取消</button>
+        <button id="btn-save-key" class="btn btn-primary" type="button">保存 API Key</button>
+        <button id="btn-close-modal" class="btn btn-secondary" type="button">關閉</button>
+      </div>
+
+      <div class="settings-divider" role="separator"></div>
+
+      <!-- Firebase 雲端同步 -->
+      <h3 class="settings-subtitle">☁️ Firebase 雲端同步</h3>
+      <p class="modal-desc">
+        到
+        <a
+          href="https://console.firebase.google.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Firebase Console</a>
+        建立專案後，複製網頁應用程式的
+        <code class="settings-code">firebaseConfig</code>
+        貼到下方，即可連上你自己的雲端。
+      </p>
+      <p id="firebase-status" class="firebase-status firebase-status--off" role="status">
+        尚未連線 Firebase
+      </p>
+
+      <label class="label-text" for="firebase-config-input">Firebase 設定（firebaseConfig）：</label>
+      <textarea
+        id="firebase-config-input"
+        class="firebase-config-input"
+        rows="8"
+        spellcheck="false"
+        autocomplete="off"
+        placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'
+      ></textarea>
+
+      <div class="modal-actions firebase-settings-actions">
+        <button id="btn-firebase-connect" class="btn btn-primary" type="button">
+          儲存並連線
+        </button>
+        <button id="btn-firebase-disconnect" class="btn btn-secondary" type="button" disabled>
+          中斷並清除
+        </button>
       </div>
     </div>
   </div>
@@ -1092,7 +1201,7 @@
     <span id="ai-mode-text">閃電模式 (Flash)</span>
   </div>
 
-  <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app） -->
+  <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app → Firebase） -->
   <!-- ?v= 用來避免瀏覽器快取舊版 JS -->
   <script src="js/utils.js?v=4"></script>
   <script src="js/deepseek.js?v=23"></script>
@@ -1105,6 +1214,9 @@
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=4"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/app.js?v=18"></script>
+  <!-- Firebase v10 模組化 SDK（ES module）+ 雲端同步引擎 -->
+  <script type="module" src="js/firebase-init.js?v=3"></script>
+  <script type="module" src="js/sync.js?v=3"></script>
 </body>
 </html>

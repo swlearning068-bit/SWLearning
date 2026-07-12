@@ -287,7 +287,7 @@ function refreshApiKeyState() {
 }
 
 /**
- * 開啟設定 Modal，並將已儲存的 API Key 填入輸入框
+ * 開啟設定 Modal，並將已儲存的 API Key／Firebase 設定填入表單
  */
 function openSettingsModal() {
   const modal     = $('settings-modal');
@@ -295,9 +295,16 @@ function openSettingsModal() {
   const savedKey  = localStorage.getItem(STORAGE_KEY_API) || '';
 
   if (keyInput) keyInput.value = savedKey;
+
+  if (typeof window.refreshFirebaseSettingsUI === 'function') {
+    window.refreshFirebaseSettingsUI();
+  }
+
   show(modal);
   if (keyInput) keyInput.focus();
 }
+
+window.openSettingsModal = openSettingsModal;
 
 /**
  * 關閉設定 Modal
