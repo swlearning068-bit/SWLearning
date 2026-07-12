@@ -19,7 +19,7 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=14';
+} from './firebase-init.js?v=15';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
@@ -36,7 +36,7 @@ const EXCLUDE_KEYS = new Set([
   STORAGE_KEY_DEVICE_ID
 ]);
 
-const AUTO_PUSH_DEBOUNCE_MS = 2500;
+const AUTO_PUSH_DEBOUNCE_MS = 1500;
 
 /** @type {{ local: object, cloud: object } | null} */
 let lastCompareResult = null;
@@ -51,8 +51,15 @@ let suppressAutoPush = false;
 let autoPushTimer = null;
 let autoPushInFlight = false;
 let autoPushInstalled = false;
-/** @type {typeof localStorage.setItem | null} */
-let originalSetItem = null;
+let storageHookInstalled = false;
+/** @type {((key: string, value: string) => void) | null} */
+let originalProtoSetItem = null;
+/** @type {((key: string) => void) | null} */
+let originalProtoRemoveItem = null;
+/** 上次成功上傳的本機指紋，用於輪詢偵測變更 */
+let lastPushedFingerprint = '';
+/** @type {ReturnType<typeof setInterval> | null} */
+let dirtyPollTimer = null;
 
 /** @type {(() => void) | null} */
 let cloudPullUnsubscribe = null;
@@ -642,8 +649,15 @@ async function uploadToCloud(uid, options = {}) {
   markCloudBound(uid, now);
   setLocalDirty(false);
   ignoredRemoteUpdatedMs = 0;
+  try {
+    lastPushedFingerprint = fingerprintLocalPayload();
+  } catch (_) {
+    lastPushedFingerprint = '';
+  }
   if (!options.silent) {
     syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
+  } else {
+    syncToast('☁️ 已自動同步至雲端');
   }
 }
 
@@ -1254,12 +1268,21 @@ function scheduleAutoPush() {
     const currentUid = requireUidQuiet();
     if (!currentUid || !isCloudBound(currentUid) || suppressAutoPush) return;
 
+    // 無實際變更則略過
+    try {
+      const fp = fingerprintLocalPayload();
+      if (fp && fp === lastPushedFingerprint && !isLocalDirty()) return;
+    } catch (_) {
+      // continue upload
+    }
+
     autoPushInFlight = true;
     try {
       await uploadToCloud(currentUid, { silent: true });
       console.log('[sync] 已自動上傳至雲端');
     } catch (error) {
       console.error('[sync] 自動上傳失敗：', error);
+      setLocalDirty(true);
     } finally {
       autoPushInFlight = false;
     }
@@ -1284,25 +1307,82 @@ function requireUidQuiet() {
   return user && user.uid ? user.uid : null;
 }
 
-function installAutoPush() {
-  if (!autoPushInstalled) {
-    // 還原重整前未上傳狀態
-    if (isLocalDirty()) {
-      localDirty = true;
+/**
+ * 攔截所有 localStorage 寫入（用 prototype，比覆寫 localStorage.setItem 可靠）
+ */
+function installStorageHooks() {
+  if (storageHookInstalled) return;
+  storageHookInstalled = true;
+
+  originalProtoSetItem = Storage.prototype.setItem;
+  originalProtoRemoveItem = Storage.prototype.removeItem;
+
+  Storage.prototype.setItem = function patchedStorageSetItem(key, value) {
+    originalProtoSetItem.call(this, key, value);
+    if (this !== localStorage || suppressAutoPush) return;
+    if (!shouldSyncKey(String(key))) return;
+    setLocalDirty(true);
+    scheduleAutoPush();
+  };
+
+  Storage.prototype.removeItem = function patchedStorageRemoveItem(key) {
+    originalProtoRemoveItem.call(this, key);
+    if (this !== localStorage || suppressAutoPush) return;
+    if (!shouldSyncKey(String(key))) return;
+    setLocalDirty(true);
+    scheduleAutoPush();
+  };
+}
+
+function startDirtyPoll() {
+  if (dirtyPollTimer) return;
+  dirtyPollTimer = setInterval(() => {
+    if (suppressAutoPush || autoPushInFlight || conflictDialogOpen) return;
+    const uid = requireUidQuiet();
+    if (!uid || !isCloudBound(uid)) return;
+
+    let fp = '';
+    try {
+      fp = fingerprintLocalPayload();
+    } catch (_) {
+      return;
     }
-    originalSetItem = localStorage.setItem.bind(localStorage);
-    localStorage.setItem = function patchedSetItem(key, value) {
-      originalSetItem(key, value);
-      if (!suppressAutoPush && shouldSyncKey(String(key))) {
-        setLocalDirty(true);
-        scheduleAutoPush();
-      }
-    };
-    autoPushInstalled = true;
+
+    if (fp && fp !== lastPushedFingerprint) {
+      setLocalDirty(true);
+      scheduleAutoPush();
+    }
+  }, 2000);
+}
+
+function stopDirtyPoll() {
+  if (dirtyPollTimer) {
+    clearInterval(dirtyPollTimer);
+    dirtyPollTimer = null;
   }
+}
+
+function installAutoPush() {
+  installStorageHooks();
+  startDirtyPoll();
+
+  if (isLocalDirty()) {
+    localDirty = true;
+    scheduleAutoPush();
+  }
+
+  autoPushInstalled = true;
   const uid = requireUidQuiet();
   if (uid && isCloudBound(uid)) {
     startCloudPullListener(uid);
+    // 對齊後立刻對一次指紋，作為後續輪詢基準
+    try {
+      if (!lastPushedFingerprint) {
+        lastPushedFingerprint = fingerprintLocalPayload();
+      }
+    } catch (_) {
+      // ignore
+    }
     if (isLocalDirty()) {
       scheduleAutoPush();
     }
@@ -1310,16 +1390,14 @@ function installAutoPush() {
 }
 
 function uninstallAutoPush() {
-  if (autoPushInstalled && originalSetItem) {
-    localStorage.setItem = originalSetItem;
-    originalSetItem = null;
-    autoPushInstalled = false;
-  }
+  autoPushInstalled = false;
   if (autoPushTimer) {
     clearTimeout(autoPushTimer);
     autoPushTimer = null;
   }
+  stopDirtyPoll();
   stopCloudPullListener();
+  // 保留 Storage.prototype hook，登出後再寫入也不會上傳（scheduleAutoPush 會因未登入直接 return）
 }
 
 /**
@@ -1615,6 +1693,9 @@ if (document.readyState === 'loading') {
 } else {
   bindSyncUI();
 }
+
+// 儘早掛上寫入攔截，不必等登入完成；未對齊時 scheduleAutoPush 會直接略過
+installStorageHooks();
 
 window.uploadToCloud = uploadToCloud;
 window.downloadFromCloud = downloadFromCloud;
