@@ -143,9 +143,10 @@ function updateAuthUI(user) {
   const currentUser =
     user !== undefined ? user : (auth && auth.currentUser) || null;
 
+  // 尚未連線：不顯示登入按鈕，避免與「設定」重複；請到設定頁連 Firebase
   if (!ready) {
-    loginBtn.classList.remove('hidden');
-    loginBtn.textContent = '設定雲端同步';
+    loginBtn.classList.add('hidden');
+    loginBtn.textContent = '登入以同步';
     profile.classList.add('hidden');
     return;
   }
