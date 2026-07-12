@@ -278,54 +278,65 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
     requestBody.response_format = { type: 'json_object' };
   }
 
-  let response;
-
-  try {
-    response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-  } catch (_) {
-    throw new Error('網路連線失敗，請檢查您的網路後再試。');
+  // 右下角輔助提示：顯示當前 Flash / Thinking / Pro（不取代各功能自己的 Loading）
+  if (typeof showAiIndicator === 'function') {
+    showAiIndicator(taskType);
   }
 
-  if (!response.ok) {
-    let errorDetail = `API 回應錯誤（狀態碼 ${response.status}）`;
+  try {
+    let response;
 
     try {
-      const errorBody = await response.json();
-      if (errorBody.error && errorBody.error.message) {
-        errorDetail = errorBody.error.message;
-      }
+      response = await fetch(DEEPSEEK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      });
     } catch (_) {
-      // 若無法解析錯誤 body，使用預設訊息
+      throw new Error('網路連線失敗，請檢查您的網路後再試。');
     }
 
-    if (response.status === 401) {
-      throw new Error('API Key 無效或已過期，請重新設定。');
+    if (!response.ok) {
+      let errorDetail = `API 回應錯誤（狀態碼 ${response.status}）`;
+
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error && errorBody.error.message) {
+          errorDetail = errorBody.error.message;
+        }
+      } catch (_) {
+        // 若無法解析錯誤 body，使用預設訊息
+      }
+
+      if (response.status === 401) {
+        throw new Error('API Key 無效或已過期，請重新設定。');
+      }
+
+      throw new Error(errorDetail);
     }
 
-    throw new Error(errorDetail);
-  }
+    let data;
+    try {
+      data = await response.json();
+    } catch (_) {
+      throw new Error('API 回傳格式異常，無法解析 JSON。');
+    }
 
-  let data;
-  try {
-    data = await response.json();
-  } catch (_) {
-    throw new Error('API 回傳格式異常，無法解析 JSON。');
-  }
+    const rawContent = data?.choices?.[0]?.message?.content;
+    if (!rawContent) {
+      throw new Error('API 回傳內容為空，請稍後再試。');
+    }
 
-  const rawContent = data?.choices?.[0]?.message?.content;
-  if (!rawContent) {
-    throw new Error('API 回傳內容為空，請稍後再試。');
+    // 思考模式可能夾帶 <think>...</think>，回傳前必須過濾
+    return stripThinkTags(rawContent);
+  } finally {
+    if (typeof hideAiIndicator === 'function') {
+      hideAiIndicator();
+    }
   }
-
-  // 思考模式可能夾帶 <think>...</think>，回傳前必須過濾
-  return stripThinkTags(rawContent);
 }
 
 /**

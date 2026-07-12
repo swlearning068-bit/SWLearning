@@ -122,7 +122,82 @@ function createVocabSpeakButton(term) {
   return btn;
 }
 
+/** 巢狀 API 計數：避免並行請求時過早隱藏標籤 */
+let aiIndicatorDepth = 0;
+
+/** hide 動畫延遲計時器 */
+let hideAiIndicatorTimer = null;
+
+/**
+ * 顯示右下角 AI 模式懸浮標籤
+ * @param {string} [mode='standard'] - taskType：standard / complex_logic / ultimate_celebration / deep_correction
+ */
+function showAiIndicator(mode) {
+  const indicator = document.getElementById('ai-mode-indicator');
+  const icon = document.getElementById('ai-mode-icon');
+  const text = document.getElementById('ai-mode-text');
+  if (!indicator || !icon || !text) return;
+
+  if (hideAiIndicatorTimer) {
+    clearTimeout(hideAiIndicatorTimer);
+    hideAiIndicatorTimer = null;
+  }
+
+  aiIndicatorDepth += 1;
+
+  indicator.classList.remove('mode-flash', 'mode-thinking', 'mode-pro');
+
+  switch (mode) {
+    case 'complex_logic':
+      icon.textContent = '🧠';
+      text.textContent = '深度思考中 (Thinking)...';
+      indicator.classList.add('mode-thinking');
+      break;
+    case 'ultimate_celebration':
+    case 'deep_correction':
+      icon.textContent = '💎';
+      text.textContent = '專業模式 (Pro)...';
+      indicator.classList.add('mode-pro');
+      break;
+    default:
+      icon.textContent = '⚡';
+      text.textContent = '閃電模式 (Flash)...';
+      indicator.classList.add('mode-flash');
+  }
+
+  indicator.setAttribute('aria-hidden', 'false');
+  indicator.classList.remove('hidden');
+  // 下一幀再加 show，讓 opacity / transform 過渡生效
+  requestAnimationFrame(() => {
+    indicator.classList.add('show');
+  });
+}
+
+/**
+ * 隱藏 AI 模式懸浮標籤（等淡出動畫結束後再加 hidden）
+ */
+function hideAiIndicator() {
+  const indicator = document.getElementById('ai-mode-indicator');
+  if (!indicator) return;
+
+  aiIndicatorDepth = Math.max(0, aiIndicatorDepth - 1);
+  if (aiIndicatorDepth > 0) return;
+
+  indicator.classList.remove('show');
+  indicator.setAttribute('aria-hidden', 'true');
+
+  if (hideAiIndicatorTimer) {
+    clearTimeout(hideAiIndicatorTimer);
+  }
+  hideAiIndicatorTimer = setTimeout(() => {
+    indicator.classList.add('hidden');
+    hideAiIndicatorTimer = null;
+  }, 300);
+}
+
 window.speakText = speakText;
 window.stopSpeaking = stopSpeaking;
 window.createArticleSpeakControls = createArticleSpeakControls;
 window.createVocabSpeakButton = createVocabSpeakButton;
+window.showAiIndicator = showAiIndicator;
+window.hideAiIndicator = hideAiIndicator;

@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=28">
+  <link rel="stylesheet" href="css/style.css?v=29">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -1080,10 +1080,22 @@
   <!-- Toast 浮動提示（切換科目等操作的短暫視覺回饋） -->
   <div id="toast-notification" class="toast-hidden" role="status" aria-live="polite"></div>
 
+  <!-- AI 模式懸浮標籤（API 呼叫時顯示當前 Flash / Thinking / Pro） -->
+  <div
+    id="ai-mode-indicator"
+    class="ai-indicator hidden"
+    role="status"
+    aria-live="polite"
+    aria-hidden="true"
+  >
+    <span id="ai-mode-icon" aria-hidden="true">⚡</span>
+    <span id="ai-mode-text">閃電模式 (Flash)</span>
+  </div>
+
   <!-- 引入 JavaScript 模組（順序：utils → deepseek → … → reward → app） -->
   <!-- ?v= 用來避免瀏覽器快取舊版 JS -->
-  <script src="js/utils.js?v=1"></script>
-  <script src="js/deepseek.js?v=17"></script>
+  <script src="js/utils.js?v=2"></script>
+  <script src="js/deepseek.js?v=18"></script>
   <script src="js/vocab-library.js?v=8"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=10"></script>

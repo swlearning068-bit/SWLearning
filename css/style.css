@@ -4392,3 +4392,55 @@ body {
   }
 }
 
+/* ---------- AI 模式懸浮標籤（右下角輔助提示） ---------- */
+.ai-indicator {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+
+.ai-indicator.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ai-indicator.mode-flash {
+  color: #3B82F6;
+}
+
+.ai-indicator.mode-thinking {
+  color: #8B5CF6;
+}
+
+.ai-indicator.mode-pro {
+  color: #F59E0B;
+}
+
+@media (max-width: 640px) {
+  .ai-indicator {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    justify-content: center;
+    font-size: 0.8rem;
+  }
+}
+
