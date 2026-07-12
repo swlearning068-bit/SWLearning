@@ -853,6 +853,9 @@ function buildArticleChallengeContext(item) {
 async function handleGenerateArticleChallenge(item, btn, container) {
   if (!item || !btn || !container) return;
 
+  // 防止連點／重試期間重複送出請求
+  if (btn.dataset.generating === '1' || btn.disabled) return;
+
   if (typeof generateArticleChallengeAPI !== 'function') {
     alert('深度挑戰功能尚未載入，請重新整理頁面後再試。');
     return;
@@ -869,6 +872,7 @@ async function handleGenerateArticleChallenge(item, btn, container) {
   }
 
   const originalLabel = btn.textContent;
+  btn.dataset.generating = '1';
   btn.disabled = true;
   btn.textContent = '🧠 生成中...';
   container.classList.remove('hidden');
@@ -890,6 +894,7 @@ async function handleGenerateArticleChallenge(item, btn, container) {
     container.innerHTML =
       `<p class="challenge-error-text">${articleEscapeHtml(message)}</p>`;
   } finally {
+    btn.dataset.generating = '0';
     btn.disabled = false;
     btn.textContent = originalLabel;
   }

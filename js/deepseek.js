@@ -49,7 +49,8 @@ const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
 function resolveDeepSeekRouting(taskType = 'standard') {
   // 預設使用最便宜的 flash 模型
   let targetModel = DEEPSEEK_MODEL_FLASH;
-  let extraBody = {};
+  // V4 預設會開 thinking；非推理任務必須明確關閉，否則思考佔滿 max_tokens 會讓 content 變空
+  let extraBody = { thinking: { type: 'disabled' } };
 
   // 根據任務類型強制切換「真正會分開計費」的 V4 模型
   if (taskType === 'story' || taskType === 'literature') {
@@ -283,6 +284,12 @@ vocabulary 請挑選 5 到 8 個對於該科目最重要的單字。`;
 const L1_STORY_SYSTEM_PROMPT = L1_STORY_LONG_SYSTEM_PROMPT;
 
 /**
+ * Thinking 模式會把 reasoning 也計入 max_tokens；過低時 content 常為空。
+ * 對有開 thinking 的任務抬高下限，避免多次重試才「碰巧」成功。
+ */
+const THINKING_MAX_TOKENS_FLOOR = 4096;
+
+/**
  * 呼叫 DeepSeek Chat Completions（含智慧模型路由）
  *
  * @param {Array<{role: string, content: string}>} messages
@@ -302,28 +309,22 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
   }
 
   const apiKey = getApiKey();
-  const maxTokens = Number(options.maxTokens) > 0 ? Number(options.maxTokens) : 2500;
   const temperature =
     typeof options.temperature === 'number' ? options.temperature : 0.7;
   const jsonObject = options.jsonObject !== false;
 
   const { modelName, extraBody } = resolveDeepSeekRouting(taskType);
+  const thinkingEnabled = extraBody?.thinking?.type === 'enabled';
 
-  const requestBody = {
-    model: modelName, // 必須依 taskType 動態帶入
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-    ...extraBody
-  };
-
-  if (jsonObject) {
-    requestBody.response_format = { type: 'json_object' };
+  let maxTokens = Number(options.maxTokens) > 0 ? Number(options.maxTokens) : 2500;
+  if (thinkingEnabled && maxTokens < THINKING_MAX_TOKENS_FLOOR) {
+    maxTokens = THINKING_MAX_TOKENS_FLOOR;
   }
 
   // 發送請求前確認目前使用的模型（除錯用）
   console.log(
-    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`
+    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}` +
+      (thinkingEnabled ? ' + thinking' : '')
   );
 
   // 右下角輔助提示：顯示當前 Flash / Chat / Reasoner / Pro（不取代各功能自己的 Loading）
@@ -331,9 +332,24 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
     showAiIndicator(taskType);
   }
 
-  try {
-    let response;
+  /**
+   * @param {number} tokenBudget
+   * @returns {Promise<{rawContent: string, finishReason: string}>}
+   */
+  async function fetchOnce(tokenBudget) {
+    const requestBody = {
+      model: modelName,
+      messages,
+      temperature,
+      max_tokens: tokenBudget,
+      ...extraBody
+    };
 
+    if (jsonObject) {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
+    let response;
     try {
       response = await fetch(DEEPSEEK_API_URL, {
         method: 'POST',
@@ -373,13 +389,52 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
       throw new Error('API 回傳格式異常，無法解析 JSON。');
     }
 
-    const rawContent = data?.choices?.[0]?.message?.content;
-    if (!rawContent) {
-      throw new Error('API 回傳內容為空，請稍後再試。');
+    const choice = data?.choices?.[0];
+    const rawContent = choice?.message?.content;
+    const finishReason = String(choice?.finish_reason || '');
+    const hasReasoning = Boolean(
+      choice?.message?.reasoning_content &&
+        String(choice.message.reasoning_content).trim()
+    );
+
+    return {
+      rawContent: typeof rawContent === 'string' ? rawContent : '',
+      finishReason,
+      hasReasoning
+    };
+  }
+
+  try {
+    let result = await fetchOnce(maxTokens);
+
+    // Thinking 佔滿 token 時 content 會是空字串；自動加大配額重試一次
+    if (!result.rawContent.trim()) {
+      const shouldRetry =
+        thinkingEnabled ||
+        result.finishReason === 'length' ||
+        result.hasReasoning;
+
+      if (shouldRetry) {
+        const retryTokens = Math.max(maxTokens * 2, 8192);
+        console.warn(
+          `[API] content 為空 (finish_reason=${result.finishReason || 'n/a'})，` +
+            `以 max_tokens=${retryTokens} 重試一次…`
+        );
+        result = await fetchOnce(retryTokens);
+      }
+    }
+
+    if (!result.rawContent.trim()) {
+      const truncated = result.finishReason === 'length';
+      throw new Error(
+        truncated
+          ? 'API 回傳內容被截斷（思考過程過長），請再試一次。'
+          : 'API 回傳內容為空，請稍後再試。'
+      );
     }
 
     // 思考模式可能夾帶 <think>...</think>，回傳前必須過濾
-    return stripThinkTags(rawContent);
+    return stripThinkTags(result.rawContent);
   } finally {
     if (typeof hideAiIndicator === 'function') {
       hideAiIndicator();
@@ -1210,11 +1265,11 @@ async function generateArticleChallengeAPI(articleContext, taskType = 'challenge
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
-  // AI 深度挑戰：使用 deepseek-v4-pro + thinking（可由呼叫端覆寫 taskType）
+  // AI 深度挑戰：Pro + thinking；max_tokens 需預留 reasoning，否則 content 常為空
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,
-    1200,
+    4096,
     taskType || 'challenge'
   );
 
