@@ -68,7 +68,7 @@
     {
       "id": "ethics_and_values",
       "name": "社會工作倫理與價值",
-      "prompt_context": "你的核心任務是生動描繪香港前線實務的『社工倫理兩難 (Ethical Dilemmas)』。⚠️【最高級別寫作禁令】：1. 絕對禁止出現「SWRB」、「Code of Practice」、「Guidelines」、「守則」、「原則」等名詞。 2. 絕對禁止描述「參照條文的動作」，例如嚴禁使用「consulting, referring to, according to, guided by, recalling」等字眼！\n\n請徹底貫徹『Show, Don't Tell』，將焦點完全放在社工內心的「價值觀拉扯」與「人性的重量」。\n✅【正確示範】：\"She was deeply torn between the heavy burden of protecting the adolescent's life and the sacred trust they had built over months of counseling.\"\n❌【錯誤示範】：\"After consulting the guidelines, she weighed the limits of confidentiality...\"\n\n請直接描寫真實的危機情境（例如：知情決定受限時的自主權剝奪感、法庭或生命威脅下的私隱保密極限、醫療/教育跨專業小組中的價值觀碰撞），呈現出深刻的道德掙扎。"
+      "prompt_context": "你的核心任務是生動描繪香港前線實務的『社工倫理兩難 (Ethical Dilemmas)』。⚠️【最高級別寫作禁令】：1. 絕對禁止出現「SWRB」、「Code of Practice」、「Guidelines」、「守則」、「原則」等名詞。 2. 絕對禁止描述「參照條文的動作」，例如嚴禁使用「consulting, referring to, according to, guided by, recalling」等字眼！\n\n請徹底貫徹『Show, Don't Tell』，將焦點放在社工如何以專業判斷權衡相互衝突的價值。\n✅【正確示範】：\"She carefully weighed the risk of harm against the adolescent's right to confidentiality, documenting her rationale before deciding whether disclosure was necessary.\"\n❌【錯誤示範】：\"After consulting the guidelines, she weighed the limits of confidentiality...\"\n\n請直接描寫真實的危機情境（例如：知情決定受限時的自主權、法庭或生命威脅下的私隱保密極限、醫療/教育跨專業小組中的價值觀碰撞）。請著重於呈現『道德抉擇時的專業反思 (Professional Reflection) 與批判性思考 (Critical Thinking)』，保持冷靜且專業的分析語氣。"
     }
   ]
 }
