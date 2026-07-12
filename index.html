@@ -462,11 +462,35 @@
           <div id="reading-l1-panel" class="reading-level-panel" data-reading-panel="l1">
 
             <h2 class="section-title">L1 漸進式閱讀 — 社工小故事</h2>
-            <p class="section-desc">隨機生成香港社工日常短文。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。</p>
+            <p id="l1-story-desc" class="section-desc">隨機生成香港社工 detailed case vignette（約 300–450 字）。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。</p>
+
+            <!-- 長文／短文切換 -->
+            <div class="l1-length-switch" id="l1-length-switch" role="tablist" aria-label="故事長度切換">
+              <button
+                id="btn-l1-length-long"
+                class="level-btn active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                data-length="long"
+              >
+                📄 長文
+              </button>
+              <button
+                id="btn-l1-length-short"
+                class="level-btn"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-length="short"
+              >
+                📝 短文
+              </button>
+            </div>
 
             <!-- 生成故事按鈕 -->
             <button id="btn-generate-story" class="btn btn-primary" type="button">
-              🎲 隨機生成社工小故事
+              🎲 隨機生成詳細個案情境
             </button>
 
           </div><!-- /#reading-l1-panel -->
@@ -534,7 +558,7 @@
           <div class="reading-results-panel" data-reading-panel="l1">
             <div class="layout-placeholder" aria-hidden="true">
               <p class="layout-placeholder-title">故事閱讀區</p>
-              <p class="layout-placeholder-desc">點左側「隨機生成」後，英文故事與翻譯會顯示在這裡。</p>
+              <p class="layout-placeholder-desc">點左側「隨機生成」後，英文個案情境與翻譯會顯示在這裡。</p>
             </div>
 
             <!-- 載入中骨架屏（預設隱藏） -->
@@ -543,15 +567,15 @@
               <div class="skeleton-line skeleton-line--long"></div>
               <div class="skeleton-line skeleton-line--medium"></div>
               <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在創作故事...</p>
+              <p class="loading-text">正在創作詳細個案情境...</p>
             </div>
 
-            <!-- 故事展示區（預設隱藏，生成成功後顯示） -->
+            <!-- 個案情境展示區（預設隱藏，生成成功後顯示） -->
             <div id="story-display" class="story-display hidden" aria-live="polite">
 
               <!-- 英文原文區（關鍵字會被包成 .hover-word） -->
               <div class="story-en-block">
-                <span class="result-label">英文故事</span>
+                <span class="result-label">英文個案情境</span>
                 <p id="story-en" class="story-en"></p>
               </div>
 
@@ -569,7 +593,7 @@
               <!-- 收藏至文章庫（由 reading.js 控制狀態） -->
               <div class="save-story-wrap">
                 <button id="btn-save-story" class="save-story-btn btn btn-primary" type="button">
-                  💾 收藏此故事
+                  💾 收藏此個案情境
                 </button>
               </div>
 

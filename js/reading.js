@@ -182,6 +182,68 @@ const LEGACY_KEY_SAVED_STORIES = 'sw_saved_stories';
 /** @type {Object|null} 目前畫面上的 L1 故事（供收藏按鈕使用） */
 let currentL1Story = null;
 
+/** @type {'long'|'short'} L1 長文／短文模式（預設長文） */
+let currentL1LengthMode = 'long';
+
+const L1_LENGTH_UI = {
+  long: {
+    desc: '隨機生成香港社工 detailed case vignette（約 300–450 字）。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。',
+    generateLabel: '🎲 隨機生成詳細個案情境',
+    loadingLabel: '正在創作詳細個案情境...',
+    resultLabel: '英文個案情境',
+    saveLabel: '💾 收藏此個案情境'
+  },
+  short: {
+    desc: '隨機生成香港社工小故事（約 3–4 句）。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。',
+    generateLabel: '🎲 隨機生成社工小故事',
+    loadingLabel: '正在創作社工小故事...',
+    resultLabel: '英文故事',
+    saveLabel: '💾 收藏此故事'
+  }
+};
+
+/**
+ * 取得目前 L1 長度模式
+ * @returns {'long'|'short'}
+ */
+function getL1LengthMode() {
+  return currentL1LengthMode === 'short' ? 'short' : 'long';
+}
+
+/**
+ * 切換 L1 長文／短文，並同步按鈕與說明文案
+ * @param {'long'|'short'} mode
+ */
+function setL1LengthMode(mode) {
+  currentL1LengthMode = mode === 'short' ? 'short' : 'long';
+  const ui = L1_LENGTH_UI[currentL1LengthMode];
+
+  document.querySelectorAll('#l1-length-switch .level-btn').forEach((btn) => {
+    const isActive = btn.dataset.length === currentL1LengthMode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  const descEl = document.getElementById('l1-story-desc');
+  if (descEl) descEl.textContent = ui.desc;
+
+  const generateBtn = document.getElementById('btn-generate-story');
+  if (generateBtn && !generateBtn.disabled) {
+    generateBtn.textContent = ui.generateLabel;
+  }
+
+  const loadingText = document.querySelector('#reading-loading .loading-text');
+  if (loadingText) loadingText.textContent = ui.loadingLabel;
+
+  const resultLabel = document.querySelector('#story-display .story-en-block .result-label');
+  if (resultLabel) resultLabel.textContent = ui.resultLabel;
+
+  const saveBtn = document.getElementById('btn-save-story');
+  if (saveBtn && !saveBtn.classList.contains('is-saved')) {
+    saveBtn.textContent = ui.saveLabel;
+  }
+}
+
 /**
  * 從 localStorage 安全讀取 JSON 陣列
  * @param {string} key
@@ -299,15 +361,16 @@ function buildStoryTitle(storyEn) {
 }
 
 /**
- * 同步「收藏此故事」按鈕狀態（已收藏則 disable）
+ * 同步「收藏此個案情境」按鈕狀態（已收藏則 disable）
  */
 function syncSaveStoryButtonState() {
   const btn = document.getElementById('btn-save-story');
   if (!btn) return;
+  const saveLabel = L1_LENGTH_UI[getL1LengthMode()].saveLabel;
 
   if (!currentL1Story || !currentL1Story.story_en) {
     btn.disabled = true;
-    btn.textContent = '💾 收藏此故事';
+    btn.textContent = saveLabel;
     btn.classList.remove('is-saved');
     return;
   }
@@ -329,18 +392,18 @@ function syncSaveStoryButtonState() {
     btn.disabled = true;
     btn.classList.add('is-saved');
   } else {
-    btn.textContent = '💾 收藏此故事';
+    btn.textContent = saveLabel;
     btn.disabled = false;
     btn.classList.remove('is-saved');
   }
 }
 
 /**
- * 處理「收藏此故事」按鈕
+ * 處理「收藏此個案情境」按鈕
  */
 function handleSaveStory() {
   if (!currentL1Story || !currentL1Story.story_en) {
-    alert('目前沒有可收藏的故事，請先生成一篇。');
+    alert('目前沒有可收藏的個案情境，請先生成一篇。');
     return;
   }
 
@@ -375,7 +438,7 @@ function handleSaveStory() {
   }
 
   if (typeof showToast === 'function') {
-    showToast(result.already ? '✅ 此故事已在文章庫中' : '✅ 已收藏至文章庫');
+    showToast(result.already ? '✅ 此個案情境已在文章庫中' : '✅ 已收藏至文章庫');
   }
 }
 
@@ -447,7 +510,7 @@ function renderStory(story) {
       } else {
         const fallback = document.createElement('span');
         fallback.className = 'result-label';
-        fallback.textContent = '英文故事';
+        fallback.textContent = L1_LENGTH_UI[getL1LengthMode()].resultLabel;
         labelRow.appendChild(fallback);
       }
       labelRow.appendChild(
@@ -466,11 +529,13 @@ function renderStory(story) {
 }
 
 /**
- * 處理「隨機生成社工小故事」按鈕
+ * 處理「隨機生成社工小故事／詳細個案情境」按鈕
  */
 async function handleGenerateStory() {
   const generateBtn = document.getElementById('btn-generate-story');
   const loading = document.getElementById('reading-loading');
+  const lengthMode = getL1LengthMode();
+  const ui = L1_LENGTH_UI[lengthMode];
 
   resetReadingArea();
 
@@ -486,7 +551,7 @@ async function handleGenerateStory() {
       throw new Error('閱讀模組尚未載入完成，請強制重新整理頁面（Ctrl+F5）後再試。');
     }
 
-    const story = await generateL1Story();
+    const story = await generateL1Story(lengthMode);
 
     if (loading) loading.classList.add('hidden');
     renderStory(story);
@@ -498,7 +563,7 @@ async function handleGenerateStory() {
   } finally {
     if (generateBtn) {
       generateBtn.disabled = false;
-      generateBtn.textContent = '🎲 隨機生成社工小故事';
+      generateBtn.textContent = ui.generateLabel;
     }
   }
 }
@@ -1705,6 +1770,16 @@ function initReadingModule() {
   const showBtn = document.getElementById('btn-show-translation');
   const saveStoryBtn = document.getElementById('btn-save-story');
   const storyEn = document.getElementById('story-en');
+  const lengthSwitch = document.getElementById('l1-length-switch');
+
+  if (lengthSwitch) {
+    lengthSwitch.addEventListener('click', (event) => {
+      const btn = event.target.closest('.level-btn');
+      if (!btn || !btn.dataset.length) return;
+      setL1LengthMode(btn.dataset.length);
+    });
+    setL1LengthMode(currentL1LengthMode);
+  }
 
   if (generateBtn) {
     generateBtn.addEventListener('click', handleGenerateStory);

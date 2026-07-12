@@ -158,30 +158,51 @@ function getApiKey() {
 }
 
 /**
- * L1 閱讀故事的 System Prompt
- * 要求：高度專業 Case Vignette、300–450 字、學術術語、香港脈絡、強制 JSON（含關鍵字與例句）
+ * L1 閱讀：長文 detailed case vignette System Prompt（300–450 字）
  */
-const L1_STORY_SYSTEM_PROMPT = `你是一位具備高度學術素養的香港資深社會工作督導。請根據所選的科目與情境，生成一篇**高度專業、細節豐富的社工個案情境故事 (Case Vignette)**。
+const L1_STORY_LONG_SYSTEM_PROMPT = `你是一位具備高度學術素養的香港資深社會工作督導。請根據指定的主題，生成一篇高度專業、細節豐富的社工個案情境 (Case Vignette / detailed case vignette)。
+必須符合香港的社會脈絡與法例，並在文中自然穿插至少 8 到 10 個高級社工學術專有名詞（如 ecological perspective, empowerment, crisis intervention 等）。
+⚠️ 最高優先：主題必須嚴格符合開頭的「科目鎖定」要求，不可寫成與該科目無關的一般日常敘事。
+若科目為社會工作倫理與價值，核心必須清楚呈現社工倫理兩難與道德抉擇的掙扎（例如保密 vs 舉報、自決 vs 保護生命）；香港法例、SWRB、華人價值或宗教等僅隨機帶入 1–2 個作為導火線，不要一次塞滿。
 
+你必須嚴格回傳以下 JSON 格式，絕對不允許偏離字數限制：
+{
+  "story_en": "【必須是 300 到 450 字的英文長文】。請分為3段：1.案主背景與呈現問題。2.詳細的社工心理社會預估與對話細節。3.具體的介入過程與學術理論應用。",
+  "story_zh": "與上方 story_en 對應的繁體中文高質量翻譯。",
+  "vocabulary": [
+    {
+      "term": "英文專有名詞1",
+      "zh": "繁體中文翻譯",
+      "part_of_speech": "詞性"
+    }
+  ]
+}
+vocabulary 請提供 5-8 個從文中萃取的進階專有名詞。絕對禁止回傳過短、摘要式或僅數句的內容。`;
+
+/**
+ * L1 閱讀：短文社工小故事 System Prompt（約 3–4 句）
+ */
+const L1_STORY_SHORT_SYSTEM_PROMPT = `你是一位英文老師。請創作一個包含 3 到 4 句英文的社工小故事。
 ⚠️ 最高優先：故事主題必須嚴格符合開頭的「科目鎖定」要求，不可寫成與該科目無關的一般日常敘事。
 若科目為社會工作倫理與價值，故事核心必須清楚呈現社工倫理兩難與道德抉擇的掙扎（例如保密 vs 舉報、自決 vs 保護生命）；香港法例、SWRB、華人價值或宗教等僅隨機帶入 1–2 個作為導火線，不要一次塞滿。
-
-【格式與內容要求】：
-1. **長度與結構**：英文原文必須在 300 到 450 字之間。請分為 3-4 個段落（例如：案主背景與呈現問題、社工的心理社會預估 (Psychosocial Assessment)、具體的介入過程與理論應用、後續結果或倫理反思）。段落之間請以空行分隔。
-2. **學術深度**：必須在文章中自然地穿插**至少 8 到 10 個高級社工學術專有名詞**（例如：ecological perspective, cognitive restructuring, strengths-based approach, self-determination, transference, rapport building, empowerment, crisis intervention 等）。
-3. **具體細節**：請勿使用空泛的描述。請具體寫出案主的情緒反應、社工使用的微視技巧（Micro-skills，如 active listening, reframing）或是實際的會談對話片段。
-4. **在地化**：情境必須符合香港的社會脈絡、法例或福利制度運作。
+英文難度必須控制在初中程度，句子結構要簡單，但仍要保留關鍵專業術語。
 
 請以 JSON 格式回傳：
 {
-  "story_en": "英文故事全文（300-450 字，3-4 段）",
-  "story_zh": "高品質的繁體中文翻譯（對應全文）",
-  "keywords": [
-    {"word": "單字1", "zh": "中文意思", "example": "含該單字的英文例句"},
-    {"word": "單字2", "zh": "中文意思", "example": "含該單字的英文例句"}
+  "story_en": "英文故事全文（3 到 4 句）",
+  "story_zh": "整段故事的繁體中文翻譯",
+  "vocabulary": [
+    {
+      "term": "英文專有名詞1",
+      "zh": "繁體中文翻譯",
+      "part_of_speech": "詞性"
+    }
   ]
 }
-keywords 請從文中萃取出 5 到 8 個最核心的專業生字，並為每個生字提供一句取材自故事脈絡的英文例句。`;
+vocabulary 請挑選 5 到 8 個對於該科目最重要的單字。`;
+
+/** 相容舊名稱 */
+const L1_STORY_SYSTEM_PROMPT = L1_STORY_LONG_SYSTEM_PROMPT;
 
 /**
  * 底層：發送 DeepSeek Chat Completions 請求並解析 JSON 物件
@@ -384,54 +405,66 @@ function getL1StoryThemes(subjectId) {
 }
 
 /**
- * 生成 L1 漸進式閱讀的社工小故事
+ * 生成 L1 漸進式閱讀的社工小故事／詳細個案情境
  *
- * @returns {Promise<{story_en: string, story_zh: string, theme: string, keywords: Array<{word: string, zh: string, example?: string}>}>}
+ * @param {'long'|'short'} [lengthMode='long'] - 長文（2500 tokens）或短文（600 tokens）
+ * @returns {Promise<{story_en: string, story_zh: string, theme: string, lengthMode: string, keywords: Array<{word: string, zh: string, pos?: string}>}>}
  * @throws {Error} API Key 缺失、網路錯誤、或回傳格式異常時拋出
  */
-async function generateL1Story() {
+async function generateL1Story(lengthMode = 'long') {
+  const isShort = lengthMode === 'short';
   const subject = resolveCurrentSubject();
   // 依科目挑選主題，避免通用日常情境蓋過倫理等專科要求
   const themes = getL1StoryThemes(subject.id);
   const theme = themes[Math.floor(Math.random() * themes.length)];
-  const userContent =
-    `請根據情境「${theme}」，生成一篇 300 到 450 字、細節豐富的社工個案情境故事 (Case Vignette)。` +
-    `故事必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。` +
-    `請自然融入至少 8 到 10 個高級社工學術專有名詞，並具體描寫微視技巧與會談細節。`;
 
-  // 長文英文＋繁中翻譯＋關鍵字例句，需較高 token 上限
-  const result = await requestDeepSeekJSON(L1_STORY_SYSTEM_PROMPT, userContent, 2800);
+  const systemPrompt = isShort ? L1_STORY_SHORT_SYSTEM_PROMPT : L1_STORY_LONG_SYSTEM_PROMPT;
+  const maxTokens = isShort ? 600 : 2500;
+  const userContent = isShort
+    ? (
+      `請創作一個關於「${theme}」的社工小故事（3 到 4 句英文）。` +
+      `故事必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
+    )
+    : (
+      `請創作一篇關於「${theme}」的 detailed case vignette（詳細個案情境）。` +
+      `story_en 必須是 300 到 450 字的英文長文（分為三段），不可壓縮成摘要或數句。` +
+      `內容必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
+    );
 
-  const { story_en, story_zh, keywords } = result;
+  const result = await requestDeepSeekJSON(systemPrompt, userContent, maxTokens);
 
-  if (!story_en || !story_zh || !Array.isArray(keywords) || keywords.length === 0) {
-    throw new Error('AI 回傳資料不完整，缺少故事或關鍵字。');
+  const { story_en, story_zh } = result;
+  // 新 schema：vocabulary[{term, zh, part_of_speech}]；舊版相容：keywords[{word, zh}]
+  const rawVocab = Array.isArray(result.vocabulary)
+    ? result.vocabulary
+    : (Array.isArray(result.keywords) ? result.keywords : []);
+
+  if (!story_en || !story_zh || rawVocab.length === 0) {
+    throw new Error('AI 回傳資料不完整，缺少個案情境或專有名詞。');
   }
 
-  // 過濾無效關鍵字項目，確保 word / zh 皆為字串；例句為可選強化欄位
-  const validKeywords = keywords.filter(
-    (item) => item && typeof item.word === 'string' && typeof item.zh === 'string'
-      && item.word.trim() && item.zh.trim()
-  );
+  // 統一映射為 UI 使用的 keywords[{word, zh, pos?}]
+  const validKeywords = rawVocab
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const word = String(item.term || item.word || '').trim();
+      const zh = String(item.zh || '').trim();
+      const pos = String(item.part_of_speech || item.pos || '').trim();
+      if (!word || !zh) return null;
+      return pos ? { word, zh, pos } : { word, zh };
+    })
+    .filter(Boolean);
 
   if (validKeywords.length === 0) {
-    throw new Error('AI 回傳的關鍵字格式無效，請再試一次。');
+    throw new Error('AI 回傳的專有名詞格式無效，請再試一次。');
   }
 
   return {
     story_en: String(story_en).trim(),
     story_zh: String(story_zh).trim(),
     theme: theme,
-    keywords: validKeywords.map((item) => {
-      const mapped = {
-        word: item.word.trim(),
-        zh: item.zh.trim()
-      };
-      if (typeof item.example === 'string' && item.example.trim()) {
-        mapped.example = item.example.trim();
-      }
-      return mapped;
-    })
+    lengthMode: isShort ? 'short' : 'long',
+    keywords: validKeywords
   };
 }
 
