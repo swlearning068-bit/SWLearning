@@ -19,12 +19,14 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=13';
+} from './firebase-init.js?v=14';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
 /** 本機裝置識別（用來略過自己上傳觸發的雲端監聽） */
 const STORAGE_KEY_DEVICE_ID = 'swlearning_device_id';
+/** 尚未上傳的本機變更（sessionStorage，重整後仍記得要先上傳） */
+const STORAGE_KEY_LOCAL_DIRTY = 'swlearning_cloud_local_dirty';
 
 /** 不同步敏感／裝置設定鍵 */
 const EXCLUDE_KEYS = new Set([
@@ -60,12 +62,42 @@ let remoteApplyInFlight = false;
 let visibilityPullBound = false;
 /** 本機有尚未成功上傳的學習資料變更 */
 let localDirty = false;
+/** 本 session 已對此 uid 做過開啟時 hydrate，避免 auth 重複觸發又下載覆蓋 */
+let hydratedForUid = null;
 /** 衝突處理中，避免重複彈窗 */
 let conflictDialogOpen = false;
 /** @type {{ uid: string, remote: Record<string, unknown> } | null} */
 let pendingRemoteConflict = null;
 /** 使用者選擇稍後處理時，略過同一個雲端時間戳 */
 let ignoredRemoteUpdatedMs = 0;
+
+/**
+ * @param {boolean} value
+ */
+function setLocalDirty(value) {
+  localDirty = Boolean(value);
+  try {
+    if (localDirty) {
+      sessionStorage.setItem(STORAGE_KEY_LOCAL_DIRTY, '1');
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY_LOCAL_DIRTY);
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+/**
+ * @returns {boolean}
+ */
+function isLocalDirty() {
+  if (localDirty) return true;
+  try {
+    return sessionStorage.getItem(STORAGE_KEY_LOCAL_DIRTY) === '1';
+  } catch (_) {
+    return false;
+  }
+}
 
 /**
  * @param {string} key
@@ -608,7 +640,7 @@ async function uploadToCloud(uid, options = {}) {
   );
 
   markCloudBound(uid, now);
-  localDirty = false;
+  setLocalDirty(false);
   ignoredRemoteUpdatedMs = 0;
   if (!options.silent) {
     syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
@@ -641,7 +673,7 @@ function applyRemotePayloadToLocal(uid, remote) {
     });
     const remoteUpdated = toDateOrNull(remote.lastUpdated) || new Date();
     markCloudBound(uid, remoteUpdated);
-    localDirty = false;
+    setLocalDirty(false);
   } finally {
     suppressAutoPush = false;
   }
@@ -696,7 +728,7 @@ function applyRemoteFromOtherDevice(uid, remote) {
   remoteApplyInFlight = true;
   try {
     const keyCount = applyRemotePayloadToLocal(uid, remote);
-    localDirty = false;
+    setLocalDirty(false);
     syncToast(`☁️ 偵測到其他裝置更新，已同步 ${keyCount} 筆，即將重新載入…`);
     setTimeout(() => {
       location.reload();
@@ -725,7 +757,7 @@ function handleRemoteCloudUpdate(uid, remote) {
     return;
   }
 
-  if (localDirty || autoPushTimer || autoPushInFlight) {
+  if (localDirty || autoPushTimer || autoPushInFlight || isLocalDirty()) {
     // 有未上傳／即將上傳的本機變更 → 不要直接覆蓋
     if (autoPushTimer) {
       clearTimeout(autoPushTimer);
@@ -808,20 +840,20 @@ async function resolveConflict(choice) {
     closeSyncModal();
     try {
       await uploadToCloud(uid);
-      localDirty = false;
+      setLocalDirty(false);
       ignoredRemoteUpdatedMs = 0;
       syncToast('✅ 已保留本機並覆蓋雲端');
     } catch (error) {
       console.error('[sync] 衝突處理上傳失敗：', error);
       syncToast('❌ 上傳失敗，衝突尚未解決');
-      localDirty = true;
+      setLocalDirty(true);
     }
     return;
   }
 
   // use-cloud
   closeSyncModal();
-  localDirty = false;
+  setLocalDirty(false);
   ignoredRemoteUpdatedMs = 0;
   applyRemoteFromOtherDevice(uid, remote);
 }
@@ -883,9 +915,11 @@ function startCloudPullListener(uid) {
 
       if (isFirstEvent) {
         isFirstEvent = false;
-        // 訂閱當下若雲端明顯較新（例如他機先改完），立刻同步
+        // 訂閱當下：雲端較新才拉；本機有未上傳變更則改上傳
         if (cloudIsNewer) {
           handleRemoteCloudUpdate(uid, remote);
+        } else if (isLocalDirty()) {
+          scheduleAutoPush();
         }
         return;
       }
@@ -1252,11 +1286,15 @@ function requireUidQuiet() {
 
 function installAutoPush() {
   if (!autoPushInstalled) {
+    // 還原重整前未上傳狀態
+    if (isLocalDirty()) {
+      localDirty = true;
+    }
     originalSetItem = localStorage.setItem.bind(localStorage);
     localStorage.setItem = function patchedSetItem(key, value) {
       originalSetItem(key, value);
       if (!suppressAutoPush && shouldSyncKey(String(key))) {
-        localDirty = true;
+        setLocalDirty(true);
         scheduleAutoPush();
       }
     };
@@ -1265,6 +1303,9 @@ function installAutoPush() {
   const uid = requireUidQuiet();
   if (uid && isCloudBound(uid)) {
     startCloudPullListener(uid);
+    if (isLocalDirty()) {
+      scheduleAutoPush();
+    }
   }
 }
 
@@ -1282,11 +1323,21 @@ function uninstallAutoPush() {
 }
 
 /**
- * 已對齊時以雲端為準載入：開啟／登入後先讀雲端，若與本機不同則覆蓋本機並重整
+ * 已對齊時開啟／登入：比對雲端與本機
+ * - 相同：不動作
+ * - 雲端較新：下載（若本機也 dirty 則衝突詢問）
+ * - 本機較新／有未上傳變更：上傳，绝不默默下載覆蓋
  * @param {string} uid
  */
 async function hydrateFromCloud(uid) {
   if (!uid || remoteApplyInFlight) return;
+
+  // 同一 uid 本 session 只自動 hydrate 一次，避免 auth 重複觸發把 B 的操作下載蓋掉
+  if (hydratedForUid === uid) {
+    installAutoPush();
+    if (isLocalDirty()) scheduleAutoPush();
+    return;
+  }
 
   installAutoPush();
 
@@ -1301,8 +1352,10 @@ async function hydrateFromCloud(uid) {
   try {
     const snap = await getDoc(doc(services.db, 'users', uid));
     if (!snap.exists()) {
-      // 雲端空了但本機仍標記對齊：把本機推回雲端重建
-      scheduleAutoPush();
+      hydratedForUid = uid;
+      setLocalDirty(true);
+      await uploadToCloud(uid, { silent: true });
+      syncToast('☁️ 雲端無資料，已以上傳本機重建');
       return;
     }
 
@@ -1311,33 +1364,74 @@ async function hydrateFromCloud(uid) {
       remote.data && typeof remote.data === 'object' ? remote.data : {};
     const remoteKeys = Object.keys(remoteData).filter(shouldSyncKey);
     if (remoteKeys.length === 0) {
-      scheduleAutoPush();
+      hydratedForUid = uid;
+      setLocalDirty(true);
+      await uploadToCloud(uid, { silent: true });
       return;
     }
 
     const localFp = fingerprintLocalPayload();
     const remoteFp = fingerprintRemotePayload(remote);
+    const remoteUpdated = toDateOrNull(remote.lastUpdated);
+    const bound = readCloudBound();
+    const localSynced =
+      bound && bound.lastSyncedAt ? new Date(bound.lastSyncedAt) : null;
+    const cloudNewer = Boolean(
+      remoteUpdated &&
+        (!localSynced ||
+          remoteUpdated.getTime() > localSynced.getTime() + 800)
+    );
+    const dirty = isLocalDirty();
+
     if (localFp === remoteFp) {
-      const remoteUpdated = toDateOrNull(remote.lastUpdated);
+      hydratedForUid = uid;
+      setLocalDirty(false);
       if (remoteUpdated) markCloudBound(uid, remoteUpdated);
       else markCloudBound(uid);
       return;
     }
 
-    // 已對齊裝置：存取以雲端為準
-    if (remoteApplyInFlight) return;
-    remoteApplyInFlight = true;
-    try {
-      const keyCount = applyRemotePayloadToLocal(uid, remote);
-      syncToast(`☁️ 已從雲端載入 ${keyCount} 筆最新資料，即將重新載入…`);
-      setTimeout(() => {
-        location.reload();
-      }, 700);
-    } catch (error) {
-      remoteApplyInFlight = false;
-      console.error('[sync] 從雲端載入套用失敗：', error);
-      syncToast('❌ 從雲端載入失敗');
+    // 本機有未上傳變更，且雲端未更新 → 上傳本機
+    if (dirty && !cloudNewer) {
+      hydratedForUid = uid;
+      syncToast('☁️ 正在上傳此裝置尚未同步的變更…');
+      await uploadToCloud(uid, { silent: true });
+      syncToast('✅ 本機變更已上傳至雲端');
+      return;
     }
+
+    // 兩邊都有較新變更 → 詢問
+    if (dirty && cloudNewer) {
+      hydratedForUid = uid;
+      handleRemoteCloudUpdate(uid, remote);
+      return;
+    }
+
+    // 雲端較新、本機無未上傳變更 → 下載
+    if (cloudNewer) {
+      if (remoteApplyInFlight) return;
+      remoteApplyInFlight = true;
+      try {
+        const keyCount = applyRemotePayloadToLocal(uid, remote);
+        hydratedForUid = uid;
+        syncToast(`☁️ 已從雲端載入 ${keyCount} 筆最新資料，即將重新載入…`);
+        setTimeout(() => {
+          location.reload();
+        }, 700);
+      } catch (error) {
+        remoteApplyInFlight = false;
+        console.error('[sync] 從雲端載入套用失敗：', error);
+        syncToast('❌ 從雲端載入失敗');
+      }
+      return;
+    }
+
+    // 內容不同但雲端未較新 → 視為本機領先，上傳
+    hydratedForUid = uid;
+    setLocalDirty(true);
+    syncToast('☁️ 本機資料較新，正在上傳…');
+    await uploadToCloud(uid, { silent: true });
+    syncToast('✅ 本機變更已上傳至雲端');
   } catch (error) {
     console.error('[sync] 從雲端載入失敗：', error);
   }
@@ -1378,6 +1472,7 @@ async function handleAuthCloudDecision(user, options = {}) {
 
   if (!uid) {
     previousAuthUid = null;
+    hydratedForUid = null;
     uninstallAutoPush();
     stopCloudPullListener();
     return;
@@ -1390,6 +1485,8 @@ async function handleAuthCloudDecision(user, options = {}) {
   const bound = readCloudBound();
   if (bound && bound.uid && bound.uid !== uid) {
     clearCloudBound();
+    hydratedForUid = null;
+    setLocalDirty(false);
   }
 
   if (isCloudBound(uid) && !forceDecision) {
