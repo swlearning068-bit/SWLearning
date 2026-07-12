@@ -23,7 +23,8 @@ import {
   getFirestore,
   doc,
   setDoc,
-  getDoc
+  getDoc,
+  deleteDoc
 } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
 
 const STORAGE_KEY_FIREBASE = 'swlearning_firebase_config';
@@ -248,6 +249,7 @@ function exposeFirebaseGlobals() {
   window.firebaseDoc = doc;
   window.firebaseSetDoc = setDoc;
   window.firebaseGetDoc = getDoc;
+  window.firebaseDeleteDoc = deleteDoc;
   window.firebaseCurrentUser = (auth && auth.currentUser) || null;
   window.isFirebaseReady = isFirebaseReady;
   window.getFirebaseAuth = getFirebaseAuth;
@@ -660,6 +662,7 @@ export {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   isFirebaseReady,
   getFirebaseAuth,
   getFirebaseDb,

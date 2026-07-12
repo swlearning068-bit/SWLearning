@@ -11,11 +11,12 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   isFirebaseReady,
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=9';
+} from './firebase-init.js?v=10';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
@@ -362,6 +363,7 @@ function renderSyncComparison(mode, result, errorMessage) {
   const hintEl = document.getElementById('sync-hint');
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
+  const clearBtn = document.getElementById('btn-sync-clear-cloud');
   const closeBtn = document.getElementById('btn-close-sync-modal');
 
   const localFallback =
@@ -390,6 +392,18 @@ function renderSyncComparison(mode, result, errorMessage) {
     closeBtn.textContent = mode === 'manual' ? '關閉' : '稍後再說';
   }
 
+  const showClear =
+    mode === 'manual' &&
+    result &&
+    result.cloud &&
+    result.cloud.hasData &&
+    !result.cloud.error;
+
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', !showClear);
+    clearBtn.disabled = !showClear;
+  }
+
   if (errorMessage) {
     if (localEl) {
       localEl.textContent = localFallback.hasData
@@ -398,6 +412,10 @@ function renderSyncComparison(mode, result, errorMessage) {
     }
     if (cloudEl) cloudEl.textContent = errorMessage;
     if (bannerEl) bannerEl.classList.add('hidden');
+    if (clearBtn) {
+      clearBtn.classList.add('hidden');
+      clearBtn.disabled = true;
+    }
     if (uploadBtn) {
       uploadBtn.disabled = false;
       uploadBtn.classList.remove('hidden');
@@ -422,6 +440,10 @@ function renderSyncComparison(mode, result, errorMessage) {
     if (bannerEl) bannerEl.classList.add('hidden');
     if (uploadBtn) uploadBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
+    if (clearBtn) {
+      clearBtn.classList.add('hidden');
+      clearBtn.disabled = true;
+    }
     return;
   }
 
@@ -469,7 +491,7 @@ function renderSyncComparison(mode, result, errorMessage) {
         '選「沿用雲端」後會重新載入頁面；選「上傳覆蓋」會以本機改寫雲端。';
     } else {
       hintEl.textContent =
-        '已對齊狀態下，本機變更會自動上傳。手動操作僅供救援或強制重新載入。';
+        '已對齊狀態下，本機變更會自動上傳。亦可手動推送、重新載入，或清除雲端資料（需防呆確認）。';
     }
   }
 
@@ -570,6 +592,90 @@ async function downloadFromCloud(uid) {
   setTimeout(() => {
     location.reload();
   }, 600);
+}
+
+/**
+ * 清除 Firestore 上此帳號的學習資料（不動本機）
+ * @param {string} uid
+ */
+async function clearCloudData(uid) {
+  if (!uid) throw new Error('缺少使用者 uid');
+  const services = requireFirebaseServices();
+  if (!services) throw new Error('Firebase 未連線');
+
+  await deleteDoc(doc(services.db, 'users', uid));
+  clearCloudBound();
+  uninstallAutoPush();
+  syncToast('✅ 已清除雲端學習資料（本機資料未更動）');
+}
+
+/**
+ * 雙重防呆後清除雲端
+ */
+async function runClearCloudWithGuards() {
+  const uid = requireUid();
+  if (!uid) return;
+
+  const compare = await compareLocalAndCloud(uid);
+  if (compare.cloud.error) {
+    syncToast(compare.cloud.error);
+    return;
+  }
+  if (!compare.cloud.hasData) {
+    syncToast('☁️ 雲端目前沒有可清除的資料');
+    return;
+  }
+
+  const firstOk = window.confirm(
+    [
+      '即將永久刪除此帳號在 Firestore 的學習資料。',
+      '',
+      `雲端目前約 ${compare.cloud.keyCount} 筆（更新於 ${formatDateTime(
+        compare.cloud.lastUpdated
+      )}）`,
+      '',
+      '注意：',
+      '· 只清除雲端，不會刪除本機資料',
+      '· 清除後其他裝置無法再下載這份雲端庫',
+      '· 此裝置會解除「已對齊」狀態，需重新建立雲端庫',
+      '',
+      '確定要繼續嗎？'
+    ].join('\n')
+  );
+  if (!firstOk) {
+    syncToast('已取消清除');
+    return;
+  }
+
+  const CONFIRM_TEXT = '清除雲端';
+  const typed = window.prompt(
+    `防呆確認：請輸入「${CONFIRM_TEXT}」四個字（必須完全相同）才會執行清除。`,
+    ''
+  );
+  if (typed === null) {
+    syncToast('已取消清除');
+    return;
+  }
+  if (String(typed).trim() !== CONFIRM_TEXT) {
+    syncToast('輸入不符，未清除雲端資料');
+    return;
+  }
+
+  const clearBtn = document.getElementById('btn-sync-clear-cloud');
+  if (clearBtn) clearBtn.disabled = true;
+
+  try {
+    await clearCloudData(uid);
+    const refreshed = await compareLocalAndCloud(uid);
+    renderSyncComparison('manual', refreshed);
+  } catch (error) {
+    console.error('[sync] 清除雲端失敗：', error);
+    const tip = describeFirestoreError(error);
+    syncToast(tip.toast || '❌ 清除雲端失敗');
+    window.alert(['清除雲端失敗', '', tip.detail || String(error)].join('\n'));
+  } finally {
+    if (clearBtn) clearBtn.disabled = false;
+  }
 }
 
 /**
@@ -869,6 +975,7 @@ function bindSyncUI() {
   const closeBtn = document.getElementById('btn-close-sync-modal');
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
+  const clearBtn = document.getElementById('btn-sync-clear-cloud');
   const modal = document.getElementById('sync-modal');
 
   if (syncBtn) {
@@ -909,6 +1016,12 @@ function bindSyncUI() {
     });
   }
 
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      runClearCloudWithGuards();
+    });
+  }
+
   window.addEventListener('sw-firebase-auth', (event) => {
     const detail = /** @type {CustomEvent} */ (event).detail || {};
     handleAuthCloudDecision(detail.user || null);
@@ -938,12 +1051,14 @@ if (document.readyState === 'loading') {
 
 window.uploadToCloud = uploadToCloud;
 window.downloadFromCloud = downloadFromCloud;
+window.clearCloudData = clearCloudData;
 window.openSyncModal = openSyncModal;
 window.STORAGE_KEY_CLOUD_BOUND = STORAGE_KEY_CLOUD_BOUND;
 
 export {
   uploadToCloud,
   downloadFromCloud,
+  clearCloudData,
   collectLocalStoragePayload,
   compareLocalAndCloud,
   openSyncModal,

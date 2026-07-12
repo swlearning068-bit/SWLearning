@@ -223,8 +223,14 @@ body {
 }
 
 .sync-modal-actions .btn.hidden,
-.sync-modal-actions .text-btn.hidden {
+.sync-modal-actions .text-btn.hidden,
+.sync-modal-actions .danger-btn.hidden {
   display: none;
+}
+
+.sync-clear-btn {
+  width: 100%;
+  flex: 1 1 100%;
 }
 
 @media (max-width: 640px) {
