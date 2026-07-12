@@ -222,6 +222,11 @@ body {
   font-weight: 500;
 }
 
+.sync-modal-actions .btn.hidden,
+.sync-modal-actions .text-btn.hidden {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .user-email {
     max-width: 96px;

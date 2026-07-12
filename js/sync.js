@@ -1,11 +1,10 @@
 /**
- * sync.js — 雲端同步引擎（含本機／雲端衝突分辨）
+ * sync.js — 雲端儲存庫
  *
- * 職責：
- * 1. 打包本機 localStorage 學習資料上傳至 Firestore
- * 2. 從雲端下載並覆蓋本機 localStorage
- * 3. 同步前比對兩邊資料，兩邊皆有時強制確認，避免誤覆蓋
- * 4. 登入後若偵測衝突，主動開啟同步視窗
+ * 流程：
+ * 1. 首次登入且雲端空白 → 確認後以上傳建立雲端真相
+ * 2. 之後裝置登入且雲端已有資料 → 二選一（上傳覆蓋／沿用雲端）
+ * 3. 本機標記已對齊後 → 學習資料變更防抖自動上傳
  */
 
 import {
@@ -16,19 +15,35 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=8';
+} from './firebase-init.js?v=9';
+
+/** 本機對齊標記（不同步上雲） */
+const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
 
 /** 不同步敏感／裝置設定鍵 */
 const EXCLUDE_KEYS = new Set([
   'swlearning_deepseek_api_key',
-  STORAGE_KEY_FIREBASE
+  STORAGE_KEY_FIREBASE,
+  STORAGE_KEY_CLOUD_BOUND
 ]);
+
+const AUTO_PUSH_DEBOUNCE_MS = 2500;
 
 /** @type {{ local: object, cloud: object } | null} */
 let lastCompareResult = null;
 
-/** 用來判斷「剛登入」而非頁面重整帶入既有 session */
+/** @type {string | null | undefined} */
 let previousAuthUid = undefined;
+
+/** @type {'first-seed' | 'choose' | 'manual' | null} */
+let syncModalMode = null;
+
+let suppressAutoPush = false;
+let autoPushTimer = null;
+let autoPushInFlight = false;
+let autoPushInstalled = false;
+/** @type {typeof localStorage.setItem | null} */
+let originalSetItem = null;
 
 /**
  * @param {string} key
@@ -87,11 +102,16 @@ function requireFirebaseServices() {
     window.firebaseDb ||
     null;
 
-  // 後備：若模組狀態異常，但 window 上仍有可用實例
   if ((!auth || !db) && typeof window.isFirebaseReady === 'function') {
     ready = window.isFirebaseReady() || ready;
-    auth = auth || (window.getFirebaseAuth && window.getFirebaseAuth()) || window.firebaseAuth;
-    db = db || (window.getFirebaseDb && window.getFirebaseDb()) || window.firebaseDb;
+    auth =
+      auth ||
+      (window.getFirebaseAuth && window.getFirebaseAuth()) ||
+      window.firebaseAuth;
+    db =
+      db ||
+      (window.getFirebaseDb && window.getFirebaseDb()) ||
+      window.firebaseDb;
   }
 
   if (!ready && !(auth && db)) {
@@ -107,7 +127,6 @@ function requireFirebaseServices() {
 
 /**
  * @param {unknown} error
- * @returns {{ code: string, toast: string, detail: string }}
  */
 function describeFirestoreError(error) {
   const code =
@@ -126,19 +145,7 @@ function describeFirestoreError(error) {
       detail: [
         '雲端讀取被拒絕（permission-denied）。',
         '',
-        '請到 Firebase Console → Firestore Database → Rules，改成：',
-        '',
-        'rules_version = \'2\';',
-        'service cloud.firestore {',
-        '  match /databases/{database}/documents {',
-        '    match /users/{userId} {',
-        '      allow read, write: if request.auth != null',
-        '        && request.auth.uid == userId;',
-        '    }',
-        '  }',
-        '}',
-        '',
-        '儲存規則後等幾秒再同步。'
+        '請到 Firebase Console → Firestore Database → Rules，允許登入者讀寫 users/{userId}。'
       ].join('\n')
     };
   }
@@ -153,20 +160,8 @@ function describeFirestoreError(error) {
     return {
       code,
       toast: '⚠️ 請先在 Firebase 建立 Firestore 資料庫',
-      detail: [
-        '專案尚未建立 Firestore Database。',
-        '',
-        '請到 Firebase Console → Build → Firestore Database → 建立資料庫',
-        '（可先選測試模式，稍後再改成上方安全規則）。'
-      ].join('\n')
-    };
-  }
-
-  if (code === 'unavailable' || code === 'deadline-exceeded') {
-    return {
-      code,
-      toast: '❌ 暫時無法連上 Firestore，請稍後再試',
-      detail: '網路不穩或 Firebase 服務忙碌，請稍後再開一次雲端同步。'
+      detail:
+        '請到 Firebase Console → Build → Firestore Database → 建立資料庫。'
     };
   }
 
@@ -205,7 +200,6 @@ function toDateOrNull(value) {
 
 /**
  * @param {Date | null} date
- * @returns {string}
  */
 function formatDateTime(date) {
   if (!date) return '未知時間';
@@ -230,6 +224,59 @@ function getLocalSyncSummary() {
     keyCount: keys.length,
     keys
   };
+}
+
+/**
+ * @param {string} uid
+ */
+function readCloudBound() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CLOUD_BOUND);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * @param {string} uid
+ */
+function isCloudBound(uid) {
+  const bound = readCloudBound();
+  return Boolean(bound && bound.uid === uid);
+}
+
+/**
+ * @param {string} uid
+ */
+function markCloudBound(uid) {
+  const prevSuppress = suppressAutoPush;
+  suppressAutoPush = true;
+  try {
+    localStorage.setItem(
+      STORAGE_KEY_CLOUD_BOUND,
+      JSON.stringify({
+        uid,
+        lastSyncedAt: new Date().toISOString()
+      })
+    );
+  } finally {
+    suppressAutoPush = prevSuppress;
+  }
+  installAutoPush();
+}
+
+function clearCloudBound() {
+  const prevSuppress = suppressAutoPush;
+  suppressAutoPush = true;
+  try {
+    localStorage.removeItem(STORAGE_KEY_CLOUD_BOUND);
+  } finally {
+    suppressAutoPush = prevSuppress;
+  }
 }
 
 /**
@@ -288,7 +335,6 @@ async function getCloudSyncSummary(uid) {
 }
 
 /**
- * 比對本機與雲端，供 UI 與覆蓋前確認使用
  * @param {string} uid
  */
 async function compareLocalAndCloud(uid) {
@@ -301,20 +347,48 @@ async function compareLocalAndCloud(uid) {
 }
 
 /**
- * 把比對結果寫進同步 Modal
+ * @param {'first-seed' | 'choose' | 'manual'} mode
  * @param {{ local: object, cloud: object, bothHaveData: boolean } | null} result
  * @param {string} [errorMessage]
  */
-function renderSyncComparison(result, errorMessage) {
+function renderSyncComparison(mode, result, errorMessage) {
+  syncModalMode = mode;
+
+  const titleEl = document.getElementById('sync-modal-title');
+  const descEl = document.getElementById('sync-modal-desc');
   const localEl = document.getElementById('sync-local-meta');
   const cloudEl = document.getElementById('sync-cloud-meta');
-  const conflictEl = document.getElementById('sync-conflict-banner');
+  const bannerEl = document.getElementById('sync-conflict-banner');
   const hintEl = document.getElementById('sync-hint');
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
+  const closeBtn = document.getElementById('btn-close-sync-modal');
 
-  // 即使雲端失敗，也盡量顯示本機狀態
-  const localFallback = result && result.local ? result.local : getLocalSyncSummary();
+  const localFallback =
+    result && result.local ? result.local : getLocalSyncSummary();
+
+  if (titleEl) {
+    if (mode === 'first-seed') titleEl.textContent = '☁️ 建立雲端儲存庫';
+    else if (mode === 'choose') titleEl.textContent = '☁️ 雲端已有資料';
+    else titleEl.textContent = '☁️ 雲端儲存庫';
+  }
+
+  if (descEl) {
+    if (mode === 'first-seed') {
+      descEl.textContent =
+        '雲端尚無學習資料。確定要以「此裝置」的本機資料建立雲端庫嗎？建立後，雲端將成為此帳號的資料基準。';
+    } else if (mode === 'choose') {
+      descEl.textContent =
+        '此帳號的雲端已有資料。請選擇要以本機覆蓋雲端，或沿用雲端資料覆蓋本機。';
+    } else {
+      descEl.textContent =
+        '此裝置已對齊雲端儲存庫。本機學習資料變更會自動上傳；也可手動重新載入或推送。';
+    }
+  }
+
+  if (closeBtn) {
+    closeBtn.textContent = mode === 'manual' ? '關閉' : '稍後再說';
+  }
 
   if (errorMessage) {
     if (localEl) {
@@ -323,18 +397,21 @@ function renderSyncComparison(result, errorMessage) {
         : '尚無學習資料';
     }
     if (cloudEl) cloudEl.textContent = errorMessage;
-    if (conflictEl) conflictEl.classList.add('hidden');
+    if (bannerEl) bannerEl.classList.add('hidden');
     if (uploadBtn) {
       uploadBtn.disabled = false;
-      uploadBtn.textContent = '⬆️ 上傳覆蓋雲端';
+      uploadBtn.classList.remove('hidden');
+      uploadBtn.textContent =
+        mode === 'first-seed' ? '確定建立（上傳本機）' : '⬆️ 上傳覆蓋雲端';
     }
     if (downloadBtn) {
       downloadBtn.disabled = true;
-      downloadBtn.textContent = '⬇️ 下載覆蓋本機';
+      downloadBtn.classList.toggle('hidden', mode === 'first-seed');
+      downloadBtn.textContent = '⬇️ 沿用雲端資料';
     }
     if (hintEl) {
       hintEl.textContent =
-        '雲端狀態讀取失敗。若要先備份本機，仍可嘗試上傳；請先確認已建立 Firestore 並設定規則。';
+        '雲端狀態讀取失敗。請確認已建立 Firestore 並設定規則後再試。';
     }
     return;
   }
@@ -342,11 +419,13 @@ function renderSyncComparison(result, errorMessage) {
   if (!result) {
     if (localEl) localEl.textContent = '檢查中…';
     if (cloudEl) cloudEl.textContent = '檢查中…';
-    if (conflictEl) conflictEl.classList.add('hidden');
+    if (bannerEl) bannerEl.classList.add('hidden');
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
     return;
   }
 
-  const { local, cloud, bothHaveData } = result;
+  const { local, cloud } = result;
 
   if (localEl) {
     localEl.textContent = local.hasData
@@ -355,68 +434,80 @@ function renderSyncComparison(result, errorMessage) {
   }
 
   if (cloudEl) {
-    if (cloud.error) {
-      cloudEl.textContent = cloud.error;
-    } else if (cloud.hasData) {
+    if (cloud.error) cloudEl.textContent = cloud.error;
+    else if (cloud.hasData) {
       cloudEl.textContent = `${cloud.keyCount} 筆（更新於 ${formatDateTime(
         cloud.lastUpdated
       )}）`;
-    } else {
-      cloudEl.textContent = '尚無資料';
-    }
+    } else cloudEl.textContent = '尚無資料';
   }
 
-  if (conflictEl) {
-    conflictEl.classList.toggle('hidden', !bothHaveData);
+  if (bannerEl) {
+    if (mode === 'first-seed') {
+      bannerEl.classList.remove('hidden');
+      bannerEl.textContent =
+        '首次建立後，其他裝置登入時會詢問要以哪一邊為準。';
+    } else if (mode === 'choose') {
+      bannerEl.classList.remove('hidden');
+      bannerEl.textContent =
+        '⚠️ 上傳會改寫雲端真相；沿用雲端會覆蓋此裝置本機學習資料。';
+    } else {
+      bannerEl.classList.add('hidden');
+    }
   }
 
   if (hintEl) {
     if (cloud.error) {
       hintEl.textContent =
-        '雲端讀取失敗：請確認已建立 Firestore，並允許登入使用者讀寫自己的 users/{uid} 文件。';
-    } else if (bothHaveData) {
+        '雲端讀取失敗：請確認 Firestore 已建立，且允許登入者讀寫 users/{uid}。';
+    } else if (mode === 'first-seed') {
+      hintEl.textContent = local.hasData
+        ? '將上傳本機學習資料（不含 API Key／Firebase 設定）。'
+        : '本機目前幾乎沒有學習資料，仍可建立空白雲端庫。';
+    } else if (mode === 'choose') {
       hintEl.textContent =
-        '兩邊都有資料：請明確選擇「以本機為準上傳」或「以雲端為準下載」。連線本身不會自動覆蓋任一方。';
-    } else if (local.hasData && !cloud.hasData) {
-      hintEl.textContent =
-        '建議：先上傳本機資料到雲端，其他裝置再下載。';
-    } else if (!local.hasData && cloud.hasData) {
-      hintEl.textContent =
-        '建議：下載雲端資料到此裝置。';
+        '選「沿用雲端」後會重新載入頁面；選「上傳覆蓋」會以本機改寫雲端。';
     } else {
-      hintEl.textContent = '兩邊都還沒有可同步資料。';
+      hintEl.textContent =
+        '已對齊狀態下，本機變更會自動上傳。手動操作僅供救援或強制重新載入。';
     }
   }
 
   if (uploadBtn) {
-    // 雲端讀取失敗時仍允許上傳（可首次建立文件）
+    uploadBtn.classList.remove('hidden');
     uploadBtn.disabled = false;
-    uploadBtn.textContent = cloud.hasData
-      ? '⬆️ 以本機覆蓋雲端'
-      : '⬆️ 上傳到雲端';
+    if (mode === 'first-seed') uploadBtn.textContent = '確定建立（上傳本機）';
+    else if (mode === 'choose') uploadBtn.textContent = '⬆️ 上傳覆蓋雲端';
+    else uploadBtn.textContent = '⬆️ 將本機推上雲端';
   }
+
   if (downloadBtn) {
-    downloadBtn.disabled = !cloud.hasData || Boolean(cloud.error);
-    downloadBtn.textContent = local.hasData
-      ? '⬇️ 以雲端覆蓋本機'
-      : '⬇️ 下載到本機';
+    if (mode === 'first-seed') {
+      downloadBtn.classList.add('hidden');
+      downloadBtn.disabled = true;
+    } else {
+      downloadBtn.classList.remove('hidden');
+      downloadBtn.disabled = !cloud.hasData || Boolean(cloud.error);
+      downloadBtn.textContent =
+        mode === 'choose' ? '⬇️ 沿用雲端資料' : '⬇️ 從雲端重新載入';
+    }
   }
 }
 
 /**
  * @param {string} uid
+ * @param {{ silent?: boolean }} [options]
  */
-async function uploadToCloud(uid) {
+async function uploadToCloud(uid, options = {}) {
   if (!uid) throw new Error('缺少使用者 uid');
   const services = requireFirebaseServices();
   if (!services) throw new Error('Firebase 未連線');
 
-  const { db } = services;
   const payload = collectLocalStoragePayload();
   const keyCount = Object.keys(payload).length;
 
   await setDoc(
-    doc(db, 'users', uid),
+    doc(services.db, 'users', uid),
     {
       data: payload,
       lastUpdated: new Date(),
@@ -425,7 +516,10 @@ async function uploadToCloud(uid) {
     { merge: true }
   );
 
-  syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
+  markCloudBound(uid);
+  if (!options.silent) {
+    syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
+  }
 }
 
 /**
@@ -436,8 +530,7 @@ async function downloadFromCloud(uid) {
   const services = requireFirebaseServices();
   if (!services) throw new Error('Firebase 未連線');
 
-  const { db } = services;
-  const snap = await getDoc(doc(db, 'users', uid));
+  const snap = await getDoc(doc(services.db, 'users', uid));
   if (!snap.exists()) {
     syncToast('☁️ 雲端尚無資料，請先從此裝置上傳');
     return;
@@ -457,15 +550,21 @@ async function downloadFromCloud(uid) {
     return;
   }
 
-  keys.forEach((key) => {
-    if (!shouldSyncKey(key)) return;
-    const value = data[key];
-    if (value === null || value === undefined) {
-      localStorage.removeItem(key);
-      return;
-    }
-    localStorage.setItem(key, String(value));
-  });
+  suppressAutoPush = true;
+  try {
+    keys.forEach((key) => {
+      if (!shouldSyncKey(key)) return;
+      const value = data[key];
+      if (value === null || value === undefined) {
+        localStorage.removeItem(key);
+        return;
+      }
+      localStorage.setItem(key, String(value));
+    });
+    markCloudBound(uid);
+  } finally {
+    suppressAutoPush = false;
+  }
 
   syncToast(`✅ 已從雲端下載 ${keys.length} 筆資料，即將重新載入…`);
   setTimeout(() => {
@@ -488,67 +587,21 @@ function requireUid() {
   return user.uid;
 }
 
-/**
- * 覆蓋前二次確認（兩邊都有資料時必問）
- * @param {'upload' | 'download'} mode
- * @param {{ local: object, cloud: object, bothHaveData: boolean }} compare
- * @returns {boolean}
- */
-function confirmDestructiveSync(mode, compare) {
-  const { local, cloud, bothHaveData } = compare;
-
-  if (mode === 'upload') {
-    if (!local.hasData) {
-      const okEmpty = window.confirm(
-        '本機目前沒有可同步的學習資料。\n若繼續上傳，可能用空資料覆蓋雲端。確定嗎？'
-      );
-      return okEmpty;
-    }
-    if (cloud.hasData || bothHaveData) {
-      return window.confirm(
-        [
-          '即將以「本機資料」覆蓋「雲端資料」。',
-          '',
-          `本機：${local.keyCount} 筆`,
-          `雲端：${cloud.keyCount} 筆（更新於 ${formatDateTime(
-            cloud.lastUpdated
-          )}）`,
-          '',
-          '雲端現有內容會被取代，且無法自動復原。確定上傳嗎？'
-        ].join('\n')
-      );
-    }
-    return true;
-  }
-
-  // download
-  if (!cloud.hasData) {
-    syncToast('☁️ 雲端尚無資料可下載');
-    return false;
-  }
-  if (local.hasData || bothHaveData) {
-    return window.confirm(
-      [
-        '即將以「雲端資料」覆蓋「本機資料」。',
-        '',
-        `本機：${local.keyCount} 筆`,
-        `雲端：${cloud.keyCount} 筆（更新於 ${formatDateTime(
-          cloud.lastUpdated
-        )}）`,
-        '',
-        '本機現有學習內容會被取代，並重新載入頁面。確定下載嗎？'
-      ].join('\n')
-    );
-  }
-  return true;
+function closeSyncModal() {
+  const modal = document.getElementById('sync-modal');
+  if (modal) modal.classList.add('hidden');
+  syncModalMode = null;
 }
 
-async function openSyncModal() {
+/**
+ * @param {'first-seed' | 'choose' | 'manual'} mode
+ */
+async function openSyncModal(mode = 'manual') {
   const modal = document.getElementById('sync-modal');
   if (!modal) return;
 
   modal.classList.remove('hidden');
-  renderSyncComparison(null);
+  renderSyncComparison(mode, null);
 
   const uid = requireUid();
   if (!uid) {
@@ -556,14 +609,9 @@ async function openSyncModal() {
     return;
   }
 
-  const uploadBtn = document.getElementById('btn-sync-upload');
-  const downloadBtn = document.getElementById('btn-sync-download');
-  if (uploadBtn) uploadBtn.disabled = true;
-  if (downloadBtn) downloadBtn.disabled = true;
-
   try {
     const result = await compareLocalAndCloud(uid);
-    renderSyncComparison(result);
+    renderSyncComparison(mode, result);
 
     if (result.cloud && result.cloud.errorDetail) {
       syncToast(result.cloud.error || '讀取雲端狀態失敗');
@@ -581,6 +629,7 @@ async function openSyncModal() {
     const tip = describeFirestoreError(error);
     const local = getLocalSyncSummary();
     renderSyncComparison(
+      mode,
       {
         local,
         cloud: {
@@ -595,23 +644,17 @@ async function openSyncModal() {
     );
     syncToast(tip.toast);
     window.alert(['無法讀取雲端狀態', '', tip.detail].join('\n'));
-    if (uploadBtn) uploadBtn.disabled = false;
-    if (downloadBtn) downloadBtn.disabled = true;
   }
 }
 
-function closeSyncModal() {
-  const modal = document.getElementById('sync-modal');
-  if (modal) modal.classList.add('hidden');
-}
-
 /**
- * @param {'upload' | 'download'} mode
+ * @param {'upload' | 'download'} action
  */
-async function runSync(mode) {
+async function runSyncAction(action) {
   const uid = requireUid();
   if (!uid) return;
 
+  const mode = syncModalMode || 'manual';
   const uploadBtn = document.getElementById('btn-sync-upload');
   const downloadBtn = document.getElementById('btn-sync-download');
   const buttons = [uploadBtn, downloadBtn].filter(Boolean);
@@ -622,25 +665,76 @@ async function runSync(mode) {
 
   try {
     const compare = await compareLocalAndCloud(uid);
-    renderSyncComparison(compare);
+    renderSyncComparison(mode, compare);
 
-    if (!confirmDestructiveSync(mode, compare)) {
-      syncToast('已取消同步');
+    if (action === 'upload') {
+      if (mode === 'choose' || mode === 'manual') {
+        if (compare.cloud.hasData) {
+          const ok = window.confirm(
+            [
+              '即將以「本機資料」覆蓋「雲端資料」。',
+              '',
+              `本機：${compare.local.keyCount} 筆`,
+              `雲端：${compare.cloud.keyCount} 筆（更新於 ${formatDateTime(
+                compare.cloud.lastUpdated
+              )}）`,
+              '',
+              '確定上傳嗎？'
+            ].join('\n')
+          );
+          if (!ok) {
+            syncToast('已取消');
+            return;
+          }
+        } else if (!compare.local.hasData && mode === 'manual') {
+          const ok = window.confirm(
+            '本機幾乎沒有學習資料，仍要推上雲端嗎？'
+          );
+          if (!ok) {
+            syncToast('已取消');
+            return;
+          }
+        }
+      }
+
+      await uploadToCloud(uid);
+      closeSyncModal();
+      if (mode === 'first-seed') {
+        syncToast('✅ 已建立雲端儲存庫，之後本機變更會自動上傳');
+      }
       return;
     }
 
-    if (mode === 'upload') {
-      await uploadToCloud(uid);
-      const refreshed = await compareLocalAndCloud(uid);
-      renderSyncComparison(refreshed);
-      closeSyncModal();
-    } else {
-      await downloadFromCloud(uid);
+    // download
+    if (!compare.cloud.hasData) {
+      syncToast('☁️ 雲端尚無資料可下載');
+      return;
     }
+
+    if (compare.local.hasData) {
+      const ok = window.confirm(
+        [
+          '即將以「雲端資料」覆蓋「本機資料」，並重新載入頁面。',
+          '',
+          `本機：${compare.local.keyCount} 筆`,
+          `雲端：${compare.cloud.keyCount} 筆（更新於 ${formatDateTime(
+            compare.cloud.lastUpdated
+          )}）`,
+          '',
+          '確定沿用雲端嗎？'
+        ].join('\n')
+      );
+      if (!ok) {
+        syncToast('已取消');
+        return;
+      }
+    }
+
+    await downloadFromCloud(uid);
   } catch (error) {
     console.error('[sync] 同步失敗：', error);
-    syncToast('❌ 同步失敗，請檢查網路或 Firebase 權限後再試');
-    closeSyncModal();
+    const tip = describeFirestoreError(error);
+    syncToast(tip.toast || '❌ 同步失敗，請稍後再試');
   } finally {
     buttons.forEach((btn) => {
       btn.disabled = false;
@@ -648,32 +742,125 @@ async function runSync(mode) {
   }
 }
 
-/**
- * 登入後若兩邊都有資料，主動開啟分辨視窗（僅剛登入時）
- * @param {import('https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js').User | null} user
- */
-async function handleAuthChangeForConflict(user) {
-  const uid = user && user.uid ? user.uid : null;
+function scheduleAutoPush() {
+  if (suppressAutoPush || autoPushInFlight) return;
+  const uid = requireUidQuiet();
+  if (!uid || !isCloudBound(uid)) return;
 
-  // 第一次收到 auth 狀態：只建立基準，避免重整頁面就彈窗
-  if (previousAuthUid === undefined) {
-    previousAuthUid = uid;
+  if (autoPushTimer) clearTimeout(autoPushTimer);
+  autoPushTimer = setTimeout(async () => {
+    autoPushTimer = null;
+    const currentUid = requireUidQuiet();
+    if (!currentUid || !isCloudBound(currentUid) || suppressAutoPush) return;
+
+    autoPushInFlight = true;
+    try {
+      await uploadToCloud(currentUid, { silent: true });
+      console.log('[sync] 已自動上傳至雲端');
+    } catch (error) {
+      console.error('[sync] 自動上傳失敗：', error);
+    } finally {
+      autoPushInFlight = false;
+    }
+  }, AUTO_PUSH_DEBOUNCE_MS);
+}
+
+/**
+ * @returns {string | null}
+ */
+function requireUidQuiet() {
+  try {
+    if (!isFirebaseReady() && !(window.firebaseAuth && window.firebaseDb)) {
+      return null;
+    }
+  } catch (_) {
+    return null;
+  }
+  const auth =
+    (typeof getFirebaseAuth === 'function' && getFirebaseAuth()) ||
+    window.firebaseAuth;
+  const user = (auth && auth.currentUser) || window.firebaseCurrentUser;
+  return user && user.uid ? user.uid : null;
+}
+
+function installAutoPush() {
+  if (autoPushInstalled) return;
+  originalSetItem = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function patchedSetItem(key, value) {
+    originalSetItem(key, value);
+    if (!suppressAutoPush && shouldSyncKey(String(key))) {
+      scheduleAutoPush();
+    }
+  };
+  autoPushInstalled = true;
+}
+
+function uninstallAutoPush() {
+  if (!autoPushInstalled || !originalSetItem) return;
+  localStorage.setItem = originalSetItem;
+  originalSetItem = null;
+  autoPushInstalled = false;
+  if (autoPushTimer) {
+    clearTimeout(autoPushTimer);
+    autoPushTimer = null;
+  }
+}
+
+/**
+ * 登入後決策：首次建庫／換裝置二選一／已對齊則啟用自動上傳
+ * @param {{ uid?: string } | null} user
+ * @param {{ forceDecision?: boolean }} [options]
+ */
+async function handleAuthCloudDecision(user, options = {}) {
+  const uid = user && user.uid ? user.uid : null;
+  const forceDecision = Boolean(options.forceDecision);
+
+  if (!uid) {
+    previousAuthUid = null;
+    uninstallAutoPush();
     return;
   }
 
-  const justLoggedIn = Boolean(uid && previousAuthUid !== uid);
+  const firstAuthEvent = previousAuthUid === undefined;
+  const justLoggedIn = !firstAuthEvent && previousAuthUid !== uid;
   previousAuthUid = uid;
 
-  if (!justLoggedIn || !uid) return;
+  const bound = readCloudBound();
+  if (bound && bound.uid && bound.uid !== uid) {
+    clearCloudBound();
+  }
+
+  if (isCloudBound(uid) && !forceDecision) {
+    installAutoPush();
+    return;
+  }
+
+  const shouldDecide =
+    forceDecision || justLoggedIn || (firstAuthEvent && !isCloudBound(uid));
+  if (!shouldDecide) return;
 
   try {
     const result = await compareLocalAndCloud(uid);
-    if (!result.bothHaveData) return;
+    if (result.cloud && result.cloud.error) {
+      syncToast(result.cloud.error);
+      if (result.cloud.errorDetail) {
+        window.alert(
+          ['無法讀取雲端狀態', '', result.cloud.errorDetail].join('\n')
+        );
+      }
+      return;
+    }
 
-    syncToast('⚠️ 本機與雲端都有資料，請選擇要以哪一邊為準');
-    await openSyncModal();
+    if (!result.cloud.hasData) {
+      syncToast('雲端尚無資料，請確認是否以此裝置建立雲端庫');
+      await openSyncModal('first-seed');
+      return;
+    }
+
+    syncToast('雲端已有資料，請選擇上傳覆蓋或沿用雲端');
+    await openSyncModal('choose');
   } catch (error) {
-    console.error('[sync] 登入後衝突檢查失敗：', error);
+    console.error('[sync] 登入後雲端決策失敗：', error);
   }
 }
 
@@ -686,8 +873,17 @@ function bindSyncUI() {
 
   if (syncBtn) {
     syncBtn.addEventListener('click', () => {
-      if (!requireUid()) return;
-      openSyncModal();
+      const uid = requireUid();
+      if (!uid) return;
+      if (isCloudBound(uid)) {
+        openSyncModal('manual');
+      } else {
+        // 尚未對齊：重新走決策
+        handleAuthCloudDecision(
+          { uid },
+          { forceDecision: true }
+        );
+      }
     });
   }
 
@@ -703,20 +899,35 @@ function bindSyncUI() {
 
   if (uploadBtn) {
     uploadBtn.addEventListener('click', () => {
-      runSync('upload');
+      runSyncAction('upload');
     });
   }
 
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
-      runSync('download');
+      runSyncAction('download');
     });
   }
 
   window.addEventListener('sw-firebase-auth', (event) => {
     const detail = /** @type {CustomEvent} */ (event).detail || {};
-    handleAuthChangeForConflict(detail.user || null);
+    handleAuthCloudDecision(detail.user || null);
   });
+
+  // 若 auth 事件早於 listener，補跑一次目前登入狀態
+  const auth =
+    (typeof getFirebaseAuth === 'function' && getFirebaseAuth()) ||
+    window.firebaseAuth;
+  const currentUser =
+    (auth && auth.currentUser) || window.firebaseCurrentUser || null;
+  if (currentUser) {
+    handleAuthCloudDecision(currentUser);
+  } else {
+    const existingUid = requireUidQuiet();
+    if (existingUid && isCloudBound(existingUid)) {
+      installAutoPush();
+    }
+  }
 }
 
 if (document.readyState === 'loading') {
@@ -728,11 +939,13 @@ if (document.readyState === 'loading') {
 window.uploadToCloud = uploadToCloud;
 window.downloadFromCloud = downloadFromCloud;
 window.openSyncModal = openSyncModal;
+window.STORAGE_KEY_CLOUD_BOUND = STORAGE_KEY_CLOUD_BOUND;
 
 export {
   uploadToCloud,
   downloadFromCloud,
   collectLocalStoragePayload,
   compareLocalAndCloud,
-  openSyncModal
+  openSyncModal,
+  STORAGE_KEY_CLOUD_BOUND
 };

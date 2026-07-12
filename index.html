@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=32">
+  <link rel="stylesheet" href="css/style.css?v=33">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -24,7 +24,7 @@
       <div id="user-profile" class="user-profile hidden">
         <img id="user-avatar" class="user-avatar hidden" alt="" width="28" height="28" referrerpolicy="no-referrer">
         <span id="user-email" class="user-email"></span>
-        <button id="btn-sync" class="primary-btn" type="button">☁️ 雲端同步</button>
+        <button id="btn-sync" class="primary-btn" type="button">☁️ 雲端庫</button>
         <button id="btn-logout" class="text-btn" type="button">登出</button>
       </div>
       <!-- 點擊此按鈕會開啟 API Key 設定視窗 -->
@@ -984,7 +984,7 @@
 
   </main>
 
-  <!-- ==================== 雲端同步選擇 Modal ==================== -->
+  <!-- ==================== 雲端儲存庫 Modal ==================== -->
   <div
     id="sync-modal"
     class="modal-overlay hidden"
@@ -993,9 +993,9 @@
     aria-labelledby="sync-modal-title"
   >
     <div class="modal-box sync-modal-box">
-      <h2 id="sync-modal-title" class="modal-title">☁️ 雲端同步</h2>
-      <p class="modal-desc">
-        連上 Firebase 不會自動搬移資料。請先比對兩邊狀態，再選擇要以哪一邊為準。
+      <h2 id="sync-modal-title" class="modal-title">☁️ 雲端儲存庫</h2>
+      <p id="sync-modal-desc" class="modal-desc">
+        未登入前各裝置本機獨立；首次上傳的裝置會建立雲端基準，之後裝置可選擇覆蓋或沿用雲端。
       </p>
 
       <div id="sync-summary" class="sync-summary" aria-live="polite">
@@ -1013,12 +1013,10 @@
         id="sync-conflict-banner"
         class="sync-conflict-banner hidden"
         role="status"
-      >
-        ⚠️ 本機與雲端都有資料。上傳會覆蓋雲端；下載會覆蓋本機。請確認後再操作。
-      </div>
+      ></div>
 
       <p id="sync-hint" class="modal-desc sync-modal-note">
-        上傳會覆蓋雲端；下載會覆蓋本機學習資料（不含 API Key／Firebase 設定），並重新載入頁面。
+        學習資料會同步至雲端（不含 API Key／Firebase 設定）。
       </p>
 
       <div class="modal-actions sync-modal-actions">
@@ -1026,10 +1024,10 @@
           ⬆️ 上傳覆蓋雲端
         </button>
         <button id="btn-sync-download" class="btn btn-secondary" type="button">
-          ⬇️ 下載覆蓋本機
+          ⬇️ 沿用雲端資料
         </button>
         <button id="btn-close-sync-modal" class="text-btn" type="button">
-          取消
+          稍後再說
         </button>
       </div>
     </div>
@@ -1081,6 +1079,7 @@
         （若用 127.0.0.1 也要另外加入）；③ 用本機伺服器開啟，不要用 file://；
         ④ 已建立 Firestore Database，並允許登入者讀寫
         <code class="settings-code">users/{userId}</code>。
+        登入後會引導建立／對齊雲端儲存庫；對齊後本機學習資料變更會自動上傳。
       </p>
       <p id="firebase-status" class="firebase-status firebase-status--off" role="status">
         尚未連線 Firebase
@@ -1223,6 +1222,6 @@
   <script src="js/reward.js?v=4"></script>
   <script src="js/app.js?v=18"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=6"></script>
+  <script type="module" src="js/sync.js?v=7"></script>
 </body>
 </html>
