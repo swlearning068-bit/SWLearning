@@ -1220,8 +1220,7 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=4"></script>
   <script src="js/app.js?v=18"></script>
-  <!-- Firebase v10 模組化 SDK（ES module）+ 雲端同步引擎 -->
-  <script type="module" src="js/firebase-init.js?v=5"></script>
-  <script type="module" src="js/sync.js?v=3"></script>
+  <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
+  <script type="module" src="js/sync.js?v=4"></script>
 </body>
 </html>

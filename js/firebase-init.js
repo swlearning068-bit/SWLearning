@@ -27,6 +27,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
 
 const STORAGE_KEY_FIREBASE = 'swlearning_firebase_config';
+const BOOT_FLAG = '__swLearningFirebaseBootstrapped';
 
 /** @type {import('https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js').FirebaseApp | null} */
 let app = null;
@@ -192,10 +193,15 @@ function updateFirebaseStatusUI() {
   const connectBtn = document.getElementById('btn-firebase-connect');
   const disconnectBtn = document.getElementById('btn-firebase-disconnect');
   const config = loadSavedFirebaseConfig();
+  const ready = isFirebaseReady();
+  const signedIn = Boolean(auth && auth.currentUser);
 
   if (statusEl) {
-    if (isFirebaseReady() && config) {
-      statusEl.textContent = `已連線：${config.projectId}`;
+    if (ready && config) {
+      const loginHint = signedIn
+        ? ` · 已登入${auth.currentUser.email ? `（${auth.currentUser.email}）` : ''}`
+        : ' · 尚未登入 Google';
+      statusEl.textContent = `已連線：${config.projectId}${loginHint}`;
       statusEl.classList.remove('firebase-status--off');
       statusEl.classList.add('firebase-status--on');
     } else if (config) {
@@ -210,10 +216,10 @@ function updateFirebaseStatusUI() {
   }
 
   if (connectBtn) {
-    connectBtn.textContent = isFirebaseReady() ? '重新連線' : '儲存並連線';
+    connectBtn.textContent = ready ? '重新連線' : '儲存並連線';
   }
   if (disconnectBtn) {
-    disconnectBtn.disabled = !isFirebaseReady() && !config;
+    disconnectBtn.disabled = !ready && !config;
   }
 }
 
@@ -336,6 +342,7 @@ async function connectFirebase(config) {
   unsubscribeAuth = onAuthStateChanged(auth, (user) => {
     window.firebaseCurrentUser = user || null;
     updateAuthUI(user);
+    updateFirebaseStatusUI();
     window.dispatchEvent(
       new CustomEvent('sw-firebase-auth', { detail: { user: user || null } })
     );
@@ -569,6 +576,12 @@ function bindAuthAndSettingsUI() {
 }
 
 async function bootstrapFirebase() {
+  // 防止 HTML script + import 雙載入造成第二個實例把連線狀態覆寫掉
+  if (window[BOOT_FLAG]) {
+    return;
+  }
+  window[BOOT_FLAG] = true;
+
   exposeFirebaseGlobals();
   bindAuthAndSettingsUI();
   refreshFirebaseSettingsUI();
