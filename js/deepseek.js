@@ -276,6 +276,13 @@ const L1_STORY_SYSTEM_PROMPT = L1_STORY_LONG_SYSTEM_PROMPT;
  * @returns {Promise<string>} 已過濾 <think> 標籤的訊息內容
  */
 async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}) {
+  // 防呆：漏傳 taskType 會降級為 flash，方便第一時間發現呼叫端問題
+  if (!taskType || taskType === 'standard') {
+    console.warn(
+      '⚠️ [API 警告] 當前 API 呼叫未指定 taskType，已預設降級為 deepseek-v4-flash。若這不是預期行為，請檢查呼叫來源的參數傳遞。'
+    );
+  }
+
   const apiKey = getApiKey();
   const maxTokens = Number(options.maxTokens) > 0 ? Number(options.maxTokens) : 2500;
   const temperature =
@@ -298,7 +305,8 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
 
   // 發送請求前確認目前使用的模型（除錯用）
   console.log(
-    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`
+    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`,
+    requestBody
   );
 
   // 右下角輔助提示：顯示當前 Flash / Chat / Reasoner / Pro（不取代各功能自己的 Loading）
@@ -536,10 +544,11 @@ function getL1StoryThemes(subjectId) {
  * 生成 L1 漸進式閱讀的社工小故事／詳細個案情境
  *
  * @param {'long'|'short'} [lengthMode='long'] - 長文（2500 tokens）或短文（600 tokens）
+ * @param {string} [taskType] - 呼叫端強制指定的路由；未傳時依科目自動判斷 ethics / story
  * @returns {Promise<{story_en: string, story_zh: string, theme: string, lengthMode: string, keywords: Array<{word: string, zh: string, pos?: string}>}>}
  * @throws {Error} API Key 缺失、網路錯誤、或回傳格式異常時拋出
  */
-async function generateL1Story(lengthMode = 'long') {
+async function generateL1Story(lengthMode = 'long', taskType) {
   const isShort = lengthMode === 'short';
   const subject = resolveCurrentSubject();
   // 依科目挑選主題，避免通用日常情境蓋過倫理等專科要求
@@ -559,17 +568,16 @@ async function generateL1Story(lengthMode = 'long') {
       `內容必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
     );
 
-  // 倫理與價值 → reasoner；其他科目故事 → chat
-  const taskType =
-    normalizeSubjectId(subject.id) === 'ethics_and_values'
-      ? 'ethics'
-      : 'story';
+  // 優先採用呼叫端傳入的 taskType；否則倫理與價值 → reasoner，其他科目 → chat
+  const resolvedTaskType =
+    taskType ||
+    (normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story');
 
   const result = await requestDeepSeekJSON(
     systemPrompt,
     userContent,
     maxTokens,
-    taskType
+    resolvedTaskType
   );
 
   const { story_en, story_zh } = result;
@@ -717,6 +725,7 @@ key_vocabulary 請提取 5 個重要專業生字。`;
  *
  * @param {string} keyword - 搜尋／主題關鍵字
  * @param {string} [subjectName] - 目前科目名稱；未提供時自動解析
+ * @param {string} [taskType='literature'] - 模型路由（預設 chat）
  * @returns {Promise<{
  *   original_title: string,
  *   simplified_article: string,
@@ -731,7 +740,11 @@ key_vocabulary 請提取 5 個重要專業生字。`;
  *   vocab: Array<{word: string, zh: string, pos: string}>
  * }>}
  */
-async function generateSimulatedLiteratureAPI(keyword, subjectName) {
+async function generateSimulatedLiteratureAPI(
+  keyword,
+  subjectName,
+  taskType = 'literature'
+) {
   const safeKeyword = String(keyword || '').trim();
   if (!safeKeyword) {
     throw new Error('請先輸入關鍵字，才能生成模擬文獻。');
@@ -749,12 +762,12 @@ async function generateSimulatedLiteratureAPI(keyword, subjectName) {
   const userContent =
     `科目：${subject.name}\n關鍵字：${safeKeyword}\n請依上述格式生成結合學術理論與前線實務的教材。`;
 
-  // 文獻生成：使用 deepseek-chat
+  // 文獻生成：使用 deepseek-chat（可由呼叫端覆寫 taskType）
   const result = await requestDeepSeekJSON(
     systemPrompt,
     userContent,
     1600,
-    'literature'
+    taskType || 'literature'
   );
 
   const {
@@ -1160,12 +1173,13 @@ const ARTICLE_CHALLENGE_SYSTEM_PROMPT = `你是一位嚴格的香港社會工作
  * 依文章內容生成 AI 深度挑戰測驗卷
  *
  * @param {string} articleContext - 文獻摘要／情境或故事全文
+ * @param {string} [taskType='challenge'] - 模型路由（預設 reasoner）
  * @returns {Promise<{
  *   mcq: {question: string, options: string[], correct_index: number, explanation: string},
  *   scenario_reflection: {question: string, reference_answer: string}
  * }>}
  */
-async function generateArticleChallengeAPI(articleContext) {
+async function generateArticleChallengeAPI(articleContext, taskType = 'challenge') {
   const context = String(articleContext || '').trim();
   if (!context) {
     throw new Error('文章內容為空，無法生成深度挑戰。');
@@ -1174,12 +1188,12 @@ async function generateArticleChallengeAPI(articleContext) {
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
-  // AI 深度挑戰：使用 deepseek-reasoner 確保解析具備深度
+  // AI 深度挑戰：使用 deepseek-reasoner（可由呼叫端覆寫 taskType）
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,
     1200,
-    'challenge'
+    taskType || 'challenge'
   );
 
   const mcq = result && result.mcq;

@@ -551,7 +551,26 @@ async function handleGenerateStory() {
       throw new Error('閱讀模組尚未載入完成，請強制重新整理頁面（Ctrl+F5）後再試。');
     }
 
-    const story = await generateL1Story(lengthMode);
+    // 依當前科目決定模型路由：倫理 → reasoner，其餘故事 → chat
+    let currentTaskType = 'story';
+    const currentSubjectId =
+      typeof normalizeSubjectId === 'function'
+        ? normalizeSubjectId(
+            localStorage.getItem(
+              typeof STORAGE_KEY_SUBJECT === 'string'
+                ? STORAGE_KEY_SUBJECT
+                : 'swlearning_current_subject'
+            ) || ''
+          )
+        : String(
+            localStorage.getItem('swlearning_current_subject') || ''
+          ).trim();
+
+    if (currentSubjectId === 'ethics_and_values') {
+      currentTaskType = 'ethics';
+    }
+
+    const story = await generateL1Story(lengthMode, currentTaskType);
 
     if (loading) loading.classList.add('hidden');
     renderStory(story);
@@ -1247,7 +1266,11 @@ async function handleGenerateSimulatedLiterature() {
       throw new Error('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
     }
 
-    const data = await generateSimulatedLiteratureAPI(keyword, subjectName);
+    const data = await generateSimulatedLiteratureAPI(
+      keyword,
+      subjectName,
+      'literature'
+    );
 
     if (loading) loading.classList.add('hidden');
 

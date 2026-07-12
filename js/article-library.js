@@ -876,7 +876,10 @@ async function handleGenerateArticleChallenge(item, btn, container) {
     '<p class="challenge-loading-text">正在根據文章內容生成專屬測驗，請稍候…</p>';
 
   try {
-    const challenge = await generateArticleChallengeAPI(articleContext);
+    const challenge = await generateArticleChallengeAPI(
+      articleContext,
+      'challenge'
+    );
     renderArticleChallenge(container, challenge, item);
     container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (err) {
