@@ -4,7 +4,8 @@
  * 職責：
  * 1. 從 localStorage 讀取 API Key
  * 2. 組裝 System Prompt 與使用者訊息（支援動態科目附加提示）
- * 3. 依 taskType 強制路由至 v4-flash / chat / reasoner / v4-pro
+ * 3. 依 taskType 強制路由至 v4-flash / v4-pro（+ thinking）
+ *    （勿再用 deepseek-chat / deepseek-reasoner：官方已改為 flash 別名）
  * 4. 發送 fetch 請求並強制回傳 JSON 格式（過濾 <think> 標籤）
  * 5. 解析並回傳結構化結果（寫作 L1/L2/L3 / 閱讀 L1/L2/L3）
  */
@@ -21,14 +22,15 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 /** DeepSeek V4：日常任務預設（最省 Token） */
 const DEEPSEEK_MODEL_FLASH = 'deepseek-v4-flash';
 
-/** 長篇故事／文獻：高穩定度 chat 模型 */
-const DEEPSEEK_MODEL_CHAT = 'deepseek-chat';
-
-/** 倫理兩難／測驗挑戰：推理模型（直接切換 model，勿再塞 thinking 參數） */
-const DEEPSEEK_MODEL_REASONER = 'deepseek-reasoner';
-
-/** DeepSeek V4：高價值旗艦任務 */
+/** DeepSeek V4：高價值旗艦任務（故事／文獻／推理／慶祝信） */
 const DEEPSEEK_MODEL_PRO = 'deepseek-v4-pro';
+
+/**
+ * 注意（2026-04 官方變更）：
+ * deepseek-chat / deepseek-reasoner 已是相容別名，實際都指向 deepseek-v4-flash
+ * （chat=非思考、reasoner=思考）。計費後台會一律顯示 flash。
+ * 若要真正切到不同模型與計費，必須使用 deepseek-v4-flash / deepseek-v4-pro。
+ */
 
 /** 相容舊常數名稱（預設指向 Flash） */
 const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
@@ -37,8 +39,8 @@ const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
  * 依任務類型強制決定模型字串（智慧路由）
  *
  * - standard：deepseek-v4-flash（翻譯／單字等日常任務）
- * - story / literature：deepseek-chat（長篇故事與文獻）
- * - complex_logic / ethics / challenge：deepseek-reasoner（倫理兩難、測驗題）
+ * - story / literature：deepseek-v4-pro（長篇故事與文獻，高穩定度）
+ * - complex_logic / ethics / challenge：deepseek-v4-pro + thinking（倫理兩難、測驗題）
  * - ultimate_celebration / deep_correction：deepseek-v4-pro（滿卡慶祝信、長文深度批改）
  *
  * @param {string} [taskType='standard']
@@ -47,28 +49,29 @@ const DEEPSEEK_MODEL = DEEPSEEK_MODEL_FLASH;
 function resolveDeepSeekRouting(taskType = 'standard') {
   // 預設使用最便宜的 flash 模型
   let targetModel = DEEPSEEK_MODEL_FLASH;
+  let extraBody = {};
 
-  // 根據任務類型強制切換模型字串
+  // 根據任務類型強制切換「真正會分開計費」的 V4 模型
   if (taskType === 'story' || taskType === 'literature') {
-    // 生成長篇故事與文獻，需要高穩定度的 chat 模型
-    targetModel = DEEPSEEK_MODEL_CHAT;
+    // 長篇故事與文獻：旗艦 Pro（勿用 deepseek-chat，那只是 flash 別名）
+    targetModel = DEEPSEEK_MODEL_PRO;
   } else if (
     taskType === 'complex_logic' ||
     taskType === 'ethics' ||
     taskType === 'challenge'
   ) {
-    // 倫理兩難、測驗題生成，需要強大的邏輯推理
-    targetModel = DEEPSEEK_MODEL_REASONER;
+    // 倫理兩難、測驗題：Pro + 思考模式（勿用 deepseek-reasoner，那只是 flash 思考別名）
+    targetModel = DEEPSEEK_MODEL_PRO;
+    extraBody = { thinking: { type: 'enabled' } };
   } else if (
     taskType === 'ultimate_celebration' ||
     taskType === 'deep_correction'
   ) {
-    // 滿卡慶祝信、長文深度批改等需要最高品質文字的場景
+    // 滿卡慶祝信、長文深度批改
     targetModel = DEEPSEEK_MODEL_PRO;
   }
 
-  // 不再附加 thinking 參數；推理能力改由 model: deepseek-reasoner 直接切換
-  return { modelName: targetModel, extraBody: {} };
+  return { modelName: targetModel, extraBody };
 }
 
 /**
@@ -305,8 +308,7 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
 
   // 發送請求前確認目前使用的模型（除錯用）
   console.log(
-    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`,
-    requestBody
+    `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}`
   );
 
   // 右下角輔助提示：顯示當前 Flash / Chat / Reasoner / Pro（不取代各功能自己的 Loading）
@@ -568,7 +570,7 @@ async function generateL1Story(lengthMode = 'long', taskType) {
       `內容必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`
     );
 
-  // 優先採用呼叫端傳入的 taskType；否則倫理與價值 → reasoner，其他科目 → chat
+  // 優先採用呼叫端傳入的 taskType；否則倫理與價值 → Pro+thinking，其他科目 → Pro
   const resolvedTaskType =
     taskType ||
     (normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story');
@@ -725,7 +727,7 @@ key_vocabulary 請提取 5 個重要專業生字。`;
  *
  * @param {string} keyword - 搜尋／主題關鍵字
  * @param {string} [subjectName] - 目前科目名稱；未提供時自動解析
- * @param {string} [taskType='literature'] - 模型路由（預設 chat）
+ * @param {string} [taskType='literature'] - 模型路由（預設 Pro）
  * @returns {Promise<{
  *   original_title: string,
  *   simplified_article: string,
@@ -762,7 +764,7 @@ async function generateSimulatedLiteratureAPI(
   const userContent =
     `科目：${subject.name}\n關鍵字：${safeKeyword}\n請依上述格式生成結合學術理論與前線實務的教材。`;
 
-  // 文獻生成：使用 deepseek-chat（可由呼叫端覆寫 taskType）
+  // 文獻生成：使用 deepseek-v4-pro（可由呼叫端覆寫 taskType）
   const result = await requestDeepSeekJSON(
     systemPrompt,
     userContent,
@@ -1173,7 +1175,7 @@ const ARTICLE_CHALLENGE_SYSTEM_PROMPT = `你是一位嚴格的香港社會工作
  * 依文章內容生成 AI 深度挑戰測驗卷
  *
  * @param {string} articleContext - 文獻摘要／情境或故事全文
- * @param {string} [taskType='challenge'] - 模型路由（預設 reasoner）
+ * @param {string} [taskType='challenge'] - 模型路由（預設 Pro + thinking）
  * @returns {Promise<{
  *   mcq: {question: string, options: string[], correct_index: number, explanation: string},
  *   scenario_reflection: {question: string, reference_answer: string}
@@ -1188,7 +1190,7 @@ async function generateArticleChallengeAPI(articleContext, taskType = 'challenge
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
-  // AI 深度挑戰：使用 deepseek-reasoner（可由呼叫端覆寫 taskType）
+  // AI 深度挑戰：使用 deepseek-v4-pro + thinking（可由呼叫端覆寫 taskType）
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,

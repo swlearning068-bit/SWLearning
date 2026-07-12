@@ -152,13 +152,13 @@ function showAiIndicator(mode) {
     case 'challenge':
     case 'complex_logic':
       icon.textContent = '🧠';
-      text.textContent = '推理模式 (Reasoner)...';
+      text.textContent = '推理模式 (Pro Thinking)...';
       indicator.classList.add('mode-thinking');
       break;
     case 'story':
     case 'literature':
       icon.textContent = '✍️';
-      text.textContent = '穩定寫作 (Chat)...';
+      text.textContent = '穩定寫作 (Pro)...';
       indicator.classList.add('mode-chat');
       break;
     case 'ultimate_celebration':
