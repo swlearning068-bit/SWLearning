@@ -519,6 +519,34 @@ function renderLiteratureArticleDetail(item, detailEl) {
    ============================================================ */
 
 /**
+ * 將長文依空行拆成多個段落，利於長文閱讀排版
+ * @param {HTMLElement} container
+ * @param {string} text
+ * @param {string} paragraphClass
+ */
+function appendStoryParagraphs(container, text, paragraphClass) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').trim();
+  const paragraphs = normalized
+    ? normalized.split(/\n\s*\n+/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean)
+    : [];
+
+  if (paragraphs.length === 0) {
+    const emptyP = document.createElement('p');
+    emptyP.className = paragraphClass;
+    emptyP.textContent = '';
+    container.appendChild(emptyP);
+    return;
+  }
+
+  paragraphs.forEach((para) => {
+    const p = document.createElement('p');
+    p.className = paragraphClass;
+    p.textContent = para;
+    container.appendChild(p);
+  });
+}
+
+/**
  * 渲染社工小故事詳情
  * @param {Object} item
  * @param {HTMLElement} detailEl
@@ -563,10 +591,7 @@ function renderStoryArticleDetail(item, detailEl) {
   enLabel.textContent = '英文故事';
   enBlock.appendChild(enLabel);
 
-  const enP = document.createElement('p');
-  enP.className = 'story-en';
-  enP.textContent = item.story_en || '';
-  enBlock.appendChild(enP);
+  appendStoryParagraphs(enBlock, item.story_en || '', 'story-en');
   pack.appendChild(enBlock);
 
   const toggleBtn = document.createElement('button');
@@ -584,10 +609,7 @@ function renderStoryArticleDetail(item, detailEl) {
   zhLabel.textContent = '中文翻譯';
   zhBlock.appendChild(zhLabel);
 
-  const zhP = document.createElement('p');
-  zhP.className = 'story-zh';
-  zhP.textContent = item.story_zh || '';
-  zhBlock.appendChild(zhP);
+  appendStoryParagraphs(zhBlock, item.story_zh || '', 'story-zh');
   pack.appendChild(zhBlock);
 
   toggleBtn.addEventListener('click', () => {
@@ -629,6 +651,14 @@ function renderStoryArticleDetail(item, detailEl) {
       zhSpan.className = 'literature-vocab-zh';
       zhSpan.textContent = (v && v.zh) || '';
       li.appendChild(zhSpan);
+
+      const example = String((v && (v.example || v.example_en)) || '').trim();
+      if (example) {
+        const exampleSpan = document.createElement('span');
+        exampleSpan.className = 'literature-vocab-example';
+        exampleSpan.textContent = example;
+        li.appendChild(exampleSpan);
+      }
 
       ul.appendChild(li);
     });
