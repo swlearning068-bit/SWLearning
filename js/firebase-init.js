@@ -39,6 +39,8 @@ let db = null;
 let unsubscribeAuth = null;
 /** @type {GoogleAuthProvider | null} */
 let googleProvider = null;
+/** 連線進行中：避免按鈕卡在 disabled */
+let connectInProgress = false;
 
 function authToast(message) {
   if (typeof window.showToast === 'function') {
@@ -215,11 +217,17 @@ function updateFirebaseStatusUI() {
     }
   }
 
+  // 中斷／更新狀態時務必重設，避免「儲存並連線」卡在 disabled
   if (connectBtn) {
-    connectBtn.textContent = ready ? '重新連線' : '儲存並連線';
+    connectBtn.disabled = connectInProgress;
+    connectBtn.textContent = connectInProgress
+      ? '連線中…'
+      : ready
+        ? '重新連線'
+        : '儲存並連線';
   }
   if (disconnectBtn) {
-    disconnectBtn.disabled = !ready && !config;
+    disconnectBtn.disabled = connectInProgress || (!ready && !config);
   }
 }
 
@@ -247,33 +255,74 @@ function exposeFirebaseGlobals() {
 }
 
 /**
- * @param {{ clearConfig?: boolean }} [options]
+ * 完整釋放 Auth／App，供中斷或重新連線使用
  */
-async function disconnectFirebase(options = {}) {
-  const clearConfig = Boolean(options.clearConfig);
-
-  try {
-    if (unsubscribeAuth) {
+async function disposeFirebaseRuntime() {
+  if (unsubscribeAuth) {
+    try {
       unsubscribeAuth();
-      unsubscribeAuth = null;
+    } catch (_) {
+      // ignore
     }
-
-    if (auth && auth.currentUser) {
-      await signOut(auth);
-    }
-
-    if (app) {
-      await deleteApp(app);
-    }
-  } catch (error) {
-    console.error('[firebase-init] 中斷連線失敗：', error);
+    unsubscribeAuth = null;
   }
 
+  const authRef = auth;
+  const appRef = app;
   app = null;
   auth = null;
   db = null;
   googleProvider = null;
   window.firebaseCurrentUser = null;
+
+  if (authRef) {
+    try {
+      if (authRef.currentUser) await signOut(authRef);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  const apps = getApps().slice();
+  if (appRef && !apps.includes(appRef)) {
+    apps.push(appRef);
+  }
+
+  await Promise.all(
+    apps.map((existing) =>
+      Promise.race([
+        deleteApp(existing).catch(() => undefined),
+        new Promise((resolve) => {
+          setTimeout(resolve, 1500);
+        })
+      ])
+    )
+  );
+
+  // 給 Firebase 內部狀態一點時間清乾淨，避免立刻 initializeApp 失敗／卡住
+  await new Promise((resolve) => {
+    setTimeout(resolve, 50);
+  });
+}
+
+/**
+ * @param {{ clearConfig?: boolean }} [options]
+ */
+async function disconnectFirebase(options = {}) {
+  const clearConfig = Boolean(options.clearConfig);
+  connectInProgress = false;
+
+  try {
+    await disposeFirebaseRuntime();
+  } catch (error) {
+    console.error('[firebase-init] 中斷連線失敗：', error);
+    app = null;
+    auth = null;
+    db = null;
+    googleProvider = null;
+    unsubscribeAuth = null;
+  }
+
   exposeFirebaseGlobals();
 
   window.dispatchEvent(
@@ -314,23 +363,7 @@ async function connectFirebase(config) {
     return;
   }
 
-  if (unsubscribeAuth) {
-    unsubscribeAuth();
-    unsubscribeAuth = null;
-  }
-
-  const existingApps = getApps();
-  for (const existing of existingApps) {
-    try {
-      await deleteApp(existing);
-    } catch (error) {
-      console.warn('[firebase-init] 刪除舊 App 失敗：', error);
-    }
-  }
-
-  app = null;
-  auth = null;
-  db = null;
+  await disposeFirebaseRuntime();
 
   app = initializeApp(config);
   auth = getAuth(app);
@@ -362,8 +395,10 @@ async function handleConnectFromSettings() {
     return;
   }
 
-  const connectBtn = document.getElementById('btn-firebase-connect');
-  if (connectBtn) connectBtn.disabled = true;
+  if (connectInProgress) return;
+
+  connectInProgress = true;
+  updateFirebaseStatusUI();
 
   try {
     await connectFirebase(config);
@@ -371,8 +406,14 @@ async function handleConnectFromSettings() {
   } catch (error) {
     console.error('[firebase-init] 連線失敗：', error);
     authToast('❌ Firebase 連線失敗，請檢查設定內容');
+    // 確保失敗後也可再次點擊
+    app = null;
+    auth = null;
+    db = null;
+    googleProvider = null;
+    exposeFirebaseGlobals();
   } finally {
-    if (connectBtn) connectBtn.disabled = false;
+    connectInProgress = false;
     updateFirebaseStatusUI();
   }
 }
@@ -389,6 +430,7 @@ async function handleDisconnectFromSettings() {
   );
   if (!confirmed) return;
 
+  connectInProgress = false;
   await disconnectFirebase({ clearConfig: true });
   authToast('已中斷 Firebase 連線');
 }

@@ -16,7 +16,7 @@ import {
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=7';
+} from './firebase-init.js?v=8';
 
 /** 不同步敏感／裝置設定鍵 */
 const EXCLUDE_KEYS = new Set([
