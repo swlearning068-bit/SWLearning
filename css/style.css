@@ -3345,6 +3345,38 @@ body {
   margin: 0;
 }
 
+/* 長文個案故事：提升右側詳情區易讀性 */
+#article-library-section #library-article-detail .story-en,
+#article-library-section #library-article-detail .story-zh {
+  font-size: 1rem;
+  line-height: 1.7;
+  white-space: normal;
+}
+
+#article-library-section #library-article-detail .story-en-block,
+#article-library-section #library-article-detail .story-zh-block {
+  gap: 0.5rem;
+}
+
+#article-library-section #library-article-detail .story-en-block p,
+#article-library-section #library-article-detail .story-zh-block p {
+  margin: 0 0 1.5rem;
+}
+
+#article-library-section #library-article-detail .story-en-block p:last-child,
+#article-library-section #library-article-detail .story-zh-block p:last-child {
+  margin-bottom: 0;
+}
+
+#article-library-section #library-article-detail .literature-vocab-example {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #6B7280;
+  font-style: italic;
+}
+
 #article-library-section .sim-lit-section {
   border-radius: 14px;
   background-color: #F9FAFB;

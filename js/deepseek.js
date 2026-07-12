@@ -159,23 +159,29 @@ function getApiKey() {
 
 /**
  * L1 閱讀故事的 System Prompt
- * 要求：嚴格依科目核心、香港社工情境、初中難度、3–4 句、強制 JSON（含關鍵字）
+ * 要求：高度專業 Case Vignette、300–450 字、學術術語、香港脈絡、強制 JSON（含關鍵字與例句）
  */
-const L1_STORY_SYSTEM_PROMPT = `你是一位英文老師。請創作一個包含 3 到 4 句英文的極短故事。
+const L1_STORY_SYSTEM_PROMPT = `你是一位具備高度學術素養的香港資深社會工作督導。請根據所選的科目與情境，生成一篇**高度專業、細節豐富的社工個案情境故事 (Case Vignette)**。
+
 ⚠️ 最高優先：故事主題必須嚴格符合開頭的「科目鎖定」要求，不可寫成與該科目無關的一般日常敘事。
 若科目為社會工作倫理與價值，故事核心必須清楚呈現社工倫理兩難與道德抉擇的掙扎（例如保密 vs 舉報、自決 vs 保護生命）；香港法例、SWRB、華人價值或宗教等僅隨機帶入 1–2 個作為導火線，不要一次塞滿。
-英文難度必須控制在初中程度，句子結構要簡單，但仍要保留關鍵專業術語。
+
+【格式與內容要求】：
+1. **長度與結構**：英文原文必須在 300 到 450 字之間。請分為 3-4 個段落（例如：案主背景與呈現問題、社工的心理社會預估 (Psychosocial Assessment)、具體的介入過程與理論應用、後續結果或倫理反思）。段落之間請以空行分隔。
+2. **學術深度**：必須在文章中自然地穿插**至少 8 到 10 個高級社工學術專有名詞**（例如：ecological perspective, cognitive restructuring, strengths-based approach, self-determination, transference, rapport building, empowerment, crisis intervention 等）。
+3. **具體細節**：請勿使用空泛的描述。請具體寫出案主的情緒反應、社工使用的微視技巧（Micro-skills，如 active listening, reframing）或是實際的會談對話片段。
+4. **在地化**：情境必須符合香港的社會脈絡、法例或福利制度運作。
 
 請以 JSON 格式回傳：
 {
-  "story_en": "英文故事全文",
-  "story_zh": "整段故事的繁體中文翻譯",
+  "story_en": "英文故事全文（300-450 字，3-4 段）",
+  "story_zh": "高品質的繁體中文翻譯（對應全文）",
   "keywords": [
-    {"word": "單字1", "zh": "中文意思"},
-    {"word": "單字2", "zh": "中文意思"}
+    {"word": "單字1", "zh": "中文意思", "example": "含該單字的英文例句"},
+    {"word": "單字2", "zh": "中文意思", "example": "含該單字的英文例句"}
   ]
 }
-keywords 請挑選 5 到 8 個對於該科目最重要的單字。`;
+keywords 請從文中萃取出 5 到 8 個最核心的專業生字，並為每個生字提供一句取材自故事脈絡的英文例句。`;
 
 /**
  * 底層：發送 DeepSeek Chat Completions 請求並解析 JSON 物件
@@ -380,7 +386,7 @@ function getL1StoryThemes(subjectId) {
 /**
  * 生成 L1 漸進式閱讀的社工小故事
  *
- * @returns {Promise<{story_en: string, story_zh: string, theme: string, keywords: Array<{word: string, zh: string}>}>}
+ * @returns {Promise<{story_en: string, story_zh: string, theme: string, keywords: Array<{word: string, zh: string, example?: string}>}>}
  * @throws {Error} API Key 缺失、網路錯誤、或回傳格式異常時拋出
  */
 async function generateL1Story() {
@@ -389,10 +395,12 @@ async function generateL1Story() {
   const themes = getL1StoryThemes(subject.id);
   const theme = themes[Math.floor(Math.random() * themes.length)];
   const userContent =
-    `請創作一個關於「${theme}」的極短故事。` +
-    `故事必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。`;
+    `請根據情境「${theme}」，生成一篇 300 到 450 字、細節豐富的社工個案情境故事 (Case Vignette)。` +
+    `故事必須嚴格符合科目「${subject.name}」的核心要求，不可偏離成無關日常敘事。` +
+    `請自然融入至少 8 到 10 個高級社工學術專有名詞，並具體描寫微視技巧與會談細節。`;
 
-  const result = await requestDeepSeekJSON(L1_STORY_SYSTEM_PROMPT, userContent, 600);
+  // 長文英文＋繁中翻譯＋關鍵字例句，需較高 token 上限
+  const result = await requestDeepSeekJSON(L1_STORY_SYSTEM_PROMPT, userContent, 2800);
 
   const { story_en, story_zh, keywords } = result;
 
@@ -400,7 +408,7 @@ async function generateL1Story() {
     throw new Error('AI 回傳資料不完整，缺少故事或關鍵字。');
   }
 
-  // 過濾無效關鍵字項目，確保 word / zh 皆為字串
+  // 過濾無效關鍵字項目，確保 word / zh 皆為字串；例句為可選強化欄位
   const validKeywords = keywords.filter(
     (item) => item && typeof item.word === 'string' && typeof item.zh === 'string'
       && item.word.trim() && item.zh.trim()
@@ -414,10 +422,16 @@ async function generateL1Story() {
     story_en: String(story_en).trim(),
     story_zh: String(story_zh).trim(),
     theme: theme,
-    keywords: validKeywords.map((item) => ({
-      word: item.word.trim(),
-      zh: item.zh.trim()
-    }))
+    keywords: validKeywords.map((item) => {
+      const mapped = {
+        word: item.word.trim(),
+        zh: item.zh.trim()
+      };
+      if (typeof item.example === 'string' && item.example.trim()) {
+        mapped.example = item.example.trim();
+      }
+      return mapped;
+    })
   };
 }
 
