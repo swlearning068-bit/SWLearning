@@ -5,6 +5,7 @@
  * 1. 首次登入且雲端空白 → 確認後以上傳建立雲端真相
  * 2. 之後裝置登入且雲端已有資料 → 二選一（上傳覆蓋／沿用雲端）
  * 3. 本機標記已對齊後 → 學習資料變更防抖自動上傳
+ * 4. 監聽雲端變更 → 其他裝置更新時自動下載並重新載入
  */
 
 import {
@@ -12,20 +13,24 @@ import {
   setDoc,
   getDoc,
   deleteDoc,
+  onSnapshot,
   isFirebaseReady,
   getFirebaseAuth,
   getFirebaseDb,
   STORAGE_KEY_FIREBASE
-} from './firebase-init.js?v=10';
+} from './firebase-init.js?v=11';
 
 /** 本機對齊標記（不同步上雲） */
 const STORAGE_KEY_CLOUD_BOUND = 'swlearning_cloud_bound';
+/** 本機裝置識別（用來略過自己上傳觸發的雲端監聽） */
+const STORAGE_KEY_DEVICE_ID = 'swlearning_device_id';
 
 /** 不同步敏感／裝置設定鍵 */
 const EXCLUDE_KEYS = new Set([
   'swlearning_deepseek_api_key',
   STORAGE_KEY_FIREBASE,
-  STORAGE_KEY_CLOUD_BOUND
+  STORAGE_KEY_CLOUD_BOUND,
+  STORAGE_KEY_DEVICE_ID
 ]);
 
 const AUTO_PUSH_DEBOUNCE_MS = 2500;
@@ -45,6 +50,13 @@ let autoPushInFlight = false;
 let autoPushInstalled = false;
 /** @type {typeof localStorage.setItem | null} */
 let originalSetItem = null;
+
+/** @type {(() => void) | null} */
+let cloudPullUnsubscribe = null;
+/** @type {string | null} */
+let cloudPullUid = null;
+let remoteApplyInFlight = false;
+let visibilityPullBound = false;
 
 /**
  * @param {string} key
@@ -228,6 +240,27 @@ function getLocalSyncSummary() {
 }
 
 /**
+ * @returns {string}
+ */
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(STORAGE_KEY_DEVICE_ID);
+    if (id && id.length > 8) return id;
+    id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    const prev = suppressAutoPush;
+    suppressAutoPush = true;
+    try {
+      localStorage.setItem(STORAGE_KEY_DEVICE_ID, id);
+    } finally {
+      suppressAutoPush = prev;
+    }
+    return id;
+  } catch (_) {
+    return `dev_fallback_${Date.now()}`;
+  }
+}
+
+/**
  * @param {string} uid
  */
 function readCloudBound() {
@@ -252,22 +285,30 @@ function isCloudBound(uid) {
 
 /**
  * @param {string} uid
+ * @param {Date | string | null} [syncedAt]
  */
-function markCloudBound(uid) {
+function markCloudBound(uid, syncedAt = null) {
   const prevSuppress = suppressAutoPush;
   suppressAutoPush = true;
+  const when =
+    syncedAt instanceof Date
+      ? syncedAt.toISOString()
+      : typeof syncedAt === 'string' && syncedAt
+        ? syncedAt
+        : new Date().toISOString();
   try {
     localStorage.setItem(
       STORAGE_KEY_CLOUD_BOUND,
       JSON.stringify({
         uid,
-        lastSyncedAt: new Date().toISOString()
+        lastSyncedAt: when
       })
     );
   } finally {
     suppressAutoPush = prevSuppress;
   }
   installAutoPush();
+  startCloudPullListener(uid);
 }
 
 function clearCloudBound() {
@@ -278,6 +319,7 @@ function clearCloudBound() {
   } finally {
     suppressAutoPush = prevSuppress;
   }
+  stopCloudPullListener();
 }
 
 /**
@@ -491,7 +533,7 @@ function renderSyncComparison(mode, result, errorMessage) {
         '選「沿用雲端」後會重新載入頁面；選「上傳覆蓋」會以本機改寫雲端。';
     } else {
       hintEl.textContent =
-        '已對齊狀態下，本機變更會自動上傳。亦可手動推送、重新載入，或清除雲端資料（需防呆確認）。';
+        '已對齊後：本機變更會自動上傳；其他裝置更新雲端時會自動同步並重新載入。也可手動推送／重新載入／清除雲端。';
     }
   }
 
@@ -527,51 +569,39 @@ async function uploadToCloud(uid, options = {}) {
 
   const payload = collectLocalStoragePayload();
   const keyCount = Object.keys(payload).length;
+  const now = new Date();
+  const deviceId = getDeviceId();
 
   await setDoc(
     doc(services.db, 'users', uid),
     {
       data: payload,
-      lastUpdated: new Date(),
-      keyCount
+      lastUpdated: now,
+      keyCount,
+      updatedBy: deviceId
     },
     { merge: true }
   );
 
-  markCloudBound(uid);
+  markCloudBound(uid, now);
   if (!options.silent) {
     syncToast(`✅ 已上傳 ${keyCount} 筆資料至雲端`);
   }
 }
 
 /**
+ * 將雲端 payload 寫入本機（不 reload）
  * @param {string} uid
+ * @param {Record<string, unknown>} remote
+ * @returns {number} 寫入鍵數量
  */
-async function downloadFromCloud(uid) {
-  if (!uid) throw new Error('缺少使用者 uid');
-  const services = requireFirebaseServices();
-  if (!services) throw new Error('Firebase 未連線');
-
-  const snap = await getDoc(doc(services.db, 'users', uid));
-  if (!snap.exists()) {
-    syncToast('☁️ 雲端尚無資料，請先從此裝置上傳');
-    return;
-  }
-
-  const remote = snap.data() || {};
+function applyRemotePayloadToLocal(uid, remote) {
   const data = remote.data;
-
   if (!data || typeof data !== 'object') {
-    syncToast('☁️ 雲端資料格式異常');
-    return;
+    throw new Error('雲端資料格式異常');
   }
 
   const keys = Object.keys(data);
-  if (keys.length === 0) {
-    syncToast('☁️ 雲端資料為空');
-    return;
-  }
-
   suppressAutoPush = true;
   try {
     keys.forEach((key) => {
@@ -583,15 +613,190 @@ async function downloadFromCloud(uid) {
       }
       localStorage.setItem(key, String(value));
     });
-    markCloudBound(uid);
+    const remoteUpdated = toDateOrNull(remote.lastUpdated) || new Date();
+    markCloudBound(uid, remoteUpdated);
   } finally {
     suppressAutoPush = false;
   }
+  return keys.length;
+}
 
-  syncToast(`✅ 已從雲端下載 ${keys.length} 筆資料，即將重新載入…`);
-  setTimeout(() => {
-    location.reload();
-  }, 600);
+/**
+ * @param {string} uid
+ * @param {{ reload?: boolean, toast?: boolean }} [options]
+ */
+async function downloadFromCloud(uid, options = {}) {
+  if (!uid) throw new Error('缺少使用者 uid');
+  const services = requireFirebaseServices();
+  if (!services) throw new Error('Firebase 未連線');
+
+  const snap = await getDoc(doc(services.db, 'users', uid));
+  if (!snap.exists()) {
+    syncToast('☁️ 雲端尚無資料，請先從此裝置上傳');
+    return;
+  }
+
+  const remote = snap.data() || {};
+  const keyCount = applyRemotePayloadToLocal(uid, remote);
+
+  if (keyCount === 0) {
+    syncToast('☁️ 雲端資料為空');
+    return;
+  }
+
+  if (options.toast !== false) {
+    syncToast(
+      options.reload === false
+        ? `✅ 已從雲端同步 ${keyCount} 筆資料`
+        : `✅ 已從雲端下載 ${keyCount} 筆資料，即將重新載入…`
+    );
+  }
+
+  if (options.reload !== false) {
+    setTimeout(() => {
+      location.reload();
+    }, 600);
+  }
+}
+
+/**
+ * 其他裝置更新雲端後，套用並重整
+ * @param {string} uid
+ * @param {Record<string, unknown>} remote
+ */
+function applyRemoteFromOtherDevice(uid, remote) {
+  if (remoteApplyInFlight) return;
+  remoteApplyInFlight = true;
+  try {
+    const keyCount = applyRemotePayloadToLocal(uid, remote);
+    syncToast(`☁️ 偵測到其他裝置更新，已同步 ${keyCount} 筆，即將重新載入…`);
+    setTimeout(() => {
+      location.reload();
+    }, 700);
+  } catch (error) {
+    remoteApplyInFlight = false;
+    console.error('[sync] 套用遠端更新失敗：', error);
+    syncToast('❌ 同步其他裝置資料失敗');
+  }
+}
+
+function stopCloudPullListener() {
+  if (cloudPullUnsubscribe) {
+    try {
+      cloudPullUnsubscribe();
+    } catch (_) {
+      // ignore
+    }
+  }
+  cloudPullUnsubscribe = null;
+  cloudPullUid = null;
+}
+
+/**
+ * 監聽雲端文件；其他裝置寫入時自動拉取
+ * @param {string} uid
+ */
+function startCloudPullListener(uid) {
+  if (!uid) return;
+  if (cloudPullUid === uid && cloudPullUnsubscribe) return;
+
+  const services = requireFirebaseServices();
+  if (!services) return;
+
+  stopCloudPullListener();
+  cloudPullUid = uid;
+  let isFirstEvent = true;
+  const deviceId = getDeviceId();
+
+  cloudPullUnsubscribe = onSnapshot(
+    doc(services.db, 'users', uid),
+    (snap) => {
+      if (!isCloudBound(uid)) return;
+      if (!snap.exists()) return;
+
+      const remote = snap.data() || {};
+      const remoteUpdated = toDateOrNull(remote.lastUpdated);
+      const updatedBy = remote.updatedBy ? String(remote.updatedBy) : '';
+
+      // 自己上傳的變更：只更新對齊時間，不重整
+      if (updatedBy && updatedBy === deviceId) {
+        if (remoteUpdated) markCloudBound(uid, remoteUpdated);
+        isFirstEvent = false;
+        return;
+      }
+
+      const bound = readCloudBound();
+      const localSynced = bound && bound.lastSyncedAt
+        ? new Date(bound.lastSyncedAt)
+        : null;
+
+      const cloudIsNewer =
+        remoteUpdated &&
+        (!localSynced ||
+          remoteUpdated.getTime() > localSynced.getTime() + 800);
+
+      if (isFirstEvent) {
+        isFirstEvent = false;
+        // 訂閱當下若雲端明顯較新（例如他機先改完），立刻同步
+        if (cloudIsNewer) {
+          applyRemoteFromOtherDevice(uid, remote);
+        }
+        return;
+      }
+
+      if (cloudIsNewer) {
+        applyRemoteFromOtherDevice(uid, remote);
+      }
+    },
+    (error) => {
+      console.error('[sync] 雲端監聽失敗：', error);
+    }
+  );
+}
+
+/**
+ * 分頁重新顯示時檢查雲端是否有較新資料
+ */
+async function pullIfCloudNewerOnFocus() {
+  const uid = requireUidQuiet();
+  if (!uid || !isCloudBound(uid) || remoteApplyInFlight) return;
+
+  try {
+    const services = requireFirebaseServices();
+    if (!services) return;
+    const snap = await getDoc(doc(services.db, 'users', uid));
+    if (!snap.exists()) return;
+    const remote = snap.data() || {};
+    const updatedBy = remote.updatedBy ? String(remote.updatedBy) : '';
+    if (updatedBy && updatedBy === getDeviceId()) return;
+
+    const remoteUpdated = toDateOrNull(remote.lastUpdated);
+    const bound = readCloudBound();
+    const localSynced = bound && bound.lastSyncedAt
+      ? new Date(bound.lastSyncedAt)
+      : null;
+    if (
+      remoteUpdated &&
+      (!localSynced || remoteUpdated.getTime() > localSynced.getTime() + 800)
+    ) {
+      applyRemoteFromOtherDevice(uid, remote);
+    }
+  } catch (error) {
+    console.error('[sync] 前景檢查雲端失敗：', error);
+  }
+}
+
+function bindVisibilityPull() {
+  if (visibilityPullBound) return;
+  visibilityPullBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      pullIfCloudNewerOnFocus();
+    }
+  });
+  window.addEventListener('focus', () => {
+    pullIfCloudNewerOnFocus();
+  });
 }
 
 /**
@@ -890,26 +1095,33 @@ function requireUidQuiet() {
 }
 
 function installAutoPush() {
-  if (autoPushInstalled) return;
-  originalSetItem = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function patchedSetItem(key, value) {
-    originalSetItem(key, value);
-    if (!suppressAutoPush && shouldSyncKey(String(key))) {
-      scheduleAutoPush();
-    }
-  };
-  autoPushInstalled = true;
+  if (!autoPushInstalled) {
+    originalSetItem = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function patchedSetItem(key, value) {
+      originalSetItem(key, value);
+      if (!suppressAutoPush && shouldSyncKey(String(key))) {
+        scheduleAutoPush();
+      }
+    };
+    autoPushInstalled = true;
+  }
+  const uid = requireUidQuiet();
+  if (uid && isCloudBound(uid)) {
+    startCloudPullListener(uid);
+  }
 }
 
 function uninstallAutoPush() {
-  if (!autoPushInstalled || !originalSetItem) return;
-  localStorage.setItem = originalSetItem;
-  originalSetItem = null;
-  autoPushInstalled = false;
+  if (autoPushInstalled && originalSetItem) {
+    localStorage.setItem = originalSetItem;
+    originalSetItem = null;
+    autoPushInstalled = false;
+  }
   if (autoPushTimer) {
     clearTimeout(autoPushTimer);
     autoPushTimer = null;
   }
+  stopCloudPullListener();
 }
 
 /**
@@ -924,6 +1136,7 @@ async function handleAuthCloudDecision(user, options = {}) {
   if (!uid) {
     previousAuthUid = null;
     uninstallAutoPush();
+    stopCloudPullListener();
     return;
   }
 
@@ -977,6 +1190,8 @@ function bindSyncUI() {
   const downloadBtn = document.getElementById('btn-sync-download');
   const clearBtn = document.getElementById('btn-sync-clear-cloud');
   const modal = document.getElementById('sync-modal');
+
+  bindVisibilityPull();
 
   if (syncBtn) {
     syncBtn.addEventListener('click', () => {
