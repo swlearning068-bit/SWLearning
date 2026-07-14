@@ -421,9 +421,23 @@ function handleSaveStory() {
       ? window.getCurrentSubjectName()
       : '社會工作';
 
+  const subjectId =
+    typeof resolveCurrentSubject === 'function'
+      ? resolveCurrentSubject().id
+      : (typeof normalizeSubjectId === 'function'
+        ? normalizeSubjectId(
+            localStorage.getItem(
+              typeof STORAGE_KEY_SUBJECT === 'string'
+                ? STORAGE_KEY_SUBJECT
+                : 'swlearning_current_subject'
+            ) || ''
+          )
+        : '');
+
   const payload = {
     id: Date.now(),
     type: 'story',
+    subjectId: subjectId || '',
     subjectName: subjectName || '社會工作',
     theme: currentL1Story.theme || '',
     title: buildStoryTitle(currentL1Story.story_en),
@@ -579,7 +593,11 @@ async function handleGenerateStory() {
       currentTaskType = 'ethics';
     }
 
-    const story = await generateL1Story(lengthMode, currentTaskType);
+    const story = await generateL1Story(
+      lengthMode,
+      currentTaskType,
+      currentSubjectId
+    );
 
     if (loading) loading.classList.add('hidden');
     renderStory(story);
@@ -698,9 +716,15 @@ function createSaveLiteratureButton(literatureData, subjectName) {
   }
 
   btn.addEventListener('click', () => {
+    const subjectId =
+      typeof resolveCurrentSubject === 'function'
+        ? resolveCurrentSubject().id
+        : '';
+
     const payload = {
       id: Date.now(),
       type: 'literature',
+      subjectId: subjectId || '',
       subjectName: subjectName || '社會工作',
       original_title: literatureData.original_title,
       simplified_article: literatureData.simplified_article,
@@ -1259,6 +1283,19 @@ async function handleGenerateSimulatedLiterature() {
           ? resolveCurrentSubject().name
           : '社會工作');
 
+  const currentSubjectId =
+    typeof resolveCurrentSubject === 'function'
+      ? resolveCurrentSubject().id
+      : (typeof normalizeSubjectId === 'function'
+        ? normalizeSubjectId(
+            localStorage.getItem(
+              typeof STORAGE_KEY_SUBJECT === 'string'
+                ? STORAGE_KEY_SUBJECT
+                : 'swlearning_current_subject'
+            ) || ''
+          )
+        : null);
+
   resetL2ReadingArea();
 
   if (loading) loading.classList.remove('hidden');
@@ -1278,7 +1315,8 @@ async function handleGenerateSimulatedLiterature() {
     const data = await generateSimulatedLiteratureAPI(
       keyword,
       subjectName,
-      'literature'
+      'literature',
+      currentSubjectId
     );
 
     if (loading) loading.classList.add('hidden');

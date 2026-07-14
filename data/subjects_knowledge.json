@@ -1,0 +1,58 @@
+{
+  "intro_psych": {
+    "core_philosophy": "以心理學理論理解案主行為、情緒與認知歷程，並轉化為前線評估與介入語言。",
+    "theories": []
+  },
+  "community_work": {
+    "core_philosophy": "以賦權與社區發展視角理解結構性壓迫，強調集體行動與資源動員。",
+    "theories": []
+  },
+  "family_social_work": {
+    "core_philosophy": "以家庭系統觀點理解互動模式、代際傳遞與關係張力，並設計微觀介入。",
+    "theories": []
+  },
+  "general_practice": {
+    "core_philosophy": "以通用社工實務整合評估、介入與資源轉介，回應香港前線日常服務需要。",
+    "theories": []
+  },
+  "social_policy": {
+    "core_philosophy": "以政策分析視角理解福利制度、資源分配與社會正義，連結宏觀結構與微觀經驗。",
+    "theories": []
+  },
+  "casework": {
+    "core_philosophy": "以一對一個案工作歷程（intake—assessment—intervention—closure）為核心，強調關係建立與目標導向介入。",
+    "theories": []
+  },
+  "group_work": {
+    "core_philosophy": "以小組動力與階段發展理論理解成員互動，並運用帶領技巧促進凝聚與改變。",
+    "theories": []
+  },
+  "children_youth": {
+    "core_philosophy": "以兒童保護與發展需求為核心，平衡自主、安全與家庭／學校系統協作。",
+    "theories": []
+  },
+  "elderly": {
+    "core_philosophy": "以積極老化與社區安老視角理解長者照顧需要，重視照顧者支援與尊嚴。",
+    "theories": []
+  },
+  "mental_health": {
+    "core_philosophy": "以復元導向與去污名化視角理解精神健康挑戰，強調賦權、希望與社會融合。",
+    "theories": []
+  },
+  "disability": {
+    "core_philosophy": "以權利與社會模式理解殘疾，強調無障礙、融合與自我倡議。",
+    "theories": []
+  },
+  "sw_admin": {
+    "core_philosophy": "以組織與督導視角理解服務規劃、資源配置與專業問責。",
+    "theories": []
+  },
+  "sw_research": {
+    "core_philosophy": "以實證為本實踐連結研究與前線決策，強調批判性閱讀與評估思維。",
+    "theories": []
+  },
+  "ethics_and_values": {
+    "core_philosophy": "以倫理兩難與價值權衡為核心，展現專業判斷、反思與批判性思考，而非條文背誦。",
+    "theories": []
+  }
+}

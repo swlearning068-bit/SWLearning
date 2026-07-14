@@ -8,6 +8,7 @@
  *    （勿再用 deepseek-chat / deepseek-reasoner：官方已改為 flash 別名）
  * 4. 發送 fetch 請求並強制回傳 JSON 格式（過濾 <think> 標籤）
  * 5. 解析並回傳結構化結果（寫作 L1/L2/L3 / 閱讀 L1/L2/L3）
+ * 6. 從 subjects_knowledge.json 無痕注入科目理論框架至 System Prompt
  */
 
 // localStorage 中用來儲存 API Key 的鍵名（與 app.js 保持一致）
@@ -18,6 +19,112 @@ const STORAGE_KEY_SUBJECT = 'swlearning_current_subject';
 
 // DeepSeek API 端點（OpenAI 相容格式）
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+
+/** 十二大（及延伸）社工領域理論知識庫（subjectId → knowledge） */
+let subjectsKnowledge = {};
+
+/**
+ * 系統初始化時載入科目理論知識庫
+ * @returns {Promise<void>}
+ */
+async function loadSubjectsKnowledge() {
+  try {
+    const response = await fetch('data/subjects_knowledge.json');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    subjectsKnowledge =
+      data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch (error) {
+    console.error('⚠️ 無法載入科目知識庫:', error);
+    subjectsKnowledge = {};
+  }
+}
+
+/**
+ * 依科目 ID 取得理論知識物件
+ * @param {string} subjectId
+ * @returns {Object|null}
+ */
+function getSubjectKnowledge(subjectId) {
+  const id = normalizeSubjectId(subjectId);
+  if (!id || !subjectsKnowledge || typeof subjectsKnowledge !== 'object') {
+    return null;
+  }
+  return subjectsKnowledge[id] || null;
+}
+
+/**
+ * 將知識庫理論陣列轉為可注入 System Prompt 的文字
+ * @param {Object} knowledge
+ * @returns {string}
+ */
+function buildKnowledgeInjectionText(knowledge) {
+  if (!knowledge || !Array.isArray(knowledge.theories) || knowledge.theories.length === 0) {
+    return '';
+  }
+
+  const theoriesText = knowledge.theories
+    .map((t) => {
+      if (!t || typeof t !== 'object') return '';
+      const name = String(t.theory_name || '').trim() || '未命名理論';
+      const scholar = String(t.scholar || '').trim() || '未知學者';
+      const concepts = Array.isArray(t.key_concepts)
+        ? t.key_concepts.map((c) => String(c || '').trim()).filter(Boolean).join(', ')
+        : '';
+      const application = String(t.application || '').trim();
+      return (
+        `- 【${name}】(${scholar}): 關鍵概念包含 ${concepts || '（未提供）'}。` +
+        `實務應用：${application || '（未提供）'}`
+      );
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  if (!theoriesText) return '';
+
+  const philosophy = String(knowledge.core_philosophy || '').trim() || '（未提供）';
+  return (
+    `\n\n【📚 專業學理強制注入 (CRITICAL)】：\n` +
+    `本情境的核心哲學為：「${philosophy}」。\n` +
+    `請你在生成情境故事或測驗解析時，務必精準、客觀且自然地運用以下核心理論框架進行分析，` +
+    `並展現督導級別的學術深度：\n${theoriesText}`
+  );
+}
+
+/**
+ * 將理論知識無痕附加至 messages 中的 system 訊息（就地修改副本）
+ * @param {Array<{role: string, content: string}>} messages
+ * @param {string|null} subjectId
+ * @returns {Array<{role: string, content: string}>}
+ */
+function injectSubjectKnowledgeIntoMessages(messages, subjectId) {
+  const list = Array.isArray(messages)
+    ? messages.map((msg) => ({
+        role: msg.role,
+        content: String(msg.content || '')
+      }))
+    : [];
+
+  if (!subjectId) return list;
+
+  const knowledge = getSubjectKnowledge(subjectId);
+  const injectionText = buildKnowledgeInjectionText(knowledge);
+  if (!injectionText) return list;
+
+  const systemMessageIndex = list.findIndex((msg) => msg.role === 'system');
+  if (systemMessageIndex !== -1) {
+    list[systemMessageIndex].content += injectionText;
+  } else {
+    list.unshift({
+      role: 'system',
+      content: '你是一位香港資深社會工作督導。' + injectionText
+    });
+  }
+
+  return list;
+}
 
 /** DeepSeek V4：日常任務預設（最省 Token） */
 const DEEPSEEK_MODEL_FLASH = 'deepseek-v4-flash';
@@ -294,13 +401,29 @@ const THINKING_MAX_TOKENS_FLOOR = 4096;
  *
  * @param {Array<{role: string, content: string}>} messages
  * @param {string} [taskType='standard'] - 路由任務類型
+ * @param {string|null} [subjectId=null] - 科目 ID；有值時注入理論知識庫
  * @param {Object} [options]
  * @param {number} [options.maxTokens=2500]
  * @param {number} [options.temperature=0.7]
  * @param {boolean} [options.jsonObject=true] - 是否強制 JSON Object 回傳
  * @returns {Promise<string>} 已過濾 <think> 標籤的訊息內容
  */
-async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}) {
+async function callDeepSeekChatAPI(
+  messages,
+  taskType = 'standard',
+  subjectId = null,
+  options = {}
+) {
+  // 相容舊呼叫：第三參數若為物件，視為 options（無 subjectId）
+  if (
+    subjectId &&
+    typeof subjectId === 'object' &&
+    !Array.isArray(subjectId)
+  ) {
+    options = subjectId;
+    subjectId = options.subjectId || null;
+  }
+
   // 防呆：漏傳 taskType 會降級為 flash，方便第一時間發現呼叫端問題
   if (!taskType || taskType === 'standard') {
     console.warn(
@@ -321,10 +444,21 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
     maxTokens = THINKING_MAX_TOKENS_FLOOR;
   }
 
+  // 💎 知識注入：依 subjectId 將理論框架附加至 system prompt
+  const resolvedSubjectId =
+    subjectId != null && String(subjectId).trim() !== ''
+      ? normalizeSubjectId(subjectId)
+      : null;
+  const finalMessages = injectSubjectKnowledgeIntoMessages(
+    messages,
+    resolvedSubjectId
+  );
+
   // 發送請求前確認目前使用的模型（除錯用）
   console.log(
     `[API Routing] Current Task: ${taskType}, Model Triggered: ${modelName}` +
-      (thinkingEnabled ? ' + thinking' : '')
+      (thinkingEnabled ? ' + thinking' : '') +
+      (resolvedSubjectId ? `, Subject: ${resolvedSubjectId}` : '')
   );
 
   // 右下角輔助提示：顯示當前 Flash / Chat / Reasoner / Pro（不取代各功能自己的 Loading）
@@ -339,7 +473,7 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
   async function fetchOnce(tokenBudget) {
     const requestBody = {
       model: modelName,
-      messages,
+      messages: finalMessages,
       temperature,
       max_tokens: tokenBudget,
       ...extraBody
@@ -451,6 +585,7 @@ async function callDeepSeekChatAPI(messages, taskType = 'standard', options = {}
  * @param {string} [taskType='standard']
  * @param {Object} [options]
  * @param {boolean} [options.skipSubjectContext=false]
+ * @param {string|null} [options.subjectId=null] - 科目 ID；用於理論知識注入
  * @param {number} [options.temperature]
  * @returns {Promise<Object>}
  */
@@ -465,12 +600,22 @@ async function requestDeepSeekJSON(
     ? systemPrompt
     : withSubjectContext(systemPrompt);
 
+  // 優先用呼叫端明確傳入的 subjectId；否則在有科目鎖定時用當前科目
+  let subjectId =
+    options.subjectId != null && String(options.subjectId).trim() !== ''
+      ? normalizeSubjectId(options.subjectId)
+      : null;
+  if (!subjectId && !options.skipSubjectContext) {
+    subjectId = resolveCurrentSubject().id || null;
+  }
+
   const rawContent = await callDeepSeekChatAPI(
     [
       { role: 'system', content: finalSystemPrompt },
       { role: 'user', content: userContent }
     ],
     taskType,
+    subjectId,
     {
       maxTokens,
       temperature: options.temperature,
@@ -617,12 +762,26 @@ function getL1StoryThemes(subjectId) {
  *
  * @param {'long'|'short'} [lengthMode='long'] - 長文（2500 tokens）或短文（600 tokens）
  * @param {string} [taskType] - 呼叫端強制指定的路由；未傳時依科目自動判斷 ethics / story
+ * @param {string|null} [subjectId] - 科目 ID；未傳時使用當前科目（供理論知識注入）
  * @returns {Promise<{story_en: string, story_zh: string, theme: string, lengthMode: string, keywords: Array<{word: string, zh: string, pos?: string}>}>}
  * @throws {Error} API Key 缺失、網路錯誤、或回傳格式異常時拋出
  */
-async function generateL1Story(lengthMode = 'long', taskType) {
+async function generateL1Story(lengthMode = 'long', taskType, subjectId = null) {
   const isShort = lengthMode === 'short';
-  const subject = resolveCurrentSubject();
+  const subject = subjectId
+    ? (() => {
+        const id = normalizeSubjectId(subjectId);
+        const list = Array.isArray(window.subjectsList) ? window.subjectsList : [];
+        const found = list.find((s) => s && s.id === id);
+        return found && found.name
+          ? {
+              id,
+              name: String(found.name),
+              prompt_context: String(found.prompt_context || '')
+            }
+          : { ...resolveCurrentSubject(), id };
+      })()
+    : resolveCurrentSubject();
   // 依科目挑選主題，避免通用日常情境蓋過倫理等專科要求
   const themes = getL1StoryThemes(subject.id);
   const theme = themes[Math.floor(Math.random() * themes.length)];
@@ -649,7 +808,8 @@ async function generateL1Story(lengthMode = 'long', taskType) {
     systemPrompt,
     userContent,
     maxTokens,
-    resolvedTaskType
+    resolvedTaskType,
+    { subjectId: subject.id }
   );
 
   const { story_en, story_zh } = result;
@@ -803,6 +963,7 @@ key_vocabulary 請提取 5 個重要專業生字。`;
  * @param {string} keyword - 搜尋／主題關鍵字
  * @param {string} [subjectName] - 目前科目名稱；未提供時自動解析
  * @param {string} [taskType='literature'] - 模型路由（預設 Pro）
+ * @param {string|null} [subjectId=null] - 科目 ID；供理論知識注入
  * @returns {Promise<{
  *   original_title: string,
  *   simplified_article: string,
@@ -820,17 +981,22 @@ key_vocabulary 請提取 5 個重要專業生字。`;
 async function generateSimulatedLiteratureAPI(
   keyword,
   subjectName,
-  taskType = 'literature'
+  taskType = 'literature',
+  subjectId = null
 ) {
   const safeKeyword = String(keyword || '').trim();
   if (!safeKeyword) {
     throw new Error('請先輸入關鍵字，才能生成模擬文獻。');
   }
 
+  const current = resolveCurrentSubject();
+  const resolvedSubjectId = subjectId
+    ? normalizeSubjectId(subjectId)
+    : current.id;
   const subject =
     subjectName && String(subjectName).trim()
-      ? { name: String(subjectName).trim() }
-      : resolveCurrentSubject();
+      ? { id: resolvedSubjectId, name: String(subjectName).trim() }
+      : current;
 
   const systemPrompt = buildSimulatedLiteratureSystemPrompt(
     safeKeyword,
@@ -844,7 +1010,8 @@ async function generateSimulatedLiteratureAPI(
     systemPrompt,
     userContent,
     1600,
-    taskType || 'literature'
+    taskType || 'literature',
+    { subjectId: subject.id || resolvedSubjectId }
   );
 
   const {
@@ -1251,12 +1418,17 @@ const ARTICLE_CHALLENGE_SYSTEM_PROMPT = `你是一位嚴格的香港社會工作
  *
  * @param {string} articleContext - 文獻摘要／情境或故事全文
  * @param {string} [taskType='challenge'] - 模型路由（預設 Pro + thinking）
+ * @param {string|null} [subjectId=null] - 科目 ID；供理論知識注入
  * @returns {Promise<{
  *   mcq: {question: string, options: string[], correct_index: number, explanation: string},
  *   scenario_reflection: {question: string, reference_answer: string}
  * }>}
  */
-async function generateArticleChallengeAPI(articleContext, taskType = 'challenge') {
+async function generateArticleChallengeAPI(
+  articleContext,
+  taskType = 'challenge',
+  subjectId = null
+) {
   const context = String(articleContext || '').trim();
   if (!context) {
     throw new Error('文章內容為空，無法生成深度挑戰。');
@@ -1265,12 +1437,17 @@ async function generateArticleChallengeAPI(articleContext, taskType = 'challenge
   const userContent =
     `請根據以下文本設計測驗卷（文本可能是學術文獻或社工實務故事）：\n\n${context}`;
 
+  const resolvedSubjectId = subjectId
+    ? normalizeSubjectId(subjectId)
+    : resolveCurrentSubject().id;
+
   // AI 深度挑戰：Pro + thinking；max_tokens 需預留 reasoning，否則 content 常為空
   const result = await requestDeepSeekJSON(
     ARTICLE_CHALLENGE_SYSTEM_PROMPT,
     userContent,
     4096,
-    taskType || 'challenge'
+    taskType || 'challenge',
+    { subjectId: resolvedSubjectId }
   );
 
   const mcq = result && result.mcq;
@@ -1454,4 +1631,18 @@ window.withSubjectContext = withSubjectContext;
 window.SUBJECT_ID_ALIASES = SUBJECT_ID_ALIASES;
 window.normalizeSubjectId = normalizeSubjectId;
 window.resolveCurrentSubject = resolveCurrentSubject;
-window.resolveCurrentSubject = resolveCurrentSubject;
+window.loadSubjectsKnowledge = loadSubjectsKnowledge;
+window.getSubjectKnowledge = getSubjectKnowledge;
+
+// 系統初始化：載入科目理論知識庫（供後續無痕注入）
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSubjectsKnowledge();
+    });
+  } else {
+    loadSubjectsKnowledge();
+  }
+} else {
+  loadSubjectsKnowledge();
+}

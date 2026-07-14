@@ -855,6 +855,19 @@ function buildArticleChallengeContext(item) {
 }
 
 /**
+ * 依文章科目名稱反查 subjectId（舊收藏可能只有 subjectName）
+ * @param {string} subjectName
+ * @returns {string|null}
+ */
+function resolveArticleSubjectId(subjectName) {
+  const name = String(subjectName || '').trim();
+  if (!name) return null;
+  const list = Array.isArray(window.subjectsList) ? window.subjectsList : [];
+  const found = list.find((s) => s && String(s.name || '').trim() === name);
+  return found && found.id ? String(found.id) : null;
+}
+
+/**
  * 點擊「AI 深度挑戰」：呼叫 API 並渲染測驗
  * @param {Object} item
  * @param {HTMLButtonElement} btn
@@ -890,9 +903,17 @@ async function handleGenerateArticleChallenge(item, btn, container) {
     '<p class="challenge-loading-text">正在根據文章內容生成專屬測驗，請稍候…</p>';
 
   try {
+    const articleSubjectId =
+      (item.subjectId && String(item.subjectId).trim()) ||
+      resolveArticleSubjectId(item.subjectName) ||
+      (typeof resolveCurrentSubject === 'function'
+        ? resolveCurrentSubject().id
+        : null);
+
     const challenge = await generateArticleChallengeAPI(
       articleContext,
-      'challenge'
+      'challenge',
+      articleSubjectId
     );
     renderArticleChallenge(container, challenge, item);
     container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
