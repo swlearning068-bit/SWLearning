@@ -52,20 +52,44 @@ function getSubjectKnowledge(subjectId) {
   if (!id || !subjectsKnowledge || typeof subjectsKnowledge !== 'object') {
     return null;
   }
-  return subjectsKnowledge[id] || null;
+  // family_practice 與 family_social_work 互通
+  return (
+    subjectsKnowledge[id] ||
+    (id === 'family_practice' ? subjectsKnowledge.family_social_work : null) ||
+    (id === 'family_social_work' ? subjectsKnowledge.family_practice : null) ||
+    null
+  );
 }
 
 /**
- * 將知識庫理論陣列轉為可注入 System Prompt 的文字
+ * 依科目 ID 取得核心理論知識（對外別名）
+ * @param {string} subjectId
+ * @returns {Object|null}
+ */
+function getTheoryBySubject(subjectId) {
+  return getSubjectKnowledge(subjectId);
+}
+
+/**
+ * 將知識庫轉為可注入 System Prompt 的文字
+ * 支援：theories[] 詳版，或 theory_core / key_concepts / tone 精簡版
  * @param {Object} knowledge
  * @returns {string}
  */
 function buildKnowledgeInjectionText(knowledge) {
-  if (!knowledge || !Array.isArray(knowledge.theories) || knowledge.theories.length === 0) {
-    return '';
-  }
+  if (!knowledge || typeof knowledge !== 'object') return '';
 
-  const theoriesText = knowledge.theories
+  const theoryCore = String(
+    knowledge.theory_core || knowledge.core_philosophy || ''
+  ).trim();
+  const topConcepts = Array.isArray(knowledge.key_concepts)
+    ? knowledge.key_concepts.map((c) => String(c || '').trim()).filter(Boolean)
+    : [];
+  const tone = String(knowledge.tone || '').trim();
+  const philosophy = String(knowledge.core_philosophy || '').trim();
+  const theories = Array.isArray(knowledge.theories) ? knowledge.theories : [];
+
+  const theoriesText = theories
     .map((t) => {
       if (!t || typeof t !== 'object') return '';
       const name = String(t.theory_name || '').trim() || '未命名理論';
@@ -82,15 +106,46 @@ function buildKnowledgeInjectionText(knowledge) {
     .filter(Boolean)
     .join('\n');
 
-  if (!theoriesText) return '';
+  // 無任何可用理論資訊則不注入
+  if (!theoryCore && !theoriesText && topConcepts.length === 0) {
+    return '';
+  }
 
-  const philosophy = String(knowledge.core_philosophy || '').trim() || '（未提供）';
-  return (
-    `\n\n【📚 專業學理強制注入 (CRITICAL)】：\n` +
-    `本情境的核心哲學為：「${philosophy}」。\n` +
-    `請你在生成情境故事或測驗解析時，務必精準、客觀且自然地運用以下核心理論框架進行分析，` +
-    `並展現督導級別的學術深度：\n${theoriesText}`
+  const lines = [
+    '',
+    '',
+    '【📚 專業學理強制注入 (CRITICAL)】：',
+    '你是一位香港資深社會工作督導。請運用以下理論架構進行分析：'
+  ];
+
+  if (theoryCore) {
+    lines.push(`- 核心理論: ${theoryCore}`);
+  }
+  if (philosophy && philosophy !== theoryCore) {
+    lines.push(`- 核心哲學: ${philosophy}`);
+  }
+  if (topConcepts.length > 0) {
+    lines.push(`- 關鍵概念: ${topConcepts.join(', ')}`);
+  }
+  if (tone) {
+    lines.push(`- 寫作／分析語氣: ${tone}`);
+  }
+  if (theoriesText) {
+    lines.push('以下為必須精準運用的詳細理論框架：');
+    lines.push(theoriesText);
+  }
+
+  lines.push(
+    '請確保內容精準對應上述理論框架，並符合香港社會工作脈絡。'
   );
+  lines.push(
+    '【題目解析強制要求】：若輸出含 explanation／解析／reference_answer，' +
+      '必須明確引用本科目至少一個核心理論或關鍵概念來支撐論點' +
+      '（例如：「本題涉及家庭系統理論中的三角關係，案主透過拉攏子女來稀釋伴侶間衝突...」），' +
+      '禁止只做表面對錯說明而無學理支撐。'
+  );
+
+  return lines.join('\n');
 }
 
 /**
@@ -109,7 +164,7 @@ function injectSubjectKnowledgeIntoMessages(messages, subjectId) {
 
   if (!subjectId) return list;
 
-  const knowledge = getSubjectKnowledge(subjectId);
+  const knowledge = getTheoryBySubject(subjectId);
   const injectionText = buildKnowledgeInjectionText(knowledge);
   if (!injectionText) return list;
 
@@ -201,7 +256,8 @@ const DEFAULT_SUBJECT = {
 
 /** 舊科目 ID → 新科目 ID（避免 localStorage 殘留導致選錯科） */
 const SUBJECT_ID_ALIASES = {
-  ethics: 'ethics_and_values'
+  ethics: 'ethics_and_values',
+  family_practice: 'family_social_work'
 };
 
 /**
@@ -1399,19 +1455,20 @@ const ARTICLE_CHALLENGE_SYSTEM_PROMPT = `你是一位嚴格的香港社會工作
     "question": "針對文本核心概念或情境細節的英文選擇題...",
     "options": ["A選項", "B選項", "C選項", "D選項"],
     "correct_index": 0,
-    "explanation": "中文解析說明為什麼選這個答案"
+    "explanation": "中文解析：必須明確引用本科目一個核心理論／關鍵概念來支撐為何選此答案（例：本題涉及家庭系統理論中的三角關係…）"
   },
   "scenario_reflection": {
     "question": "針對文本中的案例，提出一個進階的實務挑戰問題 (英文)。請結合香港社工實務語境...",
-    "reference_answer": "中文參考解答方向與社工倫理思考指引"
+    "reference_answer": "中文參考解答：必須結合本科目核心理論框架給出可操作的督導級分析"
   }
 }
 規則：
 1. mcq.question 與 mcq.options 必須為英文；explanation 必須為繁體中文。
 2. options 必須剛好 4 個選項；correct_index 為 0–3 的整數。
-3. scenario_reflection.question 必須為英文，並盡量結合香港前線社工實務語境（如家訪、轉介、SWRB、保密與知情同意等）；reference_answer 必須為繁體中文。
+3. scenario_reflection.question 必須為英文，並盡量結合香港前線社工實務語境（如家訪、轉介、保密與知情同意等）；reference_answer 必須為繁體中文。
 4. 題目必須緊扣所提供文本內容，不可憑空捏造無關理論或情節。
-5. 若文本為短篇故事，選擇題應聚焦情境細節與專業判斷；若為學術文獻，可聚焦理論概念與案例應用。`;
+5. 若文本為短篇故事，選擇題應聚焦情境細節與專業判斷；若為學術文獻，可聚焦理論概念與案例應用。
+6. 【學理引用強制】explanation 與 reference_answer 必須明確點出至少一個核心理論或關鍵概念名稱，並用一句話說明其如何支撐判斷；禁止只寫「因為文本提到…」而無理論支撐。`;
 
 /**
  * 依文章內容生成 AI 深度挑戰測驗卷
@@ -1633,6 +1690,7 @@ window.normalizeSubjectId = normalizeSubjectId;
 window.resolveCurrentSubject = resolveCurrentSubject;
 window.loadSubjectsKnowledge = loadSubjectsKnowledge;
 window.getSubjectKnowledge = getSubjectKnowledge;
+window.getTheoryBySubject = getTheoryBySubject;
 
 // 系統初始化：載入科目理論知識庫（供後續無痕注入）
 if (typeof document !== 'undefined') {

@@ -1,58 +1,243 @@
 {
+  "ethics_and_values": {
+    "id": "ethics_and_values",
+    "name": "社會工作倫理與價值",
+    "theory_core": "品格為本的德行倫理學、倫理決策六原則 (Reamer)",
+    "key_concepts": ["義務論 vs 目的論", "雙重關係", "專業界線", "倫理兩難"],
+    "tone": "批判性反思、專業客觀",
+    "core_philosophy": "以倫理兩難與價值權衡為核心，展現專業判斷、反思與批判性思考，而非條文背誦。",
+    "theories": [
+      {
+        "theory_name": "倫理決策六原則 (Ethical Decision-Making Framework)",
+        "scholar": "Frederic G. Reamer",
+        "key_concepts": [
+          "識別倫理議題",
+          "價值衝突排序",
+          "諮詢與問責",
+          "記錄決策理據"
+        ],
+        "application": "在保密與保護生命等衝突中，引導社工系統性權衡利害、釐清義務優先序，並以可被督導檢視的方式記錄判斷過程。"
+      },
+      {
+        "theory_name": "德行倫理學 (Virtue Ethics)",
+        "scholar": "Aristotle / 應用於社工品格倫理",
+        "key_concepts": [
+          "專業品格",
+          "實踐智慧 (phronesis)",
+          "誠信與勇氣"
+        ],
+        "application": "強調社工不僅遵循規則，更需在兩難中展現誠實、勇氣與審慎等專業德行，使決策貼近案主福祉與專業誠信。"
+      },
+      {
+        "theory_name": "義務論與目的論張力 (Deontology vs Teleology)",
+        "scholar": "Kant / Mill（應用於社工倫理分析）",
+        "key_concepts": [
+          "義務論 vs 目的論",
+          "雙重關係",
+          "專業界線",
+          "倫理兩難"
+        ],
+        "application": "分析「守密義務」與「最大福祉後果」之間的衝突，協助學生理解前線判斷如何在原則與結果之間取得可辯護的平衡。"
+      }
+    ]
+  },
+  "community_work": {
+    "id": "community_work",
+    "name": "社區工作技巧",
+    "theory_core": "洛斯曼三大模式 (社區發展、社會計畫、社會行動)",
+    "key_concepts": ["社區充權", "權力重構", "社會資本", "由下而上"],
+    "tone": "倡議導向、結構分析",
+    "core_philosophy": "以賦權與社區發展視角理解結構性壓迫，強調集體行動與資源動員。",
+    "theories": [
+      {
+        "theory_name": "洛斯曼三大模式 (Rothman's Three Models)",
+        "scholar": "Jack Rothman",
+        "key_concepts": [
+          "社區發展 (Locality Development)",
+          "社會計畫 (Social Planning)",
+          "社會行動 (Social Action)"
+        ],
+        "application": "依社區議題性質選擇策略：以參與凝聚建立本地能力、以專業規劃回應服務缺口，或以集體行動挑戰不公權力結構。"
+      },
+      {
+        "theory_name": "社區充權與權力重構 (Community Empowerment)",
+        "scholar": "Barbara Solomon / Paulo Freire（影響脈絡）",
+        "key_concepts": [
+          "社區充權",
+          "權力重構",
+          "由下而上",
+          "意識醒覺"
+        ],
+        "application": "協助居民從被動受助者轉為主動倡議者，透過組織、發聲與議程設定重構社區權力關係。"
+      },
+      {
+        "theory_name": "社會資本理論 (Social Capital)",
+        "scholar": "Robert Putnam / Pierre Bourdieu（應用於社區工作）",
+        "key_concepts": [
+          "社會資本",
+          "網絡連結",
+          "信任與互惠",
+          "橋接型資本"
+        ],
+        "application": "評估並強化社區內外部網絡，促進資源流動、互助與跨界協作，以提升集體解困能力。"
+      }
+    ]
+  },
+  "family_social_work": {
+    "id": "family_practice",
+    "name": "家庭社工實務",
+    "theory_core": "家庭系統理論 (Bowen)、結構派治療 (Minuchin)、薩提爾成長模式",
+    "key_concepts": ["自我分化", "三角關係", "家庭邊界", "冰山理論"],
+    "tone": "臨床細膩、系統觀察",
+    "core_philosophy": "將問題的焦點從『帶有病態的單一個人 (IP)』轉移至『失衡的家庭互動模式與系統動態』。",
+    "theories": [
+      {
+        "theory_name": "家庭系統理論 (Family Systems Theory)",
+        "scholar": "Murray Bowen",
+        "key_concepts": [
+          "自我分化 (Differentiation of Self)",
+          "三角關係 (Triangulation)",
+          "多世代傳遞歷程 (Multigenerational Transmission Process)"
+        ],
+        "application": "透過家族圖 (Genogram) 協助案主覺察原生家庭情緒勒索與行為模式的世代根源，促成個體在情感上的獨立與成熟。"
+      },
+      {
+        "theory_name": "結構派家庭治療 (Structural Family Therapy)",
+        "scholar": "Salvador Minuchin",
+        "key_concepts": [
+          "家庭結構與階層 (Structure and Hierarchy)",
+          "次系統 (Subsystems)",
+          "邊界僵化與糾結 (Rigid and Enmeshed Boundaries)"
+        ],
+        "application": "運用『加入 (Joining)』與『重構 (Reframing)』技術，挑戰並重組家庭現有的權力階層，重建父母次系統的合作與權威。"
+      },
+      {
+        "theory_name": "薩提爾成長模式 (Satir Growth Model)",
+        "scholar": "Virginia Satir",
+        "key_concepts": [
+          "冰山理論 (Iceberg Theory)",
+          "五種溝通生存姿態 (Communication Stances)",
+          "自我價值與一致性溝通 (Self-worth and Congruence)"
+        ],
+        "application": "透過家庭雕塑 (Family Sculpting) 將隱形的互動動力具象化，引導成員從求生存的防衛姿態轉向『一致性』的真誠溝通。"
+      }
+    ]
+  },
+  "family_practice": {
+    "id": "family_practice",
+    "name": "家庭社工實務",
+    "theory_core": "家庭系統理論 (Bowen)、結構派治療 (Minuchin)、薩提爾成長模式",
+    "key_concepts": ["自我分化", "三角關係", "家庭邊界", "冰山理論"],
+    "tone": "臨床細膩、系統觀察",
+    "core_philosophy": "將問題的焦點從『帶有病態的單一個人 (IP)』轉移至『失衡的家庭互動模式與系統動態』。",
+    "theories": [
+      {
+        "theory_name": "家庭系統理論 (Family Systems Theory)",
+        "scholar": "Murray Bowen",
+        "key_concepts": [
+          "自我分化 (Differentiation of Self)",
+          "三角關係 (Triangulation)",
+          "多世代傳遞歷程 (Multigenerational Transmission Process)"
+        ],
+        "application": "透過家族圖 (Genogram) 協助案主覺察原生家庭情緒勒索與行為模式的世代根源，促成個體在情感上的獨立與成熟。"
+      },
+      {
+        "theory_name": "結構派家庭治療 (Structural Family Therapy)",
+        "scholar": "Salvador Minuchin",
+        "key_concepts": [
+          "家庭結構與階層 (Structure and Hierarchy)",
+          "次系統 (Subsystems)",
+          "邊界僵化與糾結 (Rigid and Enmeshed Boundaries)"
+        ],
+        "application": "運用『加入 (Joining)』與『重構 (Reframing)』技術，挑戰並重組家庭現有的權力階層，重建父母次系統的合作與權威。"
+      },
+      {
+        "theory_name": "薩提爾成長模式 (Satir Growth Model)",
+        "scholar": "Virginia Satir",
+        "key_concepts": [
+          "冰山理論 (Iceberg Theory)",
+          "五種溝通生存姿態 (Communication Stances)",
+          "自我價值與一致性溝通 (Self-worth and Congruence)"
+        ],
+        "application": "透過家庭雕塑 (Family Sculpting) 將隱形的互動動力具象化，引導成員從求生存的防衛姿態轉向『一致性』的真誠溝通。"
+      }
+    ]
+  },
   "intro_psych": {
+    "theory_core": "精神分析防衛機制、認知行為理論、創傷知情照顧",
+    "key_concepts": ["防衛機制", "認知扭曲", "創傷反應", "依附型態"],
+    "tone": "心理動力與行為觀察並重",
     "core_philosophy": "以心理學理論理解案主行為、情緒與認知歷程，並轉化為前線評估與介入語言。",
     "theories": []
   },
-  "community_work": {
-    "core_philosophy": "以賦權與社區發展視角理解結構性壓迫，強調集體行動與資源動員。",
-    "theories": []
-  },
-  "family_social_work": {
-    "core_philosophy": "以家庭系統觀點理解互動模式、代際傳遞與關係張力，並設計微觀介入。",
-    "theories": []
-  },
   "general_practice": {
+    "theory_core": "通用社工實務歷程與生態系統觀點",
+    "key_concepts": ["intake", "assessment", "intervention", "follow-up"],
+    "tone": "務實、前線導向",
     "core_philosophy": "以通用社工實務整合評估、介入與資源轉介，回應香港前線日常服務需要。",
     "theories": []
   },
   "social_policy": {
+    "theory_core": "福利體制分析、社會正義與資源分配理論",
+    "key_concepts": ["means test", "housing policy", "poverty alleviation", "social justice"],
+    "tone": "政策分析、結構批判",
     "core_philosophy": "以政策分析視角理解福利制度、資源分配與社會正義，連結宏觀結構與微觀經驗。",
     "theories": []
   },
   "casework": {
+    "theory_core": "個案工作歷程模式、心理社會評估與任務中心取向",
+    "key_concepts": ["intake", "assessment", "intervention plan", "case closure"],
+    "tone": "一對一臨床、目標導向",
     "core_philosophy": "以一對一個案工作歷程（intake—assessment—intervention—closure）為核心，強調關係建立與目標導向介入。",
     "theories": []
   },
   "group_work": {
+    "theory_core": "小組發展階段理論、小組動力與互助模式",
+    "key_concepts": ["group dynamics", "facilitation", "cohesion", "group process"],
+    "tone": "帶領技巧、動力觀察",
     "core_philosophy": "以小組動力與階段發展理論理解成員互動，並運用帶領技巧促進凝聚與改變。",
     "theories": []
   },
   "children_youth": {
+    "theory_core": "兒童保護、發展需求與生態系統取向",
+    "key_concepts": ["child protection", "developmental needs", "at-risk youth", "school social work"],
+    "tone": "保護與發展並重",
     "core_philosophy": "以兒童保護與發展需求為核心，平衡自主、安全與家庭／學校系統協作。",
     "theories": []
   },
   "elderly": {
+    "theory_core": "積極老化、社區安老與照顧者支援理論",
+    "key_concepts": ["ageing in place", "dementia", "carer support", "elderly care"],
+    "tone": "尊嚴導向、照顧系統思維",
     "core_philosophy": "以積極老化與社區安老視角理解長者照顧需要，重視照顧者支援與尊嚴。",
     "theories": []
   },
   "mental_health": {
+    "theory_core": "復元導向實踐、去污名化與優勢觀點",
+    "key_concepts": ["recovery", "stigma", "emotional support", "mental health crisis"],
+    "tone": "復元、賦權、希望",
     "core_philosophy": "以復元導向與去污名化視角理解精神健康挑戰，強調賦權、希望與社會融合。",
     "theories": []
   },
   "disability": {
+    "theory_core": "社會模式殘疾觀、權利與融合取向",
+    "key_concepts": ["accessibility", "empowerment", "inclusion", "disability rights"],
+    "tone": "權利倡議、去病理化",
     "core_philosophy": "以權利與社會模式理解殘疾，強調無障礙、融合與自我倡議。",
     "theories": []
   },
   "sw_admin": {
+    "theory_core": "社會福利行政、督導與服務規劃理論",
+    "key_concepts": ["supervision", "service planning", "resource allocation", "accountability"],
+    "tone": "組織管理、專業問責",
     "core_philosophy": "以組織與督導視角理解服務規劃、資源配置與專業問責。",
     "theories": []
   },
   "sw_research": {
+    "theory_core": "實證為本實踐、質性研究與評估理論",
+    "key_concepts": ["evidence-based practice", "qualitative interview", "data analysis", "evaluation"],
+    "tone": "批判閱讀、方法嚴謹",
     "core_philosophy": "以實證為本實踐連結研究與前線決策，強調批判性閱讀與評估思維。",
-    "theories": []
-  },
-  "ethics_and_values": {
-    "core_philosophy": "以倫理兩難與價值權衡為核心，展現專業判斷、反思與批判性思考，而非條文背誦。",
     "theories": []
   }
 }
