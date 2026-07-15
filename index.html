@@ -468,36 +468,44 @@
 
       <div class="layout-container">
         <div class="layout-left">
-          <h2 class="section-title">社工專業詞彙庫</h2>
-          <p class="section-desc">瀏覽常見社工英文詞彙，點擊發音按鈕可聽美式英語讀音。</p>
+          <div class="vocab-control-panel">
+            <h2 class="section-title">社工專業詞彙庫</h2>
+            <p class="section-desc">瀏覽常見社工英文詞彙，點擊發音按鈕可聽美式英語讀音。</p>
 
-          <div class="vocab-actions">
-            <button
-              id="generate-vocab-btn"
-              class="btn btn-secondary"
-              type="button"
-            >
-              ✨ AI 探索新詞彙 (基於目前科目)
-            </button>
+            <div class="vocab-actions">
+              <button
+                id="generate-vocab-btn"
+                class="btn btn-secondary"
+                type="button"
+              >
+                ✨ AI 探索新詞彙 (基於目前科目)
+              </button>
+            </div>
+
+            <!-- 搜尋框：即時過濾單字或中文翻譯 -->
+            <div class="vocab-search-area">
+              <label class="label-text" for="vocab-search">搜尋詞彙：</label>
+              <input
+                id="vocab-search"
+                class="vocab-search-input"
+                type="text"
+                placeholder="輸入英文單字或中文翻譯…"
+                autocomplete="off"
+              >
+            </div>
+          </div><!-- /.vocab-control-panel -->
+
+          <!-- 生字複習：獨立板塊，置於詞彙庫控制卡下方 -->
+          <div class="vocab-learn-panel">
+            <h3 class="section-title">生字複習</h3>
+            <p class="section-desc">複習今日到期的生字，以間隔重複加強記憶。</p>
             <button
               id="btn-open-learn"
               class="btn btn-primary"
               type="button"
             >
-              🧠 生字複習
+              🧠 開始複習
             </button>
-          </div>
-
-          <!-- 搜尋框：即時過濾單字或中文翻譯 -->
-          <div class="vocab-search-area">
-            <label class="label-text" for="vocab-search">搜尋詞彙：</label>
-            <input
-              id="vocab-search"
-              class="vocab-search-input"
-              type="text"
-              placeholder="輸入英文單字或中文翻譯…"
-              autocomplete="off"
-            >
           </div>
         </div><!-- /.layout-left -->
 

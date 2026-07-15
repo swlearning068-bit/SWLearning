@@ -3399,6 +3399,29 @@ body {
   margin-top: -4px;
 }
 
+#vocab-section .vocab-control-panel,
+#vocab-section .vocab-learn-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+#vocab-section .vocab-learn-panel .section-title {
+  font-size: 1.15rem;
+}
+
+#vocab-section .vocab-learn-panel .btn {
+  width: 100%;
+  border-radius: 12px;
+  min-height: 44px;
+  font-weight: 500;
+}
+
 #vocab-section .vocab-actions .btn {
   border-radius: 12px;
   min-height: 44px;
@@ -4344,7 +4367,6 @@ body {
   }
 
   #reading-section .layout-left,
-  #vocab-section .layout-left,
   #learn-section .layout-left {
     padding: 20px;
     background-color: var(--surface-color);
@@ -4352,6 +4374,16 @@ body {
     border-radius: 20px;
     box-shadow: var(--shadow-sm);
     max-height: calc(100vh - 160px);
+  }
+
+  /* 詞彙庫左欄：改為兩張獨立板塊（控制卡 + 生字複習），不再整欄套白底 */
+  #vocab-section .layout-left {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    max-height: calc(100vh - 160px);
+    gap: 16px;
   }
 
   #reading-section .layout-right,
