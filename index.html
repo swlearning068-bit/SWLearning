@@ -804,6 +804,13 @@
         >
           🗑️ 清除雲端資料
         </button>
+        <button
+          id="btn-sync-clear-local"
+          class="danger-btn sync-clear-btn hidden"
+          type="button"
+        >
+          🗑️ 清除本機資料
+        </button>
         <button id="btn-close-sync-modal" class="text-btn" type="button">
           稍後再說
         </button>
@@ -1041,6 +1048,6 @@
   <script src="js/reward.js?v=5"></script>
   <script src="js/app.js?v=20"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=14"></script>
+  <script type="module" src="js/sync.js?v=15"></script>
 </body>
 </html>
