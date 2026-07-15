@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=40">
+  <link rel="stylesheet" href="css/style.css?v=41">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -45,31 +45,19 @@
   <!-- ==================== 主內容區 ==================== -->
   <main class="main-content">
 
-    <!-- ---------- Tab 導覽：寫作 / 閱讀 / 詞彙庫 / 生字複習 / 測驗 / 文獻庫 ---------- -->
+    <!-- ---------- Tab 導覽：情境演練 / 詞彙庫 / 生字複習 / 測驗 / 文章庫 ---------- -->
     <nav class="tab-nav" role="tablist" aria-label="功能模組切換">
-      <!-- 寫作練習 Tab（預設啟用） -->
+      <!-- 情境演練 Tab（預設啟用；Phase 11.8 整合讀寫） -->
       <button
-        id="tab-writing"
+        id="tab-practice"
         class="tab-btn active"
         type="button"
         role="tab"
         aria-selected="true"
-        aria-controls="writing-section"
-        data-tab="writing"
+        aria-controls="practice-section"
+        data-tab="practice"
       >
-        ✍️ 寫作練習
-      </button>
-      <!-- 閱讀練習 Tab -->
-      <button
-        id="tab-reading"
-        class="tab-btn"
-        type="button"
-        role="tab"
-        aria-selected="false"
-        aria-controls="reading-section"
-        data-tab="reading"
-      >
-        📖 閱讀練習
+        🎯 情境演練
       </button>
       <!-- 專業詞彙庫 Tab -->
       <button
@@ -133,15 +121,9 @@
       </button>
     </nav>
 
-    <!-- ==================== 模組：寫作練習（L1 / L2 / L3） ==================== -->
-    <section id="writing-section" role="tabpanel" aria-labelledby="tab-writing">
+    <!-- ==================== 舊寫作練習（Phase 11.8 已整合至情境演練；保留 DOM 相容） ==================== -->
+    <section id="writing-section" class="hidden" hidden aria-hidden="true" role="tabpanel">
 
-      <!-- 尚未設定 API Key 時的提示（預設顯示；有 Key 時由 JS 隱藏） -->
-      <div id="api-key-warning" class="warning-card">
-        <p>⚠️ 請先點擊右上角「⚙️ 設定」，輸入您的 DeepSeek API Key，才能開始練習。</p>
-      </div>
-
-      <!-- 寫作練習總容器（有 API Key 時才顯示） -->
       <div id="writing-practice" class="practice-section hidden">
 
         <div class="layout-container">
@@ -426,324 +408,52 @@
       </div><!-- /#writing-practice -->
     </section><!-- /#writing-section -->
 
-    <!-- ==================== 模組 4：漸進式閱讀理解 (L1 / L2 / L3) ==================== -->
-    <!-- 預設隱藏，點擊「閱讀練習」Tab 後由 JS 顯示 -->
-    <section id="reading-section" class="reading-section hidden" role="tabpanel" aria-labelledby="tab-reading">
+    <!-- ==================== Phase 11.8：情境演練（雙軌閱讀 + 漸進寫作） ==================== -->
+    <section id="practice-section" class="practice-section reading-section" role="tabpanel" aria-labelledby="tab-practice">
 
-      <div class="layout-container">
-        <!-- 左欄：難度切換 + 各等級控制區 -->
-        <div class="layout-left">
+      <div id="api-key-warning" class="warning-card">
+        <p>⚠️ 請先點擊右上角「⚙️ 設定」，輸入您的 DeepSeek API Key，才能開始練習。</p>
+      </div>
 
-          <!-- 難度切換：L1 故事 / L2 文獻 / L3 個案 -->
-          <div class="level-switch" id="reading-level-switch" role="tablist" aria-label="閱讀難度切換">
-            <button
-              id="btn-reading-l1"
-              class="level-btn active"
-              type="button"
-              role="tab"
-              aria-selected="true"
-              data-level="l1"
-            >
-              🌱 L1 故事
-            </button>
-            <button
-              id="btn-reading-l2"
-              class="level-btn"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              data-level="l2"
-            >
-              🌿 L2 文獻
-            </button>
-            <button
-              id="btn-reading-l3"
-              class="level-btn"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              data-level="l3"
-            >
-              🌳 L3 個案
-            </button>
+      <div id="case-practice" class="case-practice hidden">
+        <div class="layout-container">
+          <div class="layout-left">
+            <h2 class="section-title">情境演練 (Case Practice)</h2>
+            <p class="section-desc">雙軌生成「社工小故事」或「模擬學術文獻」。文章採段落穿插即時選擇題；文末可依 L1 填空 → L2 造句 → L3 專業寫作循序練習。</p>
+
+            <div class="practice-track-actions">
+              <button id="btn-generate-story-track" class="btn btn-primary" type="button">
+                📝 生成社工小故事
+              </button>
+              <button id="btn-generate-literature-track" class="btn btn-primary" type="button">
+                📄 生成模擬學術文獻
+              </button>
+            </div>
           </div>
 
-          <!-- ---------- L1：社工小故事（控制區） ---------- -->
-          <div id="reading-l1-panel" class="reading-level-panel" data-reading-panel="l1">
-
-            <h2 class="section-title">L1 漸進式閱讀 — 社工小故事</h2>
-            <p id="l1-story-desc" class="section-desc">隨機生成香港社工 detailed case vignette（約 300–450 字）。滑鼠懸停（或點擊）藍色關鍵字可看中文意思。</p>
-
-            <!-- 長文／短文切換 -->
-            <div class="l1-length-switch" id="l1-length-switch" role="tablist" aria-label="故事長度切換">
-              <button
-                id="btn-l1-length-long"
-                class="l1-length-btn active"
-                type="button"
-                role="tab"
-                aria-selected="true"
-                data-story-length="long"
-              >
-                📄 長文
-              </button>
-              <button
-                id="btn-l1-length-short"
-                class="l1-length-btn"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                data-story-length="short"
-              >
-                📝 短文
-              </button>
+          <div class="layout-right">
+            <div id="practice-placeholder" class="layout-placeholder" aria-hidden="true">
+              <p class="layout-placeholder-title">文章與練習區</p>
+              <p class="layout-placeholder-desc">點左側生成按鈕後，段落、穿插測驗與漸進寫作會顯示在這裡。</p>
             </div>
 
-            <!-- 生成故事按鈕 -->
-            <button id="btn-generate-story" class="btn btn-primary" type="button">
-              🎲 隨機生成詳細個案情境
-            </button>
-
-          </div><!-- /#reading-l1-panel -->
-
-          <!-- ---------- L2：學術文獻無縫擴寫（控制區） ---------- -->
-          <div id="reading-l2-panel" class="reading-level-panel hidden" data-reading-panel="l2">
-
-            <h2 class="section-title">L2 學術文獻 — AI 模擬擴寫</h2>
-            <p class="section-desc">輸入關鍵字（可選）後點擊生成：系統會在背景從 OpenAlex 擷取真實摘要，再以 AI 擴寫成約 800 字的 IMRaD 模擬文獻。畫面上只顯示擴寫結果與學術免責聲明，不會直接顯示真實摘要。</p>
-
-            <div class="input-area">
-              <label class="label-text" for="l2-keyword-input">搜尋關鍵字（可選）：</label>
-              <input
-                id="l2-keyword-input"
-                class="l2-keyword-input"
-                type="text"
-                placeholder="例如：attachment theory（空白則依目前科目搜尋）"
-                autocomplete="off"
-              >
-            </div>
-
-            <div class="suggested-tags-area">
-              <div class="suggested-tags-header">
-                <span class="label-text">推薦搜尋關鍵字</span>
-                <div class="suggested-tags-actions">
-                  <button id="btn-shuffle-tags" class="text-btn" type="button" aria-label="換一組推薦關鍵字">
-                    🔄 換一組關鍵字
-                  </button>
-                  <button id="btn-view-tag-history" class="text-btn text-gray" type="button" aria-label="查看已生成的標籤歷史">
-                    👁️ 查看已生成的標籤歷史
-                  </button>
-                </div>
-              </div>
-              <div id="suggested-tags-container" class="tags-container" aria-live="polite"></div>
-            </div>
-
-            <div class="l2-action-buttons">
-              <button id="btn-generate-literature" class="btn btn-primary" type="button">
-                📄 生成 AI 模擬文獻
-              </button>
-            </div>
-
-          </div><!-- /#reading-l2-panel -->
-
-          <!-- ---------- L3：個案故事與臨床實務挑戰（控制區） ---------- -->
-          <div id="reading-l3-panel" class="reading-level-panel hidden" data-reading-panel="l3">
-
-            <h2 class="section-title">L3 個案閱讀 — 臨床實務挑戰</h2>
-            <p class="section-desc">依目前科目生成專業個案故事，並以 Observation／Assessment／Intervention 實務紀錄表鍛鍊臨床判斷與英文表達。</p>
-
-            <button id="btn-l3-generate" class="btn btn-primary" type="button">
-              📝 生成臨床實務挑戰
-            </button>
-
-          </div><!-- /#reading-l3-panel -->
-
-        </div><!-- /.layout-left -->
-
-        <!-- 右欄：各等級結果區（與左欄共用 data-reading-panel 切換） -->
-        <div class="layout-right">
-
-          <div class="reading-results-panel" data-reading-panel="l1">
-            <div class="layout-placeholder" aria-hidden="true">
-              <p class="layout-placeholder-title">故事閱讀區</p>
-              <p class="layout-placeholder-desc">點左側「隨機生成」後，英文個案情境與翻譯會顯示在這裡。</p>
-            </div>
-
-            <!-- 載入中骨架屏（預設隱藏） -->
-            <div id="reading-loading" class="skeleton-card hidden" aria-live="polite">
+            <div id="practice-loading" class="skeleton-card hidden" aria-live="polite">
               <div class="skeleton-line skeleton-line--short"></div>
               <div class="skeleton-line skeleton-line--long"></div>
               <div class="skeleton-line skeleton-line--medium"></div>
               <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在創作詳細個案情境...</p>
+              <p class="loading-text">正在生成互動文章與段落測驗…</p>
             </div>
 
-            <!-- 個案情境展示區（預設隱藏，生成成功後顯示） -->
-            <div id="story-display" class="story-display hidden" aria-live="polite">
+            <div id="practice-article-root" class="practice-article-root hidden" aria-live="polite"></div>
+            <div id="practice-error" class="error-card hidden" role="alert"></div>
+          </div>
+        </div>
+      </div>
+    </section><!-- /#practice-section -->
 
-              <!-- 英文原文區（關鍵字會被包成 .hover-word） -->
-              <div class="story-en-block">
-                <span class="result-label">英文個案情境</span>
-                <p id="story-en" class="story-en"></p>
-              </div>
-
-              <!-- 顯示完整翻譯按鈕 -->
-              <button id="btn-show-translation" class="btn btn-secondary" type="button">
-                👀 顯示完整翻譯
-              </button>
-
-              <!-- 中文翻譯區（預設隱藏，點擊上方按鈕後才顯示） -->
-              <div id="story-zh-block" class="story-zh-block hidden">
-                <span class="result-label">中文翻譯</span>
-                <p id="story-zh" class="story-zh"></p>
-              </div>
-
-              <!-- 收藏至文章庫（由 reading.js 控制狀態） -->
-              <div class="save-story-wrap">
-                <button id="btn-save-story" class="save-story-btn btn btn-primary" type="button">
-                  💾 收藏此個案情境
-                </button>
-              </div>
-
-            </div><!-- /#story-display -->
-
-            <!-- 閱讀模組錯誤訊息（預設隱藏） -->
-            <div id="reading-error" class="error-card hidden" role="alert"></div>
-          </div><!-- /L1 results -->
-
-          <div class="reading-results-panel hidden" data-reading-panel="l2">
-            <div class="layout-placeholder" aria-hidden="true">
-              <p class="layout-placeholder-title">文獻結果區</p>
-              <p class="layout-placeholder-desc">生成後，AI 擴寫的模擬文獻與生字會顯示在這裡。</p>
-            </div>
-
-            <div id="l2-reading-loading" class="skeleton-card hidden" aria-live="polite">
-              <div class="skeleton-line skeleton-line--short"></div>
-              <div class="skeleton-line skeleton-line--long"></div>
-              <div class="skeleton-line skeleton-line--medium"></div>
-              <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在擷取真實摘要並擴寫模擬文獻...</p>
-            </div>
-
-            <!-- 文獻簡化結果（由 reading.js 動態填入） -->
-            <div id="l2-reading-results" class="l2-reading-results hidden" aria-live="polite"></div>
-
-            <div id="l2-reading-error" class="error-card hidden" role="alert"></div>
-          </div><!-- /L2 results -->
-
-          <div class="reading-results-panel hidden" data-reading-panel="l3">
-            <div class="layout-placeholder" aria-hidden="true">
-              <p class="layout-placeholder-title">臨床挑戰區</p>
-              <p class="layout-placeholder-desc">生成後，英文個案故事與實務紀錄表（O／A／I）會顯示在這裡。</p>
-            </div>
-
-            <div id="l3-reading-loading" class="skeleton-card hidden" aria-live="polite">
-              <div class="skeleton-line skeleton-line--short"></div>
-              <div class="skeleton-line skeleton-line--long"></div>
-              <div class="skeleton-line skeleton-line--medium"></div>
-              <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在生成個案故事與臨床挑戰...</p>
-            </div>
-
-            <div id="l3-reading-display" class="l3-reading-display hidden" aria-live="polite">
-
-              <div class="story-en-block">
-                <span class="result-label">Case Note（英文）</span>
-                <p id="l3-case-en" class="l3-case-en"></p>
-              </div>
-
-              <div class="story-zh-block">
-                <span class="result-label">中文翻譯</span>
-                <p id="l3-case-zh" class="l3-case-zh"></p>
-              </div>
-
-              <!-- 收藏至文章庫（含 task_instruction，供免 AI 再次練習） -->
-              <div class="save-story-wrap save-case-note-wrap">
-                <button id="btn-save-case-note" class="save-story-btn btn btn-primary" type="button">
-                  ⭐ 收藏文章
-                </button>
-              </div>
-
-              <div class="l3-challenge-task">
-                <div class="l3-challenge-header">
-                  <span class="result-label">Clinical Challenge — 臨床實務挑戰</span>
-                  <span id="l3-task-type-badge" class="l3-task-type-badge hidden"></span>
-                </div>
-
-                <div id="clinical-task-form" class="clinical-task-form card">
-                  <h3 class="clinical-task-title">📝 臨床督導實務紀錄表</h3>
-                  <p id="task-instruction" class="hint-text"></p>
-
-                  <table class="clinical-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">欄位</th>
-                        <th scope="col">你的專業思考（請輸入英文）</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><strong>Observation</strong></td>
-                        <td>
-                          <textarea
-                            id="clinical-field-observation"
-                            class="user-textarea clinical-field-textarea"
-                            rows="3"
-                            placeholder="案主的具體行為、語氣或環境細節為何？"
-                          ></textarea>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><strong>Assessment</strong></td>
-                        <td>
-                          <textarea
-                            id="clinical-field-assessment"
-                            class="user-textarea clinical-field-textarea"
-                            rows="3"
-                            placeholder="結合理論（如：三角關係／復元模式），你的專業評估是？"
-                          ></textarea>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><strong>Intervention</strong></td>
-                        <td>
-                          <textarea
-                            id="clinical-field-intervention"
-                            class="user-textarea clinical-field-textarea"
-                            rows="3"
-                            placeholder="你打算如何回應？請嘗試撰寫你的介入對話。"
-                          ></textarea>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  <button id="btn-submit-task" class="btn btn-primary primary-btn" type="button">
-                    發送給督導 (Submit)
-                  </button>
-                </div>
-
-                <div id="l3-supervision-loading" class="l3-supervision-loading hidden" aria-live="polite">
-                  <p class="loading-text">督導正在閱讀你的實務紀錄…</p>
-                </div>
-
-                <div id="l3-supervision-feedback" class="l3-supervision-feedback hidden" role="status" aria-live="polite">
-                  <span class="result-label">督導回饋 (Supervision Feedback)</span>
-                  <p id="l3-feedback-zh" class="l3-feedback-zh"></p>
-                  <p id="l3-feedback-en" class="l3-feedback-en hidden"></p>
-                  <div id="l3-field-feedback" class="l3-field-feedback hidden"></div>
-                  <div id="l3-vocab-corrections" class="l3-vocab-corrections hidden"></div>
-                </div>
-              </div>
-
-            </div><!-- /#l3-reading-display -->
-
-            <div id="l3-reading-error" class="error-card hidden" role="alert"></div>
-          </div><!-- /L3 results -->
-
-        </div><!-- /.layout-right -->
-      </div><!-- /.layout-container -->
-
-    </section><!-- /#reading-section -->
+    <!-- 舊閱讀區佔位（相容閱讀模組殘留 ID；永久隱藏） -->
+    <section id="reading-section" class="reading-section hidden" hidden aria-hidden="true"></section>
 
     <!-- ==================== 模組 5：專業詞彙庫 ==================== -->
     <!-- 預設隱藏，點擊「專業詞彙庫」Tab 後由 JS 顯示 -->
@@ -938,17 +648,18 @@
     >
 
       <h2 class="section-title">📚 文章庫</h2>
-      <p class="section-desc">統一管理已收藏的學術文獻、社工小故事與臨床挑戰。左側分類瀏覽；臨床文章可免 AI 再次寫作練習（僅 Submit 批改時呼叫 API）。</p>
+      <p class="section-desc">統一管理情境演練、學術文獻與舊版收藏。開啟情境演練文章可免 AI 重新生成，重複練習段落測驗與漸進寫作。</p>
 
       <p id="article-library-empty" class="library-empty hidden">
         尚未收藏任何文章。<br>
-        請先到「閱讀練習」生成文章後，點「收藏至文章庫／收藏文章」。
+        請先到「情境演練」生成文章後，點「⭐ 收藏文章」。
       </p>
 
       <div class="layout-container">
         <div class="layout-left">
           <div class="library-filters" role="group" aria-label="文章類型篩選">
             <button class="filter-chip active" type="button" data-type="all" aria-pressed="true">🗂️ 全部</button>
+            <button class="filter-chip" type="button" data-type="practice" aria-pressed="false">🎯 情境演練</button>
             <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 學術文獻</button>
             <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📖 社工故事</button>
             <button class="filter-chip" type="button" data-type="case_note" aria-pressed="false">📝 臨床挑戰</button>
@@ -1316,18 +1027,19 @@
     })();
   </script>
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=28"></script>
-  <script src="js/task-ui.js?v=2"></script>
+  <script src="js/deepseek.js?v=29"></script>
+  <script src="js/task-ui.js?v=3"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
-  <script src="js/reading.js?v=23"></script>
-  <script src="js/article-library.js?v=13"></script>
+  <script src="js/reading.js?v=24"></script>
+  <script src="js/story.js?v=1"></script>
+  <script src="js/article-library.js?v=14"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=5"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/app.js?v=19"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=14"></script>
 </body>

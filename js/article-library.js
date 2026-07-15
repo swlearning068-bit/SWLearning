@@ -13,7 +13,7 @@
 /** localStorage 鍵名（與 reading.js 共用） */
 const ARTICLE_LIBRARY_STORAGE_KEY = 'sw_saved_articles';
 
-/** @type {'all'|'literature'|'story'|'case_note'} 目前過濾類型 */
+/** @type {'all'|'literature'|'story'|'case_note'|'practice'} 目前過濾類型 */
 let articleFilterType = 'all';
 
 /** 目前展開中的文章 id；無則為 null */
@@ -100,6 +100,9 @@ function extractArticleVocabTerms(vocab) {
  */
 function getArticleListTitle(item) {
   if (!item) return '（無標題）';
+  if (item.type === 'practice') {
+    return String(item.title_zh || item.title_en || item.title || '（無標題演練）');
+  }
   if (item.type === 'story' || item.type === 'case_note') {
     if (item.title) return String(item.title);
     const text = String(
@@ -123,6 +126,11 @@ function getArticleListTitle(item) {
  * @returns {{label: string, modifier: string}}
  */
 function getArticleTypeBadgeMeta(item) {
+  if (item?.type === 'practice') {
+    return item.track === 'literature'
+      ? { label: '演練·文獻', modifier: 'article-type-badge--literature' }
+      : { label: '演練·故事', modifier: 'article-type-badge--story' };
+  }
   if (item?.type === 'story') {
     return { label: '故事', modifier: 'article-type-badge--story' };
   }
@@ -267,7 +275,8 @@ function renderArticlesList(filterType = 'all') {
     const emptyMsgs = {
       literature: '此分類尚無學術文獻。',
       story: '此分類尚無社工故事。',
-      case_note: '此分類尚無臨床挑戰文章。'
+      case_note: '此分類尚無臨床挑戰文章。',
+      practice: '此分類尚無情境演練文章。'
     };
     emptyFilter.textContent =
       emptyMsgs[articleFilterType] || '此分類尚無文章。';
@@ -864,12 +873,44 @@ function renderCaseNoteArticleDetail(item, detailEl) {
 }
 
 /**
+ * 渲染 Phase 11.8 情境演練收藏（免 AI；與主畫面同一套 UI）
+ * @param {Object} item
+ * @param {HTMLElement} detailEl
+ */
+function renderPracticeArticleDetail(item, detailEl) {
+  clozeModeActive = false;
+  detailEl.innerHTML = '';
+
+  if (typeof renderPracticeArticle === 'function') {
+    const root = document.createElement('div');
+    root.className = 'practice-article-root library-practice-root';
+    detailEl.appendChild(root);
+    renderPracticeArticle(item, root);
+    detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  detailEl.innerHTML =
+    '<p class="hint-text">情境演練模組尚未載入，請重新整理頁面後再試。</p>';
+}
+
+/**
  * 依 type 分派詳情渲染（開啟收藏文章時一律離線渲染，不呼叫文章生成 API）
  * @param {Object} item
  */
 function renderArticleDetail(item) {
   const detailEl = document.getElementById('library-article-detail');
   if (!detailEl || !item) return;
+
+  // Phase 11.8：有 content_chunks 的 practice／相容舊資料
+  if (
+    item.type === 'practice' ||
+    (typeof isInteractivePracticeArticle === 'function' &&
+      isInteractivePracticeArticle(item))
+  ) {
+    renderPracticeArticleDetail(item, detailEl);
+    return;
+  }
 
   if (item.type === 'story') {
     renderStoryArticleDetail(item, detailEl);

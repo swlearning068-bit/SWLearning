@@ -312,7 +312,7 @@ function getSavedArticles() {
 
 /**
  * 將文章寫入統一文章庫
- * @param {Object} article - 必須含 type: 'literature' | 'story' | 'case_note'
+ * @param {Object} article - 必須含 type: 'literature' | 'story' | 'case_note' | 'practice'
  * @returns {{ok: boolean, already?: boolean, message?: string}}
  */
 function saveArticleToLibrary(article) {
@@ -330,6 +330,11 @@ function saveArticleToLibrary(article) {
     const articleEn = article.article_en || article.case_note_en;
     if (!articleEn) {
       return { ok: false, message: '個案文章資料不完整，無法收藏。' };
+    }
+  }
+  if (article.type === 'practice') {
+    if (!article.title_en || !Array.isArray(article.content_chunks)) {
+      return { ok: false, message: '情境演練文章資料不完整，無法收藏。' };
     }
   }
 
@@ -360,6 +365,15 @@ function saveArticleToLibrary(article) {
         item.subjectName === article.subjectName
       );
     });
+  } else if (article.type === 'practice') {
+    already = list.some(
+      (item) =>
+        item &&
+        item.type === 'practice' &&
+        item.title_en === article.title_en &&
+        item.track === article.track &&
+        item.subjectName === article.subjectName
+    );
   }
 
   if (already) {
@@ -1944,6 +1958,12 @@ function handleSuggestedTagsInteraction(event) {
  * 綁定閱讀模組的所有事件（由 app.js 在 DOMContentLoaded 時呼叫）
  */
 function initReadingModule() {
+  // Phase 11.8：主畫面已改為情境演練；舊閱讀面板移除時略過事件綁定
+  if (!document.getElementById('btn-generate-story') &&
+      !document.getElementById('btn-l3-generate')) {
+    return;
+  }
+
   // --- 難度切換 ---
   const levelSwitch = document.getElementById('reading-level-switch');
   if (levelSwitch) {

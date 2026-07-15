@@ -2030,8 +2030,255 @@ async function generateCelebrationLetterAPI(
   return { message_en, message_zh };
 }
 
+/* ============================================================
+   Phase 11.8：雙軌互動文章（段落穿插測驗 + 漸進寫作題）
+   ============================================================ */
+
+/** 共用 JSON 契約說明（嵌入兩軌 system prompt） */
+const INTERACTIVE_PRACTICE_JSON_CONTRACT = `
+請務必以 JSON 格式回傳（不可省略欄位）：
+{
+  "title_en": "文章英文標題",
+  "title_zh": "文章中文標題",
+  "vocabulary": [
+    { "term": "英文專有名詞", "zh": "繁體中文", "part_of_speech": "n." }
+  ],
+  "content_chunks": [
+    {
+      "paragraph_en": "本段英文（約 60–120 字）",
+      "paragraph_zh": "本段繁體中文意譯",
+      "inline_quiz": {
+        "question": "針對本段的閱讀理解選擇題（英文）",
+        "options": ["選項A全文", "選項B全文", "選項C全文", "選項D全文"],
+        "correct_answer": "A",
+        "explanation": "繁體中文詳解，必須引述該科目理論／關鍵概念"
+      }
+    }
+  ],
+  "writing_tasks": {
+    "l1_cloze": {
+      "instruction": "請填入適當的臨床/學術單字：",
+      "sentence_zh": "中文提示句",
+      "sentence_en_template": "English sentence with one _______ blank.",
+      "answer": "defense"
+    },
+    "l2_sentence": {
+      "instruction": "請將以下臨床情境/學術論述翻譯成適當的英文：",
+      "prompt_zh": "中文造句提示",
+      "suggested_answer": "Suggested full English sentence."
+    }
+  },
+  "task_instruction": "給 L3 專業寫作表單的繁體中文引導（1–3 句，須點名科目理論）"
+}
+硬性規則：
+1. content_chunks 必須剛好 3 或 4 段；每一段都要有完整 inline_quiz。
+2. inline_quiz.options 必須剛好 4 個字串；correct_answer 用 "A"|"B"|"C"|"D"（對應 options 第 1–4 項）。
+3. vocabulary 提供 5–8 個進階專有名詞。
+4. writing_tasks.l1_cloze 的 sentence_en_template 必須含 _______；answer 為應填單字（可為片語）。
+5. explanation 與 task_instruction 必須結合已注入的科目理論知識庫，禁止空泛套話。
+6. 中文須為自然繁體、避免翻譯腔。`;
+
+const INTERACTIVE_STORY_SYSTEM_PROMPT =
+  `你是一位香港資深社會工作督導兼英文教師。請依當前科目生成一篇「社工小故事／個案情境」互動閱讀教材。` +
+  `\n語氣專業、客觀，符合香港社工實務脈絡；拒絕煽情。` +
+  `\n文章切成 3–4 段，每段後附即時閱讀選擇題；並一併產出 L1 填空與 L2 造句寫作題。` +
+  INTERACTIVE_PRACTICE_JSON_CONTRACT;
+
+const INTERACTIVE_LITERATURE_SYSTEM_PROMPT =
+  `你是一位社工學術寫作教練。請依當前科目生成一篇「模擬學術文獻／理論短文」互動閱讀教材（IMRaD 或理論應用口吻均可）。` +
+  `\n這是教學模擬文獻，非真實出版論文；用語須學術、嚴謹。` +
+  `\n文章切成 3–4 段，每段後附即時閱讀選擇題；並一併產出 L1 填空與 L2 造句寫作題。` +
+  INTERACTIVE_PRACTICE_JSON_CONTRACT;
+
+/**
+ * 正規化互動文章 JSON（雙軌共用）
+ * @param {Object} result
+ * @param {'story'|'literature'} track
+ * @returns {Object}
+ */
+function normalizeInteractivePracticeArticle(result, track) {
+  if (!result || typeof result !== 'object') {
+    throw new Error('AI 回傳資料格式無效。');
+  }
+
+  const title_en = String(result.title_en || '').trim();
+  const title_zh = String(result.title_zh || '').trim();
+  if (!title_en) {
+    throw new Error('AI 回傳資料不完整，缺少文章標題。');
+  }
+
+  const rawVocab = Array.isArray(result.vocabulary) ? result.vocabulary : [];
+  const vocabulary = rawVocab
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const term = String(item.term || item.word || '').trim();
+      const zh = String(item.zh || '').trim();
+      const part_of_speech = String(
+        item.part_of_speech || item.pos || ''
+      ).trim();
+      if (!term || !zh) return null;
+      return { term, zh, part_of_speech };
+    })
+    .filter(Boolean);
+
+  const rawChunks = Array.isArray(result.content_chunks)
+    ? result.content_chunks
+    : [];
+  const content_chunks = rawChunks
+    .map((chunk) => {
+      if (!chunk || typeof chunk !== 'object') return null;
+      const paragraph_en = String(chunk.paragraph_en || '').trim();
+      const paragraph_zh = String(chunk.paragraph_zh || '').trim();
+      const quiz = chunk.inline_quiz && typeof chunk.inline_quiz === 'object'
+        ? chunk.inline_quiz
+        : null;
+      if (!paragraph_en || !quiz) return null;
+
+      let options = Array.isArray(quiz.options)
+        ? quiz.options.map((o) => String(o || '').trim()).filter(Boolean)
+        : [];
+      if (options.length > 4) options = options.slice(0, 4);
+      if (options.length < 4) return null;
+
+      let correct_answer = String(quiz.correct_answer || '').trim();
+      const letter = correct_answer.toUpperCase();
+      if (/^[A-D]$/.test(letter)) {
+        correct_answer = letter;
+      } else {
+        const idx = options.findIndex(
+          (o) => o.toLowerCase() === correct_answer.toLowerCase()
+        );
+        correct_answer = idx >= 0 ? String.fromCharCode(65 + idx) : 'A';
+      }
+
+      return {
+        paragraph_en,
+        paragraph_zh,
+        inline_quiz: {
+          question: String(quiz.question || '').trim(),
+          options,
+          correct_answer,
+          explanation: String(quiz.explanation || '').trim()
+        }
+      };
+    })
+    .filter(Boolean);
+
+  if (content_chunks.length < 3) {
+    throw new Error('AI 回傳的段落不足（需要 3–4 段含測驗）。');
+  }
+
+  const wt = result.writing_tasks && typeof result.writing_tasks === 'object'
+    ? result.writing_tasks
+    : {};
+  const cloze = wt.l1_cloze && typeof wt.l1_cloze === 'object' ? wt.l1_cloze : {};
+  const sentence =
+    wt.l2_sentence && typeof wt.l2_sentence === 'object' ? wt.l2_sentence : {};
+
+  const l1_cloze = {
+    instruction: String(cloze.instruction || '請填入適當的臨床/學術單字：').trim(),
+    sentence_zh: String(cloze.sentence_zh || '').trim(),
+    sentence_en_template: String(cloze.sentence_en_template || '').trim(),
+    answer: String(cloze.answer || '').trim()
+  };
+  const l2_sentence = {
+    instruction: String(
+      sentence.instruction || '請將以下內容翻譯成適當的英文：'
+    ).trim(),
+    prompt_zh: String(sentence.prompt_zh || '').trim(),
+    suggested_answer: String(sentence.suggested_answer || '').trim()
+  };
+
+  if (!l1_cloze.sentence_en_template || !l1_cloze.answer) {
+    throw new Error('AI 回傳缺少 L1 填空寫作題。');
+  }
+  if (!l2_sentence.prompt_zh || !l2_sentence.suggested_answer) {
+    throw new Error('AI 回傳缺少 L2 造句寫作題。');
+  }
+
+  const task_instruction = String(
+    result.task_instruction || result.guidance_zh || ''
+  ).trim();
+
+  return {
+    track: track === 'literature' ? 'literature' : 'story',
+    type: 'practice',
+    title_en,
+    title_zh: title_zh || title_en,
+    vocabulary,
+    content_chunks: content_chunks.slice(0, 4),
+    writing_tasks: { l1_cloze, l2_sentence },
+    task_instruction
+  };
+}
+
+/**
+ * Phase 11.8：生成互動社工小故事（段落測驗 + 寫作題）
+ * @returns {Promise<Object>}
+ */
+async function generateInteractiveStoryAPI() {
+  const subject = resolveCurrentSubject();
+  const themes = getL1StoryThemes(subject.id);
+  const theme = themes[Math.floor(Math.random() * themes.length)];
+  const taskType =
+    normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story';
+
+  const userContent =
+    `請為科目「${subject.name}」生成一篇互動社工小故事教材。` +
+    `\n主題方向：${theme}` +
+    `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks 與 vocabulary。`;
+
+  const result = await requestDeepSeekJSON(
+    INTERACTIVE_STORY_SYSTEM_PROMPT,
+    userContent,
+    8192,
+    taskType,
+    { subjectId: subject.id }
+  );
+
+  return normalizeInteractivePracticeArticle(result, 'story');
+}
+
+/**
+ * Phase 11.8：生成互動模擬學術文獻（段落測驗 + 寫作題）
+ * @returns {Promise<Object>}
+ */
+async function generateInteractiveLiteratureAPI() {
+  const subject = resolveCurrentSubject();
+  const knowledge = getSubjectKnowledge(subject.id);
+  const theoryHint = knowledge
+    ? [
+        knowledge.theory_core,
+        Array.isArray(knowledge.key_concepts)
+          ? knowledge.key_concepts.slice(0, 3).join('、')
+          : ''
+      ]
+        .filter(Boolean)
+        .join('；')
+    : '';
+
+  const userContent =
+    `請為科目「${subject.name}」生成一篇互動模擬學術文獻教材。` +
+    (theoryHint ? `\n理論焦點：${theoryHint}` : '') +
+    `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks 與 vocabulary。` +
+    `\n文體須像教學用模擬論文／理論短文，並在適處加學術免責意識（不必另開欄位）。`;
+
+  const result = await requestDeepSeekJSON(
+    INTERACTIVE_LITERATURE_SYSTEM_PROMPT,
+    userContent,
+    8192,
+    'literature',
+    { subjectId: subject.id }
+  );
+
+  return normalizeInteractivePracticeArticle(result, 'literature');
+}
+
 // 明確掛到 window，避免快取／作用域問題導致其他模組找不到函式
 window.generateL1Story = generateL1Story;
+window.generateInteractiveStoryAPI = generateInteractiveStoryAPI;
+window.generateInteractiveLiteratureAPI = generateInteractiveLiteratureAPI;
+window.normalizeInteractivePracticeArticle = normalizeInteractivePracticeArticle;
 window.callDeepSeekAPI = callDeepSeekAPI;
 window.callL2WritingAPI = callL2WritingAPI;
 window.callL3WritingAPI = callL3WritingAPI;

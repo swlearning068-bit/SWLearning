@@ -4917,3 +4917,194 @@ body {
   }
 }
 
+/* ---------- Phase 11.8：情境演練（雙軌 + 段落測驗 + 漸進寫作） ---------- */
+.practice-track-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.practice-track-actions .btn {
+  width: 100%;
+}
+
+.practice-article-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.practice-article-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.practice-track-badge {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.practice-track-badge--story {
+  background: #F3F4F6;
+  color: #374151;
+}
+
+.practice-track-badge--literature {
+  background: #111827;
+  color: #FFFFFF;
+}
+
+.practice-title-en {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+.practice-title-zh {
+  margin: 0;
+  color: var(--color-text-light, #6B7280);
+  font-size: 0.95rem;
+}
+
+.practice-chunk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-color, #E5E7EB);
+}
+
+.practice-chunk-en {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.practice-chunk-zh {
+  margin: 0;
+  padding: 10px 12px;
+  background: #FAFAFA;
+  border-radius: 8px;
+  line-height: 1.65;
+  color: #4B5563;
+}
+
+.practice-inline-quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 10px;
+  background: #FFFFFF;
+}
+
+.practice-quiz-question {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.practice-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.practice-quiz-option {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.practice-quiz-feedback {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.practice-quiz-feedback.is-correct {
+  color: #047857;
+}
+
+.practice-quiz-feedback.is-wrong {
+  color: #B91C1C;
+}
+
+.practice-quiz-explanation {
+  margin: 6px 0 0;
+  color: #4B5563;
+}
+
+.progressive-writing {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 2px solid var(--border-color, #E5E7EB);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progressive-writing-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.progressive-writing-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.writing-l1-cloze,
+.writing-l2-sentence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.writing-l1-template,
+.writing-l2-prompt {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.writing-l1-input {
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.writing-check-feedback.is-correct {
+  color: #047857;
+}
+
+.writing-check-feedback.is-wrong {
+  color: #B91C1C;
+}
+
+.writing-l2-suggested {
+  padding: 10px 12px;
+  background: #F9FAFB;
+  border-radius: 8px;
+}
+
+.writing-l2-suggested-text {
+  margin: 6px 0 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.literature-vocab-pos {
+  color: #9CA3AF;
+  font-size: 0.85em;
+}
+

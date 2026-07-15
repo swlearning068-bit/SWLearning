@@ -760,8 +760,300 @@ function createClinicalTaskPracticeBlock(options) {
   return wrap;
 }
 
+/* ============================================================
+   Phase 11.8：漸進式寫作（L1 填空／L2 造句／L3 表單）
+   ============================================================ */
+
+/**
+ * 在掛載點渲染 L1/L2/L3 寫作切換區
+ * @param {HTMLElement} mountEl
+ * @param {Object} article - 互動文章（含 writing_tasks、track、task_instruction）
+ */
+function renderProgressiveWritingBlock(mountEl, article) {
+  if (!mountEl || !article) return;
+
+  mountEl.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'progressive-writing';
+  wrap.innerHTML =
+    '<h3 class="progressive-writing-title">✍️ 漸進式寫作練習</h3>' +
+    '<div class="level-switch progressive-writing-switch" role="tablist" aria-label="寫作難度">' +
+    '<button type="button" class="level-btn active" data-write-level="l1" role="tab" aria-selected="true">🌱 L1 填空</button>' +
+    '<button type="button" class="level-btn" data-write-level="l2" role="tab" aria-selected="false">🌿 L2 造句</button>' +
+    '<button type="button" class="level-btn" data-write-level="l3" role="tab" aria-selected="false">🌳 L3 專業寫作</button>' +
+    '</div>' +
+    '<div class="progressive-writing-panels"></div>';
+
+  const panels = wrap.querySelector('.progressive-writing-panels');
+  const panelL1 = document.createElement('div');
+  panelL1.className = 'progressive-writing-panel';
+  panelL1.dataset.writePanel = 'l1';
+  panelL1.appendChild(buildL1ClozePanel(article.writing_tasks?.l1_cloze));
+
+  const panelL2 = document.createElement('div');
+  panelL2.className = 'progressive-writing-panel hidden';
+  panelL2.dataset.writePanel = 'l2';
+  panelL2.appendChild(buildL2SentencePanel(article.writing_tasks?.l2_sentence));
+
+  const panelL3 = document.createElement('div');
+  panelL3.className = 'progressive-writing-panel hidden';
+  panelL3.dataset.writePanel = 'l3';
+  panelL3.appendChild(buildL3WritingPanel(article));
+
+  panels.appendChild(panelL1);
+  panels.appendChild(panelL2);
+  panels.appendChild(panelL3);
+
+  const switchEl = wrap.querySelector('.progressive-writing-switch');
+  switchEl?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-write-level]');
+    if (!btn) return;
+    const level = btn.getAttribute('data-write-level');
+    switchEl.querySelectorAll('.level-btn').forEach((b) => {
+      const active = b === btn;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', String(active));
+    });
+    panels.querySelectorAll('.progressive-writing-panel').forEach((p) => {
+      p.classList.toggle('hidden', p.dataset.writePanel !== level);
+    });
+  });
+
+  mountEl.appendChild(wrap);
+}
+
+/**
+ * @param {Object} cloze
+ * @returns {HTMLElement}
+ */
+function buildL1ClozePanel(cloze) {
+  const data = cloze && typeof cloze === 'object' ? cloze : {};
+  const box = document.createElement('div');
+  box.className = 'writing-l1-cloze card';
+
+  const instruction = document.createElement('p');
+  instruction.className = 'hint-text';
+  instruction.textContent = data.instruction || '請填入適當的臨床/學術單字：';
+  box.appendChild(instruction);
+
+  if (data.sentence_zh) {
+    const zh = document.createElement('p');
+    zh.className = 'writing-l1-zh';
+    zh.textContent = data.sentence_zh;
+    box.appendChild(zh);
+  }
+
+  const template = document.createElement('p');
+  template.className = 'writing-l1-template';
+  template.textContent = data.sentence_en_template || '';
+  box.appendChild(template);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'user-textarea writing-l1-input';
+  input.placeholder = '在此輸入單字…';
+  input.autocomplete = 'off';
+  box.appendChild(input);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary';
+  btn.textContent = '檢查答案';
+  box.appendChild(btn);
+
+  const feedback = document.createElement('p');
+  feedback.className = 'writing-check-feedback hidden';
+  box.appendChild(feedback);
+
+  btn.addEventListener('click', () => {
+    const user = String(input.value || '').trim();
+    const answer = String(data.answer || '').trim();
+    if (!user) {
+      feedback.textContent = '請先填寫答案。';
+      feedback.classList.remove('hidden', 'is-correct', 'is-wrong');
+      return;
+    }
+    const ok = user.toLowerCase() === answer.toLowerCase();
+    feedback.classList.remove('hidden');
+    feedback.classList.toggle('is-correct', ok);
+    feedback.classList.toggle('is-wrong', !ok);
+    feedback.textContent = ok
+      ? '✅ 正確！'
+      : `❌ 再想想。參考答案：${answer}`;
+  });
+
+  return box;
+}
+
+/**
+ * @param {Object} sentenceTask
+ * @returns {HTMLElement}
+ */
+function buildL2SentencePanel(sentenceTask) {
+  const data = sentenceTask && typeof sentenceTask === 'object' ? sentenceTask : {};
+  const box = document.createElement('div');
+  box.className = 'writing-l2-sentence card';
+
+  const instruction = document.createElement('p');
+  instruction.className = 'hint-text';
+  instruction.textContent =
+    data.instruction || '請將以下內容翻譯成適當的英文：';
+  box.appendChild(instruction);
+
+  const prompt = document.createElement('p');
+  prompt.className = 'writing-l2-prompt';
+  prompt.textContent = data.prompt_zh || '';
+  box.appendChild(prompt);
+
+  const ta = document.createElement('textarea');
+  ta.className = 'user-textarea writing-l2-input';
+  ta.rows = 3;
+  ta.placeholder = '請用英文寫出完整句子…';
+  box.appendChild(ta);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary';
+  btn.textContent = '對答案';
+  box.appendChild(btn);
+
+  const suggested = document.createElement('div');
+  suggested.className = 'writing-l2-suggested hidden';
+  suggested.innerHTML =
+    '<span class="result-label">參考答案（自我校對）</span>' +
+    `<p class="writing-l2-suggested-text"></p>`;
+  box.appendChild(suggested);
+
+  btn.addEventListener('click', () => {
+    const textEl = suggested.querySelector('.writing-l2-suggested-text');
+    if (textEl) textEl.textContent = data.suggested_answer || '（無參考答案）';
+    suggested.classList.remove('hidden');
+  });
+
+  return box;
+}
+
+/**
+ * L3：依 track 顯示 SOAP 或文獻反思表
+ * @param {Object} article
+ * @returns {HTMLElement}
+ */
+function buildL3WritingPanel(article) {
+  const isLit = article?.track === 'literature';
+  const wrap = document.createElement('div');
+  wrap.className = 'writing-l3-panel';
+
+  const articleEn =
+    typeof buildPracticeArticleContext === 'function'
+      ? buildPracticeArticleContext(article)
+      : (Array.isArray(article?.content_chunks)
+        ? article.content_chunks.map((c) => c.paragraph_en).join('\n\n')
+        : '');
+
+  const articleZh = Array.isArray(article?.content_chunks)
+    ? article.content_chunks
+        .map((c) => String(c.paragraph_zh || '').trim())
+        .filter(Boolean)
+        .join('\n\n')
+    : '';
+
+  let subjectId = article?.subjectId || null;
+  let subjectName = article?.subjectName || '';
+  if (!subjectId && typeof resolveCurrentSubject === 'function') {
+    const s = resolveCurrentSubject();
+    subjectId = s?.id || null;
+    subjectName = subjectName || s?.name || '';
+  }
+
+  const knowledge =
+    typeof getSubjectKnowledge === 'function' && subjectId
+      ? getSubjectKnowledge(subjectId)
+      : null;
+
+  const instruction =
+    buildStoredTaskInstruction(article) ||
+    buildFallbackGuidance(knowledge, subjectName);
+
+  const title = isLit
+    ? '📝 學術文獻反思表'
+    : '📝 臨床督導實務紀錄表 (SOAP)';
+
+  const labels = isLit
+    ? {
+        observation: 'Observation 關鍵觀察',
+        assessment: 'Critique 理論批判／評估',
+        intervention: 'Application 實務應用'
+      }
+    : {
+        observation: 'Observation',
+        assessment: 'Assessment',
+        intervention: 'Intervention'
+      };
+
+  const form = document.createElement('div');
+  form.className = 'clinical-task-form card';
+  form.innerHTML =
+    `<h3 class="clinical-task-title">${title}</h3>` +
+    `<p class="task-instruction hint-text"></p>` +
+    '<table class="clinical-table"><thead><tr><th>欄位</th><th>你的專業思考（請輸入英文）</th></tr></thead><tbody>' +
+    `<tr><td><strong>${labels.observation}</strong></td><td>` +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-observation" rows="3"></textarea></td></tr>' +
+    `<tr><td><strong>${labels.assessment}</strong></td><td>` +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-assessment" rows="3"></textarea></td></tr>' +
+    `<tr><td><strong>${labels.intervention}</strong></td><td>` +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-intervention" rows="3"></textarea></td></tr>' +
+    '</tbody></table>' +
+    '<button class="btn btn-primary btn-submit-clinical-task" type="button">發送給督導 (Submit)</button>';
+
+  wrap.appendChild(form);
+
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'l3-supervision-loading hidden';
+  loadingEl.innerHTML = '<p class="loading-text">督導正在閱讀你的實務紀錄…</p>';
+  wrap.appendChild(loadingEl);
+
+  const feedback = document.createElement('div');
+  feedback.className = 'l3-supervision-feedback hidden';
+  feedback.setAttribute('role', 'status');
+  feedback.innerHTML =
+    '<span class="result-label">督導回饋 (Supervision Feedback)</span>' +
+    '<p class="l3-feedback-zh"></p>' +
+    '<p class="l3-feedback-en hidden"></p>' +
+    '<div class="l3-field-feedback hidden"></div>' +
+    '<div class="l3-vocab-corrections hidden"></div>';
+  wrap.appendChild(feedback);
+
+  hydrateClinicalTaskForm({
+    root: form,
+    task_instruction: instruction,
+    knowledge,
+    subjectName
+  });
+
+  form.querySelector('.btn-submit-clinical-task')?.addEventListener('click', () => {
+    submitClinicalTaskToSupervisor({
+      root: form,
+      feedbackRoot: wrap,
+      articleEn,
+      articleZh,
+      taskInstruction: instruction,
+      taskType: isLit ? 'literature_reflection' : 'soap',
+      subjectId,
+      loadingEl,
+      onError: (message) => {
+        if (typeof showToast === 'function') showToast(`❌ ${message}`);
+        else alert(message);
+      }
+    });
+  });
+
+  return wrap;
+}
+
 // 對外 API
 window.buildSubjectFieldPlaceholders = buildSubjectFieldPlaceholders;
+window.renderProgressiveWritingBlock = renderProgressiveWritingBlock;
 window.buildFallbackGuidance = buildFallbackGuidance;
 window.buildStoredTaskInstruction = buildStoredTaskInstruction;
 window.setTaskInstruction = setTaskInstruction;

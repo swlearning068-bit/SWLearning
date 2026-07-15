@@ -230,15 +230,8 @@ async function initSubjectSelector() {
         const subjectName = getCurrentSubjectName();
         showToast('✅ 已切換學習科目至：' + subjectName);
 
-        // 切換科目時清空標籤歷史黑名單；若在閱讀模組則立即重載
         if (typeof invalidateSuggestedTags === 'function') {
           invalidateSuggestedTags();
-        }
-        const readingSection = $('reading-section');
-        const isReadingVisible =
-          readingSection && !readingSection.classList.contains('hidden');
-        if (isReadingVisible && typeof loadSuggestedTags === 'function') {
-          loadSuggestedTags();
         }
       });
     }
@@ -267,15 +260,15 @@ async function initSubjectSelector() {
    ============================================================ */
 
 /**
- * 檢查 localStorage 是否有 API Key，並切換寫作區顯示狀態
- * - 有 Key：顯示寫作練習總容器，隱藏警告
- * - 無 Key：顯示警告，隱藏寫作練習總容器
+ * 檢查 localStorage 是否有 API Key，並切換情境演練區顯示狀態
+ * - 有 Key：顯示情境演練主體，隱藏警告
+ * - 無 Key：顯示警告，隱藏情境演練主體
  */
 function refreshApiKeyState() {
   const hasKey = !!localStorage.getItem(STORAGE_KEY_API);
 
-  const warning  = $('api-key-warning');
-  const practice = $('writing-practice');
+  const warning = $('api-key-warning');
+  const practice = $('case-practice') || $('writing-practice');
 
   if (hasKey) {
     hide(warning);
@@ -350,10 +343,16 @@ function ensureFlashcardStyles() {
 
 /**
  * 切換到指定 Tab，顯示對應 section、隱藏其餘
- * @param {'writing'|'reading'|'vocab'|'learn'|'quiz'|'articles'|'reward'} tabName - 目標 Tab 名稱
+ * @param {'practice'|'vocab'|'learn'|'quiz'|'articles'|'reward'} tabName
  */
 function switchTab(tabName) {
+  // 相容舊呼叫
+  if (tabName === 'writing' || tabName === 'reading') {
+    tabName = 'practice';
+  }
+
   const sections = {
+    practice: $('practice-section'),
     writing:  $('writing-section'),
     reading:  $('reading-section'),
     vocab:    $('vocab-section'),
@@ -364,8 +363,7 @@ function switchTab(tabName) {
   };
 
   const tabs = {
-    writing:  $('tab-writing'),
-    reading:  $('tab-reading'),
+    practice: $('tab-practice'),
     vocab:    $('tab-vocab'),
     learn:    $('tab-learn'),
     quiz:     $('tab-quiz'),
@@ -373,10 +371,14 @@ function switchTab(tabName) {
     reward:   $('nav-reward')
   };
 
-  // 顯示目標區塊，隱藏其餘
   Object.keys(sections).forEach((name) => {
     const section = sections[name];
     if (!section) return;
+    // 舊 writing／reading 區塊永久隱藏
+    if (name === 'writing' || name === 'reading') {
+      hide(section);
+      return;
+    }
     if (name === tabName) {
       show(section);
     } else {
@@ -384,7 +386,6 @@ function switchTab(tabName) {
     }
   });
 
-  // 更新 Tab 按鈕的 active 樣式與無障礙屬性
   Object.keys(tabs).forEach((name) => {
     const tab = tabs[name];
     if (!tab) return;
@@ -393,17 +394,14 @@ function switchTab(tabName) {
     tab.setAttribute('aria-selected', String(isActive));
   });
 
-  // 進入生字複習時，重新載入到期卡片
   if (tabName === 'learn' && typeof refreshLearnSession === 'function') {
     refreshLearnSession();
   }
 
-  // 進入文章庫時，重新讀取 localStorage 並渲染列表
   if (tabName === 'articles' && typeof refreshArticleLibraryView === 'function') {
     refreshArticleLibraryView();
   }
 
-  // 進入學習目標時，刷新印花卡／設定表單
   if (tabName === 'reward' && typeof refreshRewardView === 'function') {
     refreshRewardView();
   }
@@ -416,12 +414,11 @@ function initTabs() {
   const tabNav = document.querySelector('.tab-nav');
   if (!tabNav) return;
 
-  // 事件委派：點擊任一 .tab-btn 時切換
   tabNav.addEventListener('click', (event) => {
     const btn = event.target.closest('.tab-btn');
     if (!btn) return;
 
-    const tabName = btn.dataset.tab; // writing | reading | vocab | learn | quiz | articles | reward
+    const tabName = btn.dataset.tab;
     if (tabName) switchTab(tabName);
   });
 }
@@ -452,12 +449,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 4. 初始化 Tab 切換
+  // 4. 初始化 Tab 切換（預設情境演練）
   initTabs();
+  switchTab('practice');
 
-  // 5. 初始化寫作模組（L1 / L2 / L3，定義於 writing.js）
-  if (typeof initWritingModule === 'function') {
-    initWritingModule();
+  // 5. 初始化情境演練（Phase 11.8，定義於 story.js）
+  if (typeof initCasePracticeModule === 'function') {
+    initCasePracticeModule();
   }
 
   // 6. 初始化詞彙庫模組（定義於 vocab-library.js）
@@ -465,9 +463,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     initVocabLibrary();
   }
 
-  // 7. 初始化閱讀模組（定義於 reading.js）
+  // 7. 舊閱讀模組：僅保留文章庫收藏工具；主 UI 已由情境演練接管
   if (typeof initReadingModule === 'function') {
-    initReadingModule();
+    // 可選：若仍有殘留綁定需求則呼叫；閱讀區 DOM 已清空
+    try {
+      initReadingModule();
+    } catch (_) {
+      // ignore：舊面板 ID 可能已移除
+    }
   }
 
   // 8. 初始化生字複習模組（定義於 vocab-learn.js）
