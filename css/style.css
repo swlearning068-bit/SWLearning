@@ -5241,3 +5241,150 @@ body {
   border-top: 1px solid var(--border-color, #E5E7EB);
 }
 
+/* ============================================================
+   文章庫：電子書沉浸閱讀模式
+   ============================================================ */
+
+.ebook-mode-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.ebook-mode-btn {
+  flex-shrink: 0;
+}
+
+/* 電子書模式啟用時：隱藏干擾元素 */
+body.ebook-active {
+  overflow: hidden;
+}
+
+body.ebook-active header,
+body.ebook-active .top-nav,
+body.ebook-active .subject-bar,
+body.ebook-active .tab-nav,
+body.ebook-active #article-library-section > .section-title,
+body.ebook-active #article-library-section > .section-desc,
+body.ebook-active #article-library-section .layout-left,
+body.ebook-active #library-articles-list {
+  display: none !important;
+}
+
+/* 電子書閱讀區塊全螢幕化 */
+body.ebook-active #article-library-section {
+  display: block !important;
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  margin: 0;
+  padding: 0;
+  background-color: #fdfcf8;
+}
+
+body.ebook-active #article-library-section .layout-container,
+body.ebook-active #article-library-section .layout-right {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+body.ebook-active #library-article-detail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background-color: #fdfcf8;
+  overflow-y: auto;
+  padding: 5% 20px 8%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 100vh;
+}
+
+/* 限制閱讀寬度並優化排版 */
+body.ebook-active #library-article-detail > .library-detail-pack,
+body.ebook-active #library-article-detail > .practice-article-root,
+body.ebook-active #library-article-detail > .library-practice-root {
+  max-width: 800px;
+  margin: 0 auto;
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: #333;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+body.ebook-active #library-article-detail .literature-title,
+body.ebook-active #library-article-detail .section-title,
+body.ebook-active #library-article-detail h3 {
+  font-size: 1.55rem;
+  line-height: 1.4;
+  color: #222;
+}
+
+body.ebook-active #library-article-detail .library-en-text,
+body.ebook-active #library-article-detail .story-en,
+body.ebook-active #library-article-detail .sim-lit-en,
+body.ebook-active #library-article-detail p {
+  font-size: 1.15rem;
+  line-height: 1.8;
+}
+
+body.ebook-active #btn-ebook-mode,
+body.ebook-active .ebook-mode-toolbar {
+  display: none;
+}
+
+/* 懸浮的退出按鈕 */
+#btn-exit-ebook {
+  display: none;
+  position: fixed;
+  top: 20px;
+  right: 30px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 10000;
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+body.ebook-active #btn-exit-ebook {
+  display: block;
+}
+
+body.ebook-active #btn-exit-ebook:hover {
+  background-color: #f5f5f5;
+  border-color: #999;
+}
+
+@media (max-width: 640px) {
+  body.ebook-active #library-article-detail {
+    padding: 12% 16px 10%;
+  }
+
+  #btn-exit-ebook {
+    top: 12px;
+    right: 12px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
+
