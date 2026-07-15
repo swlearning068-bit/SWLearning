@@ -1307,20 +1307,27 @@ async function expandLiteratureFromAbstractAPI(
 }
 
 /**
- * L3 閱讀：依當前科目生成個案故事 + 臨床實務挑戰任務
+ * L3 閱讀：依當前科目生成個案故事 + 臨床實務挑戰任務（表格化 O/A/I）
  */
 const CASE_NOTE_READING_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。請根據當前選擇的社工科目，先生成一篇約 180–220 字的 L3 英文個案故事（Case Note／個案情境），英文難度適合準備實習的社工學生。
 內容必須嚴格貼合該科目核心與已注入的理論知識庫；若科目為社會工作倫理與價值，個案必須清楚呈現倫理兩難與道德抉擇的掙扎，並只隨機帶入 1–2 個背景元素，不要一次塞滿。
 
-接著，請為社工學生設計一個『臨床實務挑戰任務 (Clinical Challenge Task)』。
+接著，請為社工學生設計一個『臨床實務挑戰任務 (Clinical Challenge Task)』，讓學生以 Observation／Assessment／Intervention 三欄實務紀錄表作答。
 請絕對不要問能在文章中直接找到答案的表面問題（禁止 True/False、細節回憶、選詞填空等閱讀測驗式題目）。
-請從以下三種任務類型中『隨機挑選一種』來出題：
+請從以下三種任務焦點中『隨機挑選一種』來出題（作為引導方向，學生仍填寫 O／A／I 三欄）：
 
-1. soap — SOAP 紀錄撰寫：要求學生根據文章，用英文簡潔寫出該個案的 Assessment（評估）與 Plan（介入計畫）。
-2. theory_ethics — 理論與倫理批判：結合該科目的核心理論（如家庭系統、倫理六原則），詢問學生文章中社工的決策是否有盲點，並要求提出更好的介入建議。
-3. key_dialogue — 關鍵對話回應：擷取文章中案主最抗拒或情緒最高漲的一句話，要求學生寫出他們當下會如何用英文進行同理與回應。
+1. soap — SOAP 紀錄撰寫：引導學生把焦點放在 Assessment（評估）與 Plan／Intervention（介入計畫）。
+2. theory_ethics — 理論與倫理批判：結合該科目的核心理論（如家庭系統、倫理六原則），引導學生檢視決策盲點並提出更好介入。
+3. key_dialogue — 關鍵對話回應：擷取文章中案主最抗拒或情緒最高漲的一句話，引導學生撰寫同理與介入對話。
 
-【任務指令語氣】必須像一位嚴格但具啟發性的督導；task_en 與 task_zh 皆為完整可獨立閱讀的任務說明（雙語對照）。
+【客製化引導建議 guidance_zh — 必填】
+必須根據已注入的科目理論知識庫，寫出一段親切、具體、可操作的繁體中文引導（約 1–3 句），放入 guidance_zh。
+引導必須點名該科目至少一個理論／關鍵概念，並告訴學生在填表時該如何運用。
+示例（長者服務）：「請運用積極老齡化觀點，分析案主在社會參與上的限制。」
+示例（家庭社工）：「請留意三角關係與邊界，評估家庭互動如何維持症狀。」
+禁止空泛套話（如「請認真作答」）；禁止與科目無關的理論。
+
+【任務指令語氣】task_en 與 task_zh 為完整可獨立閱讀的任務說明（雙語對照），語氣像嚴格但具啟發性的督導。
 
 請務必以 JSON 格式回傳：
 {
@@ -1328,36 +1335,68 @@ const CASE_NOTE_READING_SYSTEM_PROMPT = `你是一位香港資深社會工作督
   "case_note_zh": "繁體中文翻譯",
   "task_type": "soap",
   "task_en": "英文任務指令（督導語氣）",
-  "task_zh": "繁體中文任務指令（督導語氣）"
+  "task_zh": "繁體中文任務指令（督導語氣）",
+  "guidance_zh": "依科目理論客製化的親切引導建議（繁體中文，1–3 句）"
 }
 task_type 必須是 "soap"、"theory_ethics" 或 "key_dialogue" 其中之一。`;
 
-/** L3 督導回饋 System Prompt */
-const L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。學生剛完成一份臨床實務挑戰任務。
-請根據「個案文章、任務題目、學生答案」，給予一段嚴格但具啟發性的督導回饋 (Supervision Feedback)。
+/** L3 督導回饋 System Prompt（分欄 O/A/I + 詞彙修正） */
+const L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。學生剛以 Observation／Assessment／Intervention 三欄完成臨床實務紀錄表。
+
+請根據「個案文章、任務題目／引導、學生三欄答案 JSON」，分別對三個欄位給予評語，並重點加強英文學術詞彙的修正建議 (Vocab Correction)。
 
 回饋重點：
-1. 肯定學生答案中值得保留的專業判斷或同理語言（若有）。
-2. 指出盲點、遺漏的風險評估、倫理考量，或理論應用不足之處。
-3. 給出 1–2 個可操作的改進建議（可用英文示範句）。
-4. 語氣像督導面談：直接、具體、鼓勵批判性思考；禁止只說「很好」或複述文章。
-5. 必須結合該科目核心理論／關鍵概念至少一點。
+1. 對 Observation／Assessment／Intervention 各自評語：肯定可取之處，指出盲點、風險、倫理或理論應用不足。
+2. Assessment 必須檢查是否連結該科目核心理論／關鍵概念。
+3. Intervention 可給 1 句可操作的英文示範對話（若合適）。
+4. Vocab Correction：列出 2–5 組可改進的詞彙或片語（口語→學術／更精確的社工英語）；若學生幾乎全中文，請建議對應英文專業用語。
+5. 語氣像督導面談：直接、具體、親切鼓勵；禁止只說「很好」或複述文章。
+6. 必須結合該科目核心理論／關鍵概念至少一點（寫入 feedback_zh）。
 
 請以 JSON 回傳：
 {
-  "feedback_zh": "繁體中文督導回饋（約 120–220 字）",
-  "feedback_en": "Optional short English coaching note (2–4 sentences)"
+  "feedback_zh": "繁體中文總評（約 80–160 字）",
+  "feedback_en": "Optional short English coaching note (2–4 sentences)",
+  "field_feedback": {
+    "observation": "對 Observation 的繁體中文評語",
+    "assessment": "對 Assessment 的繁體中文評語",
+    "intervention": "對 Intervention 的繁體中文評語"
+  },
+  "vocab_corrections": [
+    {
+      "original": "學生用詞或片語",
+      "suggestion": "更合適的學術／社工英文",
+      "note": "一句簡短說明（繁中或英皆可）"
+    }
+  ]
 }`;
 
 /**
- * 生成 L3 個案故事 + 臨床實務挑戰任務
+ * 生成 L3 個案故事 + 臨床實務挑戰任務（含科目客製化引導）
  *
- * @returns {Promise<{case_note_en: string, case_note_zh: string, task_type: string, task_en: string, task_zh: string, question_en: string, question_zh: string}>}
+ * @returns {Promise<{case_note_en: string, case_note_zh: string, task_type: string, task_en: string, task_zh: string, guidance_zh: string, question_en: string, question_zh: string}>}
  */
 async function generateCaseNoteReading() {
   const subject = resolveCurrentSubject();
+  const knowledge = getSubjectKnowledge(subject.id);
+  const theoryHint = knowledge
+    ? [
+        knowledge.theory_core,
+        Array.isArray(knowledge.key_concepts)
+          ? knowledge.key_concepts.slice(0, 3).join('、')
+          : ''
+      ]
+        .filter(Boolean)
+        .join('；')
+    : '';
+
   const userContent =
-    `請為科目「${subject.name}」生成一篇 L3 英文個案故事，並隨機挑選一種臨床實務挑戰任務出題。`;
+    `請為科目「${subject.name}」生成一篇 L3 英文個案故事，並隨機挑選一種臨床實務挑戰焦點出題。` +
+    `\n學生將以 Observation／Assessment／Intervention 三欄實務紀錄表作答。` +
+    `\n請務必產出 guidance_zh：一段貼合本科目理論的親切引導建議。` +
+    (theoryHint
+      ? `\n本科目理論提示（請融入 guidance_zh）：${theoryHint}`
+      : '');
 
   const result = await requestDeepSeekJSON(
     CASE_NOTE_READING_SYSTEM_PROMPT,
@@ -1373,6 +1412,7 @@ async function generateCaseNoteReading() {
   const task_en = result.task_en || result.question_en;
   const task_zh = result.task_zh || result.question_zh;
   const rawType = String(result.task_type || '').trim().toLowerCase();
+  let guidance_zh = String(result.guidance_zh || '').trim();
 
   if (!case_note_en || !case_note_zh || !task_en || !task_zh) {
     throw new Error('AI 回傳資料不完整，缺少個案故事或臨床挑戰任務。');
@@ -1384,12 +1424,24 @@ async function generateCaseNoteReading() {
   const taskEn = String(task_en).trim();
   const taskZh = String(task_zh).trim();
 
+  // 若模型漏掉 guidance，由知識庫組 fallback（前端亦會再兜底）
+  if (!guidance_zh) {
+    if (typeof buildFallbackGuidance === 'function') {
+      guidance_zh = buildFallbackGuidance(knowledge, subject.name);
+    } else if (theoryHint) {
+      guidance_zh = `請運用「${theoryHint}」觀點，以 Observation → Assessment → Intervention 完成這份實務紀錄。`;
+    } else {
+      guidance_zh = taskZh;
+    }
+  }
+
   return {
     case_note_en: String(case_note_en).trim(),
     case_note_zh: String(case_note_zh).trim(),
     task_type,
     task_en: taskEn,
     task_zh: taskZh,
+    guidance_zh,
     // 供舊 UI／呼叫端相容
     question_en: taskEn,
     question_zh: taskZh
@@ -1397,30 +1449,61 @@ async function generateCaseNoteReading() {
 }
 
 /**
- * L3：送出學生答案，取得督導回饋
+ * L3：送出學生實務紀錄表（O/A/I JSON），取得督導分欄回饋
  *
- * @param {{caseNoteEn: string, caseNoteZh?: string, taskEn: string, taskZh?: string, taskType?: string, studentAnswer: string}} payload
- * @returns {Promise<{feedback_zh: string, feedback_en: string}>}
+ * @param {{
+ *   caseNoteEn: string,
+ *   caseNoteZh?: string,
+ *   taskEn?: string,
+ *   taskZh?: string,
+ *   guidanceZh?: string,
+ *   taskType?: string,
+ *   studentAnswer?: string,
+ *   clinicalAnswers?: {observation?: string, assessment?: string, intervention?: string}
+ * }} payload
+ * @returns {Promise<{
+ *   feedback_zh: string,
+ *   feedback_en: string,
+ *   field_feedback: {observation: string, assessment: string, intervention: string},
+ *   vocab_corrections: Array<{original: string, suggestion: string, note: string}>
+ * }>}
  */
 async function getL3SupervisionFeedbackAPI(payload) {
   const caseNoteEn = String(payload?.caseNoteEn || '').trim();
   const caseNoteZh = String(payload?.caseNoteZh || '').trim();
   const taskEn = String(payload?.taskEn || '').trim();
   const taskZh = String(payload?.taskZh || '').trim();
+  const guidanceZh = String(payload?.guidanceZh || '').trim();
   const taskType = String(payload?.taskType || '').trim();
-  const studentAnswer = String(payload?.studentAnswer || '').trim();
+
+  const clinical = payload?.clinicalAnswers && typeof payload.clinicalAnswers === 'object'
+    ? {
+        observation: String(payload.clinicalAnswers.observation || '').trim(),
+        assessment: String(payload.clinicalAnswers.assessment || '').trim(),
+        intervention: String(payload.clinicalAnswers.intervention || '').trim()
+      }
+    : null;
+
+  const legacyAnswer = String(payload?.studentAnswer || '').trim();
+  const hasClinical =
+    clinical &&
+    (clinical.observation || clinical.assessment || clinical.intervention);
 
   if (!caseNoteEn) {
     throw new Error('缺少個案文章，無法請督導批改。');
   }
-  if (!taskEn && !taskZh) {
+  if (!taskEn && !taskZh && !guidanceZh) {
     throw new Error('缺少任務題目，無法請督導批改。');
   }
-  if (!studentAnswer) {
-    throw new Error('請先輸入你的答案再送出給督導。');
+  if (!hasClinical && !legacyAnswer) {
+    throw new Error('請先填寫實務紀錄表再送出給督導。');
   }
 
   const subject = resolveCurrentSubject();
+  const answersJson = hasClinical
+    ? JSON.stringify(clinical, null, 2)
+    : JSON.stringify({ free_response: legacyAnswer }, null, 2);
+
   const userContent = `科目：${subject.name}
 任務類型：${taskType || '（未標示）'}
 
@@ -1431,11 +1514,12 @@ ${caseNoteZh ? `\n（中文參考）\n${caseNoteZh}` : ''}
 【臨床實務挑戰任務】
 ${taskEn || ''}
 ${taskZh ? `\n${taskZh}` : ''}
+${guidanceZh ? `\n【科目客製引導】\n${guidanceZh}` : ''}
 
-【學生答案】
-${studentAnswer}
+【學生實務紀錄表（JSON）】
+${answersJson}
 
-請給予督導回饋。`;
+請分別對 Observation／Assessment／Intervention 給予評語，並提供 Vocab Correction。`;
 
   const result = await requestDeepSeekJSON(
     L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT,
@@ -1452,9 +1536,35 @@ ${studentAnswer}
     throw new Error('AI 回傳資料不完整，缺少督導回饋。');
   }
 
+  const rawFields =
+    result.field_feedback && typeof result.field_feedback === 'object'
+      ? result.field_feedback
+      : {};
+
+  const field_feedback = {
+    observation: String(rawFields.observation || '').trim(),
+    assessment: String(rawFields.assessment || '').trim(),
+    intervention: String(rawFields.intervention || '').trim()
+  };
+
+  const vocab_corrections = Array.isArray(result.vocab_corrections)
+    ? result.vocab_corrections
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const original = String(item.original || '').trim();
+          const suggestion = String(item.suggestion || '').trim();
+          const note = String(item.note || '').trim();
+          if (!original && !suggestion) return null;
+          return { original, suggestion, note };
+        })
+        .filter(Boolean)
+    : [];
+
   return {
     feedback_zh: feedback_zh || feedback_en,
-    feedback_en
+    feedback_en,
+    field_feedback,
+    vocab_corrections
   };
 }
 

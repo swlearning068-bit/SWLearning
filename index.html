@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=38">
+  <link rel="stylesheet" href="css/style.css?v=39">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -549,7 +549,7 @@
           <div id="reading-l3-panel" class="reading-level-panel hidden" data-reading-panel="l3">
 
             <h2 class="section-title">L3 個案閱讀 — 臨床實務挑戰</h2>
-            <p class="section-desc">依目前科目生成專業個案故事，並以 SOAP／理論倫理批判／關鍵對話等開放式任務鍛鍊臨床判斷。</p>
+            <p class="section-desc">依目前科目生成專業個案故事，並以 Observation／Assessment／Intervention 實務紀錄表鍛鍊臨床判斷與英文表達。</p>
 
             <button id="btn-l3-generate" class="btn btn-primary" type="button">
               📝 生成臨床實務挑戰
@@ -633,7 +633,7 @@
           <div class="reading-results-panel hidden" data-reading-panel="l3">
             <div class="layout-placeholder" aria-hidden="true">
               <p class="layout-placeholder-title">臨床挑戰區</p>
-              <p class="layout-placeholder-desc">生成後，英文個案故事與開放式臨床實務挑戰會顯示在這裡。</p>
+              <p class="layout-placeholder-desc">生成後，英文個案故事與實務紀錄表（O／A／I）會顯示在這裡。</p>
             </div>
 
             <div id="l3-reading-loading" class="skeleton-card hidden" aria-live="polite">
@@ -661,29 +661,70 @@
                   <span class="result-label">Clinical Challenge — 臨床實務挑戰</span>
                   <span id="l3-task-type-badge" class="l3-task-type-badge hidden"></span>
                 </div>
-                <p id="l3-question-en" class="l3-question-en"></p>
-                <p id="l3-question-zh" class="l3-question-zh"></p>
 
-                <label class="label-text" for="l3-answer-input">你的回答（英文或中文皆可）：</label>
-                <textarea
-                  id="l3-answer-input"
-                  class="user-textarea l3-answer-textarea"
-                  rows="6"
-                  placeholder="Write your Assessment &amp; Plan / critique / empathic response here…"
-                ></textarea>
+                <div id="clinical-task-form" class="clinical-task-form card">
+                  <h3 class="clinical-task-title">📝 臨床督導實務紀錄表</h3>
+                  <p id="task-instruction" class="hint-text"></p>
 
-                <button id="btn-l3-submit-supervisor" class="btn btn-primary" type="button">
-                  送出給督導 (Submit to Supervisor)
-                </button>
+                  <table class="clinical-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">欄位</th>
+                        <th scope="col">你的專業思考（請輸入英文）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Observation</strong></td>
+                        <td>
+                          <textarea
+                            id="clinical-field-observation"
+                            class="user-textarea clinical-field-textarea"
+                            rows="3"
+                            placeholder="案主的具體行為、語氣或環境細節為何？"
+                          ></textarea>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><strong>Assessment</strong></td>
+                        <td>
+                          <textarea
+                            id="clinical-field-assessment"
+                            class="user-textarea clinical-field-textarea"
+                            rows="3"
+                            placeholder="結合理論（如：三角關係／復元模式），你的專業評估是？"
+                          ></textarea>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><strong>Intervention</strong></td>
+                        <td>
+                          <textarea
+                            id="clinical-field-intervention"
+                            class="user-textarea clinical-field-textarea"
+                            rows="3"
+                            placeholder="你打算如何回應？請嘗試撰寫你的介入對話。"
+                          ></textarea>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <button id="btn-submit-task" class="btn btn-primary primary-btn" type="button">
+                    發送給督導 (Submit)
+                  </button>
+                </div>
 
                 <div id="l3-supervision-loading" class="l3-supervision-loading hidden" aria-live="polite">
-                  <p class="loading-text">督導正在閱讀你的答案…</p>
+                  <p class="loading-text">督導正在閱讀你的實務紀錄…</p>
                 </div>
 
                 <div id="l3-supervision-feedback" class="l3-supervision-feedback hidden" role="status" aria-live="polite">
                   <span class="result-label">督導回饋 (Supervision Feedback)</span>
                   <p id="l3-feedback-zh" class="l3-feedback-zh"></p>
-                  <p id="l3-feedback-en" class="l3-feedback-en"></p>
+                  <p id="l3-feedback-en" class="l3-feedback-en hidden"></p>
+                  <div id="l3-field-feedback" class="l3-field-feedback hidden"></div>
+                  <div id="l3-vocab-corrections" class="l3-vocab-corrections hidden"></div>
                 </div>
               </div>
 
@@ -1267,11 +1308,12 @@
     })();
   </script>
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=26"></script>
+  <script src="js/deepseek.js?v=27"></script>
+  <script src="js/task-ui.js?v=1"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
-  <script src="js/reading.js?v=21"></script>
+  <script src="js/reading.js?v=22"></script>
   <script src="js/article-library.js?v=12"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>

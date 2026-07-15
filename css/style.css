@@ -1841,15 +1841,91 @@ body {
   white-space: pre-wrap;
 }
 
+/* ---------- L3：臨床督導實務紀錄表 ---------- */
+.clinical-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background-color: #FAFAFA;
+}
+
+.clinical-task-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.hint-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--color-text-light);
+  white-space: pre-wrap;
+}
+
+.clinical-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.clinical-table th,
+.clinical-table td {
+  border: 1px solid var(--border-color);
+  padding: 10px 12px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.clinical-table th {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: #F3F4F6;
+}
+
+.clinical-table td:first-child {
+  width: 28%;
+  min-width: 110px;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  background-color: #FCFCFC;
+}
+
+.clinical-field-textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  margin: 0;
+  border: 1px solid transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.clinical-field-textarea:focus {
+  border-color: var(--border-color);
+  background-color: #FFFFFF;
+  outline: none;
+}
+
+#btn-submit-task,
+#btn-l3-submit-supervisor {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 .l3-answer-textarea {
   width: 100%;
   min-height: 140px;
   resize: vertical;
-}
-
-#btn-l3-submit-supervisor {
-  align-self: flex-start;
-  margin-top: 4px;
 }
 
 .l3-supervision-loading {
@@ -1881,6 +1957,123 @@ body {
   white-space: pre-wrap;
   border-top: 1px dashed var(--border-color);
   padding-top: 8px;
+}
+
+.l3-field-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.l3-field-feedback-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-color);
+}
+
+.l3-field-feedback-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.l3-field-feedback-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  white-space: pre-wrap;
+}
+
+.l3-vocab-corrections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.l3-vocab-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.l3-vocab-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.l3-vocab-original {
+  color: #B45309;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.l3-vocab-arrow {
+  color: var(--text-secondary);
+}
+
+.l3-vocab-suggestion {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.l3-vocab-note {
+  flex-basis: 100%;
+  font-size: 0.82rem;
+  color: var(--color-text-light);
+}
+
+@media (max-width: 640px) {
+  .clinical-table,
+  .clinical-table thead,
+  .clinical-table tbody,
+  .clinical-table th,
+  .clinical-table td,
+  .clinical-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .clinical-table thead {
+    display: none;
+  }
+
+  .clinical-table tr {
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .clinical-table td:first-child {
+    width: 100%;
+    border-bottom: none;
+    padding-bottom: 4px;
+    background-color: #F3F4F6;
+  }
+
+  .clinical-table td:last-child {
+    border-top: none;
+    padding-top: 4px;
+  }
 }
 
 /* ---------- 懸停翻譯關鍵字 ---------- */
