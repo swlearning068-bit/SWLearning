@@ -276,7 +276,7 @@ function renderArticlesList(filterType = 'all') {
       literature: '此分類尚無學術文獻。',
       story: '此分類尚無社工故事。',
       case_note: '此分類尚無臨床挑戰文章。',
-      practice: '此分類尚無情境演練文章。'
+      practice: '此分類尚無閱讀練習文章。'
     };
     emptyFilter.textContent =
       emptyMsgs[articleFilterType] || '此分類尚無文章。';
@@ -394,6 +394,75 @@ function appendArticleChallengeControls(pack, item, opts = {}) {
 }
 
 /**
+ * 取得文章庫項目可朗讀的英文全文
+ * @param {Object} item
+ * @returns {string}
+ */
+function getLibraryArticleSpeakText(item) {
+  if (!item) return '';
+
+  if (
+    typeof isInteractivePracticeArticle === 'function' &&
+    isInteractivePracticeArticle(item) &&
+    typeof buildPracticeArticleContext === 'function'
+  ) {
+    return buildPracticeArticleContext(item);
+  }
+
+  if (item.type === 'story') {
+    return String(item.story_en || '').trim();
+  }
+
+  if (item.type === 'case_note') {
+    return String(item.article_en || item.case_note_en || '').trim();
+  }
+
+  // literature 與其他：串接各英文區塊
+  return [
+    item.simplified_article,
+    item.simplified_en,
+    item.article_en,
+    item.case_scenario_en,
+    item.practical_application_en
+  ]
+    .map((t) => String(t || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/**
+ * 在標題列掛上朗讀控制（缺字時不掛）
+ * @param {HTMLElement} titleRow
+ * @param {string|(() => string)} textOrGetter
+ */
+function appendLibrarySpeakControls(titleRow, textOrGetter) {
+  if (!titleRow || typeof createArticleSpeakControls !== 'function') return;
+  const probe =
+    typeof textOrGetter === 'function' ? textOrGetter() : textOrGetter;
+  if (!String(probe || '').trim()) return;
+  titleRow.appendChild(createArticleSpeakControls(textOrGetter));
+}
+
+/**
+ * 建立帶朗讀的區塊標籤列
+ * @param {string} labelText
+ * @param {string|(() => string)} speakText
+ * @returns {HTMLElement}
+ */
+function createLibrarySpeakLabelRow(labelText, speakText) {
+  const row = document.createElement('div');
+  row.className = 'tts-label-row';
+
+  const label = document.createElement('span');
+  label.className = 'result-label';
+  label.textContent = labelText;
+  row.appendChild(label);
+
+  appendLibrarySpeakControls(row, speakText);
+  return row;
+}
+
+/**
  * 建立文獻內容區塊（英文＋可切換中文）
  * @param {{heading: string, enText: string, zhText: string, variant?: string}} opts
  * @returns {HTMLElement}
@@ -405,10 +474,19 @@ function createArticleLiteratureSection(opts) {
   section.className = `sim-lit-section library-detail-section${variant ? ` sim-lit-section--${variant}` : ''}`;
   section.dataset.variant = variant;
 
+  const headingRow = document.createElement('div');
+  headingRow.className = 'tts-label-row library-section-heading-row';
+
   const headingEl = document.createElement('h4');
   headingEl.className = 'sim-lit-section-heading';
   headingEl.textContent = heading;
-  section.appendChild(headingEl);
+  headingRow.appendChild(headingEl);
+
+  const enTextStr = String(enText || '').trim();
+  if (enTextStr) {
+    appendLibrarySpeakControls(headingRow, () => enTextStr);
+  }
+  section.appendChild(headingRow);
 
   const enP = document.createElement('p');
   enP.className = 'sim-lit-en library-en-text';
@@ -466,20 +544,7 @@ function renderLiteratureArticleDetail(item, detailEl) {
   titleEl.textContent = item.original_title || '（無標題）';
   titleRow.appendChild(titleEl);
 
-  if (typeof createArticleSpeakControls === 'function') {
-    titleRow.appendChild(
-      createArticleSpeakControls(() =>
-        [
-          item.simplified_article,
-          item.case_scenario_en,
-          item.practical_application_en
-        ]
-          .map((t) => String(t || '').trim())
-          .filter(Boolean)
-          .join('\n\n')
-      )
-    );
-  }
+  appendLibrarySpeakControls(titleRow, () => getLibraryArticleSpeakText(item));
   pack.appendChild(titleRow);
 
   const metaEl = document.createElement('p');
@@ -586,11 +651,7 @@ function renderStoryArticleDetail(item, detailEl) {
   titleEl.textContent = getArticleListTitle(item);
   titleRow.appendChild(titleEl);
 
-  if (typeof createArticleSpeakControls === 'function') {
-    titleRow.appendChild(
-      createArticleSpeakControls(() => item.story_en || '')
-    );
-  }
+  appendLibrarySpeakControls(titleRow, () => getLibraryArticleSpeakText(item));
   pack.appendChild(titleRow);
 
   const metaEl = document.createElement('p');
@@ -604,10 +665,9 @@ function renderStoryArticleDetail(item, detailEl) {
   const enBlock = document.createElement('div');
   enBlock.className = 'story-en-block';
 
-  const enLabel = document.createElement('span');
-  enLabel.className = 'result-label';
-  enLabel.textContent = '英文故事';
-  enBlock.appendChild(enLabel);
+  enBlock.appendChild(
+    createLibrarySpeakLabelRow('英文故事', () => item.story_en || '')
+  );
 
   const enP = document.createElement('p');
   enP.className = 'story-en';
@@ -730,9 +790,7 @@ function renderCaseNoteArticleDetail(item, detailEl) {
   titleEl.textContent = getArticleListTitle(item);
   titleRow.appendChild(titleEl);
 
-  if (typeof createArticleSpeakControls === 'function') {
-    titleRow.appendChild(createArticleSpeakControls(() => articleEn));
-  }
+  appendLibrarySpeakControls(titleRow, () => articleEn);
   pack.appendChild(titleRow);
 
   const metaEl = document.createElement('p');
@@ -744,10 +802,9 @@ function renderCaseNoteArticleDetail(item, detailEl) {
 
   const enBlock = document.createElement('div');
   enBlock.className = 'story-en-block';
-  const enLabel = document.createElement('span');
-  enLabel.className = 'result-label';
-  enLabel.textContent = 'Case Note（英文）';
-  enBlock.appendChild(enLabel);
+  enBlock.appendChild(
+    createLibrarySpeakLabelRow('Case Note（英文）', () => articleEn)
+  );
   const enP = document.createElement('p');
   enP.className = 'story-en l3-case-en';
   enP.textContent = articleEn;
@@ -886,12 +943,28 @@ function renderPracticeArticleDetail(item, detailEl) {
     root.className = 'practice-article-root library-practice-root';
     detailEl.appendChild(root);
     renderPracticeArticle(item, root);
+
+    // 若主渲染未掛到朗讀（極端相容），補掛於標題列
+    if (
+      !root.querySelector('.tts-controls') &&
+      typeof createArticleSpeakControls === 'function'
+    ) {
+      const titleRow =
+        root.querySelector('.practice-title-row') ||
+        root.querySelector('.tts-title-row');
+      if (titleRow) {
+        appendLibrarySpeakControls(titleRow, () =>
+          getLibraryArticleSpeakText(item)
+        );
+      }
+    }
+
     detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
 
   detailEl.innerHTML =
-    '<p class="hint-text">情境演練模組尚未載入，請重新整理頁面後再試。</p>';
+    '<p class="hint-text">閱讀練習模組尚未載入，請重新整理頁面後再試。</p>';
 }
 
 /**

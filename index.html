@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=41">
+  <link rel="stylesheet" href="css/style.css?v=44">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -57,7 +57,7 @@
         aria-controls="practice-section"
         data-tab="practice"
       >
-        🎯 情境演練
+        📖 閱讀練習
       </button>
       <!-- 專業詞彙庫 Tab -->
       <button
@@ -418,7 +418,7 @@
       <div id="case-practice" class="case-practice hidden">
         <div class="layout-container">
           <div class="layout-left">
-            <h2 class="section-title">情境演練 (Case Practice)</h2>
+            <h2 class="section-title">閱讀練習 (Case Practice)</h2>
             <p class="section-desc">雙軌生成「社工小故事」或「模擬學術文獻」。文章採段落穿插即時選擇題；文末可依 L1 填空 → L2 造句 → L3 專業寫作循序練習。</p>
 
             <div class="practice-track-actions">
@@ -648,18 +648,18 @@
     >
 
       <h2 class="section-title">📚 文章庫</h2>
-      <p class="section-desc">統一管理情境演練、學術文獻與舊版收藏。開啟情境演練文章可免 AI 重新生成，重複練習段落測驗與漸進寫作。</p>
+      <p class="section-desc">統一管理閱讀練習、學術文獻與舊版收藏。開啟已收藏文章可免 AI 重新生成，重複練習段落測驗與漸進寫作。</p>
 
       <p id="article-library-empty" class="library-empty hidden">
         尚未收藏任何文章。<br>
-        請先到「情境演練」生成文章後，點「⭐ 收藏文章」。
+        請先到「閱讀練習」生成文章後，點「⭐ 收藏文章」。
       </p>
 
       <div class="layout-container">
         <div class="layout-left">
           <div class="library-filters" role="group" aria-label="文章類型篩選">
             <button class="filter-chip active" type="button" data-type="all" aria-pressed="true">🗂️ 全部</button>
-            <button class="filter-chip" type="button" data-type="practice" aria-pressed="false">🎯 情境演練</button>
+            <button class="filter-chip" type="button" data-type="practice" aria-pressed="false">📖 閱讀練習</button>
             <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 學術文獻</button>
             <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📖 社工故事</button>
             <button class="filter-chip" type="button" data-type="case_note" aria-pressed="false">📝 臨床挑戰</button>
@@ -1032,14 +1032,14 @@
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
-  <script src="js/reading.js?v=24"></script>
-  <script src="js/story.js?v=1"></script>
-  <script src="js/article-library.js?v=14"></script>
+  <script src="js/reading.js?v=25"></script>
+  <script src="js/story.js?v=4"></script>
+  <script src="js/article-library.js?v=16"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=5"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/app.js?v=20"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=14"></script>
 </body>

@@ -914,6 +914,24 @@ function createLiteratureVocabSection(vocab) {
     addBtn.className = 'btn btn-secondary btn-add-vocab';
     addBtn.textContent = '➕ 將生字加入學習';
 
+    const markAdded = (already) => {
+      addBtn.textContent = already ? '✓ 已在學習清單' : '✓ 已加入學習';
+      addBtn.disabled = true;
+      addBtn.classList.add('is-added');
+    };
+
+    // 初始狀態：已在學習清單則直接標記
+    if (typeof isTermInLearning === 'function') {
+      const slug = word
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+      const litId = `lit_${slug || 'term'}`;
+      if (isTermInLearning(litId)) {
+        markAdded(true);
+      }
+    }
+
     addBtn.addEventListener('click', () => {
       if (typeof addCustomTermToLearning !== 'function') {
         alert('生字學習模組尚未載入，請重新整理頁面。');
@@ -925,13 +943,12 @@ function createLiteratureVocabSection(vocab) {
         pos: v.pos || ''
       });
       if (result.already) {
-        addBtn.textContent = '✓ 已在學習清單';
-        addBtn.disabled = true;
-        addBtn.classList.add('is-added');
+        markAdded(true);
       } else if (result.ok) {
-        addBtn.textContent = '✓ 已加入學習';
-        addBtn.disabled = true;
-        addBtn.classList.add('is-added');
+        markAdded(false);
+        if (typeof showToast === 'function') {
+          showToast('✅ 已加入學習清單');
+        }
       } else {
         alert(result.message || '加入失敗，請稍後再試。');
       }
@@ -2077,3 +2094,4 @@ window.loadSuggestedTags = loadSuggestedTags;
 window.invalidateSuggestedTags = invalidateSuggestedTags;
 window.getSavedArticles = getSavedArticles;
 window.saveArticleToLibrary = saveArticleToLibrary;
+window.createLiteratureVocabSection = createLiteratureVocabSection;

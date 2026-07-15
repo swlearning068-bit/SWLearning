@@ -324,7 +324,7 @@ function escapePracticeHtml(text) {
 }
 
 /**
- * 渲染單字表
+ * 渲染單字表（含發音與「加入學習」）
  * @param {Array} vocabulary
  * @returns {HTMLElement|null}
  */
@@ -332,6 +332,22 @@ function renderPracticeVocabulary(vocabulary) {
   const list = Array.isArray(vocabulary) ? vocabulary : [];
   if (list.length === 0) return null;
 
+  const normalized = list.map((v) => ({
+    word: String((v && (v.term || v.word)) || '').trim(),
+    zh: String((v && v.zh) || '').trim(),
+    pos: String((v && (v.part_of_speech || v.pos)) || '').trim()
+  }));
+
+  // 複用閱讀模組生字區塊（發音 + 加入學習）
+  if (typeof createLiteratureVocabSection === 'function') {
+    const section = createLiteratureVocabSection(normalized);
+    const label = section.querySelector('.result-label');
+    if (label) label.textContent = '重點單字表';
+    section.classList.add('practice-vocab');
+    return section;
+  }
+
+  // 後備：vocab-library 尚未就緒時仍提供加入學習
   const wrap = document.createElement('div');
   wrap.className = 'literature-vocab practice-vocab';
   wrap.innerHTML = '<span class="result-label">重點單字表</span>';
@@ -339,26 +355,62 @@ function renderPracticeVocabulary(vocabulary) {
   const ul = document.createElement('ul');
   ul.className = 'literature-vocab-list';
 
-  list.forEach((v) => {
-    const term = String((v && (v.term || v.word)) || '').trim();
-    if (!term) return;
+  normalized.forEach((v) => {
+    if (!v.word || !v.zh) return;
+
     const li = document.createElement('li');
     li.className = 'literature-vocab-item';
+
+    const wordRow = document.createElement('div');
+    wordRow.className = 'literature-vocab-word-row';
+
     const word = document.createElement('span');
     word.className = 'literature-vocab-word';
-    word.textContent = term;
-    li.appendChild(word);
-    const pos = String((v && (v.part_of_speech || v.pos)) || '').trim();
-    if (pos) {
-      const posEl = document.createElement('span');
-      posEl.className = 'literature-vocab-pos';
-      posEl.textContent = ` (${pos})`;
-      li.appendChild(posEl);
+    word.textContent = v.word;
+    wordRow.appendChild(word);
+
+    if (typeof createVocabSpeakButton === 'function') {
+      wordRow.appendChild(createVocabSpeakButton(v.word));
     }
+    li.appendChild(wordRow);
+
     const zh = document.createElement('span');
     zh.className = 'literature-vocab-zh';
-    zh.textContent = (v && v.zh) || '';
+    zh.textContent = v.pos ? `${v.zh}（${v.pos}）` : v.zh;
     li.appendChild(zh);
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-secondary btn-add-vocab';
+    addBtn.textContent = '➕ 將生字加入學習';
+
+    addBtn.addEventListener('click', () => {
+      if (typeof addCustomTermToLearning !== 'function') {
+        alert('生字學習模組尚未載入，請重新整理頁面。');
+        return;
+      }
+      const result = addCustomTermToLearning({
+        word: v.word,
+        zh: v.zh,
+        pos: v.pos
+      });
+      if (result.already) {
+        addBtn.textContent = '✓ 已在學習清單';
+        addBtn.disabled = true;
+        addBtn.classList.add('is-added');
+      } else if (result.ok) {
+        addBtn.textContent = '✓ 已加入學習';
+        addBtn.disabled = true;
+        addBtn.classList.add('is-added');
+        if (typeof showToast === 'function') {
+          showToast('✅ 已加入學習清單');
+        }
+      } else {
+        alert(result.message || '加入失敗，請稍後再試。');
+      }
+    });
+
+    li.appendChild(addBtn);
     ul.appendChild(li);
   });
 
@@ -398,16 +450,40 @@ function renderPracticeArticle(article, targetRoot) {
     article.track === 'literature' ? '模擬學術文獻' : '社工小故事';
   pack.appendChild(trackBadge);
 
+  const titleRow = document.createElement('div');
+  titleRow.className = 'tts-title-row practice-title-row';
+
   const titleEn = document.createElement('h3');
-  titleEn.className = 'practice-title-en';
+  titleEn.className = 'practice-title-en literature-title';
   titleEn.textContent = article.title_en || '';
-  pack.appendChild(titleEn);
+  titleRow.appendChild(titleEn);
+
+  if (typeof createArticleSpeakControls === 'function') {
+    titleRow.appendChild(
+      createArticleSpeakControls(() => buildPracticeArticleContext(article))
+    );
+  }
+  pack.appendChild(titleRow);
 
   if (article.title_zh) {
     const titleZh = document.createElement('p');
     titleZh.className = 'practice-title-zh';
     titleZh.textContent = article.title_zh;
     pack.appendChild(titleZh);
+  }
+
+  // 主畫面：收藏按鈕放在標題下方（小尺寸）
+  if (!targetRoot) {
+    const saveWrap = document.createElement('div');
+    saveWrap.className = 'save-story-wrap practice-save-wrap';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.id = 'btn-save-practice-article';
+    saveBtn.className = 'save-story-btn btn btn-primary practice-save-btn';
+    saveBtn.textContent = '⭐ 收藏文章';
+    saveBtn.addEventListener('click', handleSavePracticeArticle);
+    saveWrap.appendChild(saveBtn);
+    pack.appendChild(saveWrap);
   }
 
   const vocabEl = renderPracticeVocabulary(article.vocabulary);
@@ -419,20 +495,6 @@ function renderPracticeArticle(article, targetRoot) {
     chunksWrap.appendChild(renderPracticeChunk(chunk, i));
   });
   pack.appendChild(chunksWrap);
-
-  // 主畫面才顯示收藏；文章庫詳情由外層處理
-  if (!targetRoot) {
-    const saveWrap = document.createElement('div');
-    saveWrap.className = 'save-story-wrap';
-    const saveBtn = document.createElement('button');
-    saveBtn.type = 'button';
-    saveBtn.id = 'btn-save-practice-article';
-    saveBtn.className = 'save-story-btn btn btn-primary';
-    saveBtn.textContent = '⭐ 收藏文章';
-    saveBtn.addEventListener('click', handleSavePracticeArticle);
-    saveWrap.appendChild(saveBtn);
-    pack.appendChild(saveWrap);
-  }
 
   const writingMount = document.createElement('div');
   writingMount.className = 'progressive-writing-mount';
