@@ -71,18 +71,6 @@
       >
         🗂️ 專業詞彙庫
       </button>
-      <!-- 生字複習 Tab（間隔複習系統） -->
-      <button
-        id="tab-learn"
-        class="tab-btn"
-        type="button"
-        role="tab"
-        aria-selected="false"
-        aria-controls="learn-section"
-        data-tab="learn"
-      >
-        🧠 生字複習
-      </button>
       <!-- 測驗模式 Tab -->
       <button
         id="tab-quiz"
@@ -491,6 +479,13 @@
             >
               ✨ AI 探索新詞彙 (基於目前科目)
             </button>
+            <button
+              id="btn-open-learn"
+              class="btn btn-primary"
+              type="button"
+            >
+              🧠 生字複習
+            </button>
           </div>
 
           <!-- 搜尋框：即時過濾單字或中文翻譯 -->
@@ -521,16 +516,26 @@
     </section><!-- /#vocab-section -->
 
     <!-- ==================== 模組 6：生字學習（間隔複習） ==================== -->
-    <!-- 預設隱藏，點擊「生字複習」Tab 後由 JS 顯示 -->
-    <section id="learn-section" class="learn-section hidden" role="tabpanel" aria-labelledby="tab-learn">
+    <!-- 由「專業詞彙庫」內的「生字複習」按鈕開啟 -->
+    <section id="learn-section" class="learn-section hidden" role="region" aria-labelledby="learn-section-title">
 
       <div class="layout-container">
         <div class="layout-left">
-          <h2 class="section-title">生字複習 — 間隔重複</h2>
+          <h2 id="learn-section-title" class="section-title">生字複習 — 間隔重複</h2>
           <p class="section-desc">複習今日到期的生字。先看英文，翻面後自我評估，系統會安排下次複習時間。</p>
 
           <!-- 進度提示（例如：還剩 3 張） -->
           <p id="learn-progress-text" class="learn-progress-text" aria-live="polite"></p>
+
+          <div class="vocab-actions">
+            <button
+              id="btn-back-to-vocab"
+              class="btn btn-secondary"
+              type="button"
+            >
+              ← 返回詞彙庫
+            </button>
+          </div>
         </div><!-- /.layout-left -->
 
         <div class="layout-right">

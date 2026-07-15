@@ -343,6 +343,7 @@ function ensureFlashcardStyles() {
 
 /**
  * 切換到指定 Tab，顯示對應 section、隱藏其餘
+ * 生字複習（learn）掛在專業詞彙庫底下，進入時高亮「專業詞彙庫」Tab
  * @param {'practice'|'vocab'|'learn'|'quiz'|'articles'|'reward'} tabName
  */
 function switchTab(tabName) {
@@ -365,7 +366,6 @@ function switchTab(tabName) {
   const tabs = {
     practice: $('tab-practice'),
     vocab:    $('tab-vocab'),
-    learn:    $('tab-learn'),
     quiz:     $('tab-quiz'),
     articles: $('nav-article-library'),
     reward:   $('nav-reward')
@@ -386,10 +386,13 @@ function switchTab(tabName) {
     }
   });
 
+  // 生字複習屬於詞彙庫子功能，導覽列維持「專業詞彙庫」為作用中
+  const activeTabName = tabName === 'learn' ? 'vocab' : tabName;
+
   Object.keys(tabs).forEach((name) => {
     const tab = tabs[name];
     if (!tab) return;
-    const isActive = name === tabName;
+    const isActive = name === activeTabName;
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', String(isActive));
   });

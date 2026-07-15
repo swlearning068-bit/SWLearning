@@ -650,4 +650,18 @@ function initVocabLibrary() {
   if (generateBtn) {
     generateBtn.addEventListener('click', handleGenerateNewVocab);
   }
+
+  const openLearnBtn = document.getElementById('btn-open-learn');
+  if (openLearnBtn) {
+    openLearnBtn.addEventListener('click', () => {
+      if (typeof switchTab === 'function') switchTab('learn');
+    });
+  }
+
+  const backToVocabBtn = document.getElementById('btn-back-to-vocab');
+  if (backToVocabBtn) {
+    backToVocabBtn.addEventListener('click', () => {
+      if (typeof switchTab === 'function') switchTab('vocab');
+    });
+  }
 }
