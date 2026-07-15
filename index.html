@@ -667,21 +667,20 @@
     >
 
       <h2 class="section-title">📚 文章庫</h2>
-      <p class="section-desc">統一管理閱讀練習、學術文獻與舊版收藏。開啟已收藏文章可免 AI 重新生成，重複練習段落測驗與漸進寫作。</p>
+      <p class="section-desc">收藏的社工小故事與模擬學術文獻，離線也可重看、複習與寫作練習。</p>
 
       <p id="article-library-empty" class="library-empty hidden">
         尚未收藏任何文章。<br>
-        請先到「閱讀練習」生成文章後，點「⭐ 收藏文章」。
+        請先到「閱讀練習」產生社工小故事或模擬學術文獻後，點「⭐ 收藏文章」。
       </p>
 
       <div class="layout-container">
         <div class="layout-left">
           <div class="library-filters" role="group" aria-label="文章類型篩選">
             <button class="filter-chip active" type="button" data-type="all" aria-pressed="true">🗂️ 全部</button>
-            <button class="filter-chip" type="button" data-type="practice" aria-pressed="false">📖 閱讀練習</button>
-            <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 學術文獻</button>
-            <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📖 社工故事</button>
-            <button class="filter-chip" type="button" data-type="case_note" aria-pressed="false">📝 臨床挑戰</button>
+            <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📝 社工小故事</button>
+            <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 模擬學術文獻</button>
+            <button class="filter-chip" type="button" data-type="legacy" aria-pressed="false">📦 舊版收藏</button>
           </div>
           <div id="library-articles-list" class="library-list list-container" aria-live="polite"></div>
         </div>
@@ -690,7 +689,7 @@
           <div id="library-article-detail" class="library-detail detail-card" aria-live="polite">
             <div class="article-library-placeholder">
               <p class="article-library-placeholder-title">選擇一篇文章</p>
-              <p class="article-library-placeholder-desc">從左側列表點選文獻或故事，即可在此閱讀、翻譯與進行填空挑戰。</p>
+              <p class="article-library-placeholder-desc">從左側列表點選社工小故事或模擬學術文獻，即可在此閱讀、單字與寫作練習。</p>
             </div>
           </div>
         </div>
@@ -1061,8 +1060,8 @@
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
   <script src="js/reading.js?v=27"></script>
-  <script src="js/story.js?v=8"></script>
-  <script src="js/article-library.js?v=16"></script>
+  <script src="js/story.js?v=9"></script>
+  <script src="js/article-library.js?v=17"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>

@@ -618,6 +618,20 @@ function renderPracticeArticle(article, targetRoot, options) {
     article.track === 'literature' ? '模擬學術文獻' : '社工小故事';
   pack.appendChild(trackBadge);
 
+  // 模擬學術文獻：強制顯示學術免責（與舊閱讀模組同一份文案）
+  if (article.track === 'literature') {
+    const disclaimerWrap = document.createElement('div');
+    disclaimerWrap.className = 'practice-academic-disclaimer-wrap';
+    disclaimerWrap.innerHTML =
+      typeof getAcademicDisclaimerHTML === 'function'
+        ? getAcademicDisclaimerHTML()
+        : '<div class="academic-disclaimer" style="background-color: #FDF2F8; color: #BE185D; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 20px; border-left: 4px solid #BE185D;">' +
+          '<strong>⚠️ AI 模擬文獻聲明：</strong><br>' +
+          '本文獻係以真實學術摘要為基礎，由 AI 擴寫而成之模擬教材（包含虛構之研究數據）。僅供英文閱讀訓練使用，請勿引用於真實學術研究。' +
+          '</div>';
+    pack.appendChild(disclaimerWrap);
+  }
+
   const titleRow = document.createElement('div');
   titleRow.className = 'tts-title-row practice-title-row';
 

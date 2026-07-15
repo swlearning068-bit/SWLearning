@@ -121,23 +121,60 @@ function getArticleListTitle(item) {
 }
 
 /**
+ * 文章庫分類鍵：story | literature | legacy
+ * 新雙軌（practice）依 track；其餘舊格式一律 legacy
+ * @param {Object} item
+ * @returns {'story'|'literature'|'legacy'}
+ */
+function getArticleLibraryCategory(item) {
+  if (!item) return 'legacy';
+  if (item.type === 'practice' || isInteractivePracticeArticle(item)) {
+    return item.track === 'literature' ? 'literature' : 'story';
+  }
+  return 'legacy';
+}
+
+/**
+ * 是否符合目前篩選 chip
+ * @param {Object} item
+ * @param {string} filterType
+ * @returns {boolean}
+ */
+function articleMatchesLibraryFilter(item, filterType) {
+  if (!item) return false;
+  if (!filterType || filterType === 'all') return true;
+  const category = getArticleLibraryCategory(item);
+  // 相容舊 chip
+  if (filterType === 'practice') {
+    return item.type === 'practice' || isInteractivePracticeArticle(item);
+  }
+  if (filterType === 'case_note') {
+    return item.type === 'case_note';
+  }
+  return category === filterType;
+}
+
+/**
  * 文章類型徽章文案與 CSS modifier
  * @param {Object} item
  * @returns {{label: string, modifier: string}}
  */
 function getArticleTypeBadgeMeta(item) {
-  if (item?.type === 'practice') {
+  if (item?.type === 'practice' || isInteractivePracticeArticle(item)) {
     return item.track === 'literature'
-      ? { label: '演練·文獻', modifier: 'article-type-badge--literature' }
-      : { label: '演練·故事', modifier: 'article-type-badge--story' };
+      ? { label: '模擬文獻', modifier: 'article-type-badge--literature' }
+      : { label: '小故事', modifier: 'article-type-badge--story' };
   }
   if (item?.type === 'story') {
-    return { label: '故事', modifier: 'article-type-badge--story' };
+    return { label: '舊·故事', modifier: 'article-type-badge--story' };
   }
   if (item?.type === 'case_note') {
-    return { label: '臨床', modifier: 'article-type-badge--case-note' };
+    return { label: '舊·臨床', modifier: 'article-type-badge--case-note' };
   }
-  return { label: '文獻', modifier: 'article-type-badge--literature' };
+  if (item?.type === 'literature') {
+    return { label: '舊·文獻', modifier: 'article-type-badge--literature' };
+  }
+  return { label: '舊收藏', modifier: 'article-type-badge--case-note' };
 }
 
 /**
@@ -148,7 +185,7 @@ function getArticleDetailPlaceholderHtml() {
   return (
     '<div class="article-library-placeholder">' +
     '<p class="article-library-placeholder-title">選擇一篇文章</p>' +
-    '<p class="article-library-placeholder-desc">從左側列表點選文獻或故事，即可在此閱讀、翻譯與進行填空挑戰。</p>' +
+    '<p class="article-library-placeholder-desc">從左側列表點選社工小故事或模擬學術文獻，即可在此閱讀、單字與寫作練習。</p>' +
     '</div>'
   );
 }
@@ -248,10 +285,9 @@ function renderArticlesList(filterType = 'all') {
   activeArticleId = null;
 
   const allArticles = loadSavedArticles();
-  const filtered =
-    articleFilterType === 'all'
-      ? allArticles
-      : allArticles.filter((item) => item && item.type === articleFilterType);
+  const filtered = allArticles.filter((item) =>
+    articleMatchesLibraryFilter(item, articleFilterType)
+  );
 
   listEl.innerHTML = '';
   if (detailEl) {
@@ -273,9 +309,10 @@ function renderArticlesList(filterType = 'all') {
     const emptyFilter = document.createElement('p');
     emptyFilter.className = 'article-filter-empty text-gray';
     const emptyMsgs = {
-      literature: '此分類尚無學術文獻。',
-      story: '此分類尚無社工故事。',
-      case_note: '此分類尚無臨床挑戰文章。',
+      literature: '此分類尚無模擬學術文獻。',
+      story: '此分類尚無社工小故事。',
+      legacy: '此分類尚無舊版收藏（舊文獻、舊故事、臨床挑戰等）。',
+      case_note: '此分類尚無舊版臨床挑戰文章。',
       practice: '此分類尚無閱讀練習文章。'
     };
     emptyFilter.textContent =
