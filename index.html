@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=49">
+  <link rel="stylesheet" href="css/style.css?v=50">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -1072,12 +1072,22 @@
       }
     })();
   </script>
-  <!-- ==================== Phase 11.9：純淨電子書閱讀器（全螢幕 overlay） ==================== -->
-  <div id="ebook-reader-overlay" class="ebook-hidden" aria-hidden="true" role="dialog" aria-label="電子書閱讀模式">
+  <!-- ==================== Phase 11.9：全功能電子書閱讀器（全螢幕 overlay） ==================== -->
+  <div id="ebook-reader-overlay" class="ebook-hidden theme-sepia" aria-hidden="true" role="dialog" aria-label="電子書閱讀模式">
     <div class="ebook-header">
-      <button id="btn-ebook-toc" type="button" aria-label="開啟目錄" aria-expanded="false">☰ 目錄</button>
-      <span id="ebook-progress" class="ebook-progress" aria-live="polite"></span>
-      <button id="btn-ebook-exit" type="button" aria-label="退出電子書模式">❌ 退出</button>
+      <div class="ebook-header-left">
+        <button id="btn-ebook-toc" class="icon-btn" type="button" aria-label="開啟目錄" aria-expanded="false">☰ 目錄</button>
+        <span id="ebook-progress" class="ebook-progress" aria-live="polite"></span>
+      </div>
+      <div class="ebook-header-center">
+        <button id="btn-ebook-read" class="icon-btn" type="button" aria-label="朗讀英文">🔊 朗讀</button>
+        <button id="btn-ebook-font-minus" class="icon-btn" type="button" aria-label="縮小文字">A-</button>
+        <button id="btn-ebook-font-plus" class="icon-btn" type="button" aria-label="放大文字">A+</button>
+        <button id="btn-ebook-theme" class="icon-btn" type="button" aria-label="切換色調">🌗 色調</button>
+      </div>
+      <div class="ebook-header-right">
+        <button id="btn-ebook-exit" class="icon-btn" type="button" aria-label="退出電子書模式">❌ 退出</button>
+      </div>
     </div>
 
     <div id="ebook-sidebar" class="ebook-sidebar-hidden" aria-hidden="true">
@@ -1087,7 +1097,7 @@
 
     <div class="ebook-content-wrapper">
       <button id="btn-ebook-prev" class="ebook-nav-btn" type="button" aria-label="上一篇">❮</button>
-      <div id="ebook-text-container">
+      <div id="ebook-text-container" style="--ebook-font-size: 1.2rem;">
         <!-- 純文字文章渲染於此 -->
       </div>
       <button id="btn-ebook-next" class="ebook-nav-btn" type="button" aria-label="下一篇">❯</button>
@@ -1103,7 +1113,7 @@
   <script src="js/reading.js?v=27"></script>
   <script src="js/story.js?v=9"></script>
   <script src="js/article-library.js?v=19"></script>
-  <script src="js/ebook-mode.js?v=1"></script>
+  <script src="js/ebook-mode.js?v=2"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>

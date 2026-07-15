@@ -5242,7 +5242,7 @@ body {
 }
 
 /* ============================================================
-   Phase 11.9：純淨電子書閱讀器
+   Phase 11.9：全功能電子書閱讀器
    ============================================================ */
 
 .ebook-entry-bar {
@@ -5262,10 +5262,10 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #F8F9FA;
   z-index: 10000;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .ebook-hidden {
@@ -5276,39 +5276,102 @@ body.ebook-reader-open {
   overflow: hidden;
 }
 
+/* ----- 三種主題色調 ----- */
+#ebook-reader-overlay.theme-light {
+  background-color: #FFFFFF;
+  color: #333333;
+}
+
+#ebook-reader-overlay.theme-light .ebook-header {
+  background-color: #F8F9FA;
+  border-bottom: 1px solid #E9ECEF;
+  box-shadow: none;
+}
+
+#ebook-reader-overlay.theme-sepia {
+  background-color: #FDF6E3;
+  color: #433422;
+}
+
+#ebook-reader-overlay.theme-sepia .ebook-header {
+  background-color: #F5E6C8;
+  border-bottom: 1px solid #E3D1B1;
+  box-shadow: none;
+}
+
+#ebook-reader-overlay.theme-dark {
+  background-color: #1E1E1E;
+  color: #D4D4D4;
+}
+
+#ebook-reader-overlay.theme-dark .ebook-header {
+  background-color: #2D2D2D;
+  border-bottom: 1px solid #404040;
+  box-shadow: none;
+}
+
 .ebook-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 15px 20px;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 12px 16px;
   flex-shrink: 0;
   position: relative;
   z-index: 10002;
 }
 
-.ebook-header button {
-  background: #fff;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  color: #374151;
-  font-weight: 600;
+.ebook-header-left,
+.ebook-header-center,
+.ebook-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.ebook-header button:hover {
-  background: #F3F4F6;
-  border-color: #D1D5DB;
+.ebook-header-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.ebook-header-center {
+  flex-shrink: 0;
+}
+
+.ebook-header-right {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.ebook-header .icon-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.ebook-header .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+#ebook-reader-overlay.theme-dark .ebook-header .icon-btn {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+#ebook-reader-overlay.theme-dark .ebook-header .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .ebook-progress {
-  font-size: 0.9rem;
-  color: #6B7280;
+  font-size: 0.85rem;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .ebook-content-wrapper {
@@ -5326,11 +5389,12 @@ body.ebook-reader-open {
   width: 100%;
   height: 100%;
   padding: 40px 20px 60px;
-  font-size: 1.2rem;
+  font-size: var(--ebook-font-size, 1.2rem);
   line-height: 1.8;
-  color: #2C3E50;
   overflow-y: auto;
   box-sizing: border-box;
+  transition: font-size 0.2s ease;
+  color: inherit;
 }
 
 /* 防呆：即使誤傳測驗／單字／表單也不顯示 */
@@ -5349,56 +5413,98 @@ body.ebook-reader-open {
 .ebook-article-header {
   margin-bottom: 28px;
   padding-bottom: 18px;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+#ebook-reader-overlay.theme-dark .ebook-article-header {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 .ebook-title {
   margin: 0 0 8px;
-  font-size: 1.75rem;
+  font-size: 1.45em;
   line-height: 1.35;
   font-weight: 600;
-  color: #1F2937;
   letter-spacing: -0.02em;
+  color: inherit;
 }
 
 .ebook-meta {
   margin: 0;
-  font-size: 0.9rem;
-  color: #9CA3AF;
+  font-size: 0.75em;
+  opacity: 0.65;
 }
 
 .ebook-section {
-  margin-bottom: 28px;
+  margin-bottom: 8px;
+}
+
+.ebook-paragraph {
+  margin-bottom: 8px;
 }
 
 .ebook-section-heading {
   margin: 0 0 12px;
-  font-size: 1.05rem;
+  font-size: 0.9em;
   font-weight: 600;
-  color: #4B5563;
+  opacity: 0.75;
 }
 
-.ebook-en {
-  margin: 0 0 12px;
-  font-size: 1.2rem;
+.ebook-en-text {
+  margin: 0 0 10px;
+  font-size: 1em;
   line-height: 1.85;
-  color: #2C3E50;
+  color: inherit;
   white-space: pre-wrap;
 }
 
-.ebook-zh {
-  margin: 0;
-  font-size: 1.05rem;
+/* 翻譯收合區塊（藍字翻譯） */
+.ebook-translation-toggle {
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+.ebook-translation-toggle summary {
+  cursor: pointer;
+  color: #888;
+  font-size: 0.9em;
+  user-select: none;
+  list-style: none;
+}
+
+.ebook-translation-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.ebook-translation-toggle summary:hover {
+  color: #555;
+}
+
+#ebook-reader-overlay.theme-dark .ebook-translation-toggle summary {
+  color: #9CA3AF;
+}
+
+#ebook-reader-overlay.theme-dark .ebook-translation-toggle summary:hover {
+  color: #D1D5DB;
+}
+
+.ebook-translation-content {
+  margin-top: 8px;
+  color: #2980b9;
+  padding-left: 10px;
+  border-left: 3px solid #2980b9;
+  font-size: 0.92em;
   line-height: 1.75;
-  color: #6B7280;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
-  border-left: 3px solid #D1D5DB;
+  white-space: pre-wrap;
+}
+
+#ebook-reader-overlay.theme-dark .ebook-translation-content {
+  color: #6CB6FF;
+  border-left-color: #6CB6FF;
 }
 
 .ebook-empty {
-  color: #9CA3AF;
+  opacity: 0.6;
   text-align: center;
   margin-top: 40px;
 }
@@ -5417,7 +5523,8 @@ body.ebook-reader-open {
 }
 
 .ebook-nav-btn:hover:not(:disabled) {
-  color: #34495E;
+  color: inherit;
+  opacity: 0.85;
 }
 
 .ebook-nav-btn:disabled {
@@ -5428,18 +5535,30 @@ body.ebook-reader-open {
 /* 側邊欄目錄 */
 #ebook-sidebar {
   position: absolute;
-  top: 60px;
+  top: 56px;
   left: 0;
   width: 300px;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 56px);
   background: #fff;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background-color 0.25s ease;
   z-index: 10001;
   overflow-y: auto;
   padding: 20px;
   box-sizing: border-box;
+  color: #1F2937;
+}
+
+#ebook-reader-overlay.theme-sepia #ebook-sidebar {
+  background: #FFF9EF;
+  color: #433422;
+}
+
+#ebook-reader-overlay.theme-dark #ebook-sidebar {
+  background: #252525;
+  color: #D4D4D4;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
 }
 
 #ebook-sidebar:not(.ebook-sidebar-hidden) {
@@ -5449,7 +5568,7 @@ body.ebook-reader-open {
 #ebook-sidebar h3 {
   margin: 0 0 16px;
   font-size: 1.05rem;
-  color: #111827;
+  color: inherit;
 }
 
 #ebook-toc-list {
@@ -5472,31 +5591,59 @@ body.ebook-reader-open {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  color: inherit;
 }
 
 .ebook-toc-btn:hover {
-  background: #F9FAFB;
-  border-color: #E5E7EB;
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+#ebook-reader-overlay.theme-dark .ebook-toc-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .ebook-toc-item.is-active .ebook-toc-btn {
-  background: #EEF2FF;
-  border-color: #C7D2FE;
+  background: rgba(41, 128, 185, 0.12);
+  border-color: rgba(41, 128, 185, 0.35);
 }
 
 .ebook-toc-title {
   font-size: 0.92rem;
   font-weight: 600;
-  color: #1F2937;
   line-height: 1.4;
+  color: inherit;
 }
 
 .ebook-toc-type {
   font-size: 0.78rem;
-  color: #9CA3AF;
+  opacity: 0.65;
 }
 
 @media (max-width: 768px) {
+  .ebook-header {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+
+  .ebook-header-left,
+  .ebook-header-center,
+  .ebook-header-right {
+    flex: 1 1 auto;
+  }
+
+  .ebook-header-center {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ebook-header .icon-btn {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
   .ebook-nav-btn {
     padding: 0 8px;
     font-size: 1.5rem;
@@ -5504,11 +5651,6 @@ body.ebook-reader-open {
 
   #ebook-text-container {
     padding: 24px 12px 48px;
-    font-size: 1.1rem;
-  }
-
-  .ebook-title {
-    font-size: 1.4rem;
   }
 
   #ebook-sidebar {

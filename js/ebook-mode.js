@@ -1,22 +1,36 @@
 /**
- * ebook-mode.js — Phase 11.9：純淨電子書閱讀器
+ * ebook-mode.js — Phase 11.9：全功能電子書閱讀器
  *
  * 職責：
- * 1. 從文章庫列表頁進入全螢幕閱讀 overlay
- * 2. 只渲染標題與中英段落（略過單字表、inline_quiz、寫作任務）
- * 3. 上一篇／下一篇與目錄導覽
- *
- * 依賴：reading.js／article-library.js 的 getSavedArticles／loadSavedArticles
+ * 1. 全螢幕純淨閱讀（略過單字表、測驗、寫作）
+ * 2. 中文翻譯預設收合（details 點擊展開）
+ * 3. TTS 朗讀、字級 A-/A+、淺色／護眼／深色主題
+ * 4. 上一篇／下一篇與目錄導覽
  */
 
-/** @type {Array<Object>} 目前閱讀清單 */
+/** @type {Array<Object>} */
 let ebookArticles = [];
 
-/** @type {number} 目前閱讀索引 */
+/** @type {number} */
 let currentEbookIndex = 0;
 
 /** 側邊目錄是否開啟 */
 let ebookTocOpen = false;
+
+/** 是否正在朗讀 */
+let ebookIsSpeaking = false;
+
+/** 主題循環 */
+const EBOOK_THEMES = ['theme-sepia', 'theme-light', 'theme-dark'];
+
+/** localStorage 鍵 */
+const EBOOK_FONT_KEY = 'sw_ebook_font_size';
+const EBOOK_THEME_KEY = 'sw_ebook_theme';
+
+const EBOOK_FONT_MIN = 1.0;
+const EBOOK_FONT_MAX = 1.8;
+const EBOOK_FONT_STEP = 0.1;
+const EBOOK_FONT_DEFAULT = 1.2;
 
 /**
  * @param {string} text
@@ -32,7 +46,6 @@ function ebookEscapeHtml(text) {
 }
 
 /**
- * 讀取收藏文章
  * @returns {Array<Object>}
  */
 function getEbookArticles() {
@@ -53,13 +66,15 @@ function getEbookArticles() {
 }
 
 /**
- * 電子書標題（完整、不截斷）
  * @param {Object} item
  * @returns {string}
  */
 function getEbookTitle(item) {
   if (!item) return '（無標題）';
-  if (item.type === 'practice' || (Array.isArray(item.content_chunks) && item.content_chunks.length)) {
+  if (
+    item.type === 'practice' ||
+    (Array.isArray(item.content_chunks) && item.content_chunks.length)
+  ) {
     return String(item.title_zh || item.title_en || item.title || '（無標題演練）');
   }
   if (item.type === 'story') {
@@ -72,19 +87,25 @@ function getEbookTitle(item) {
     const text = String(item.article_en || item.case_note_en || '')
       .replace(/\s+/g, ' ')
       .trim();
-    return text ? (text.length > 80 ? `${text.slice(0, 80)}…` : text) : '（無標題臨床挑戰）';
+    return text
+      ? text.length > 80
+        ? `${text.slice(0, 80)}…`
+        : text
+      : '（無標題臨床挑戰）';
   }
   return String(item.original_title || item.title || '（無標題）');
 }
 
 /**
- * 類型標籤
  * @param {Object} item
  * @returns {string}
  */
 function getEbookTypeLabel(item) {
   if (!item) return '';
-  if (item.type === 'practice' || (Array.isArray(item.content_chunks) && item.content_chunks.length)) {
+  if (
+    item.type === 'practice' ||
+    (Array.isArray(item.content_chunks) && item.content_chunks.length)
+  ) {
     return item.track === 'literature' ? '模擬學術文獻' : '社工小故事';
   }
   if (item.type === 'story') return '社工小故事（舊）';
@@ -94,7 +115,7 @@ function getEbookTypeLabel(item) {
 }
 
 /**
- * 建立一個中英段落區塊（純文字，不含測驗）
+ * 建立中英段落（英文直出；中文預設收合藍字翻譯）
  * @param {string} [heading]
  * @param {string} enText
  * @param {string} [zhText]
@@ -105,22 +126,25 @@ function buildEbookParagraphHtml(heading, enText, zhText) {
   const zh = String(zhText || '').trim();
   if (!en && !zh) return '';
 
-  let html = '<section class="ebook-section">';
+  let html = '<section class="ebook-section"><div class="ebook-paragraph">';
   if (heading) {
     html += `<h3 class="ebook-section-heading">${ebookEscapeHtml(heading)}</h3>`;
   }
   if (en) {
-    html += `<p class="ebook-en">${ebookEscapeHtml(en).replace(/\n/g, '<br>')}</p>`;
+    html += `<p class="ebook-en-text">${ebookEscapeHtml(en).replace(/\n/g, '<br>')}</p>`;
   }
   if (zh) {
-    html += `<p class="ebook-zh">${ebookEscapeHtml(zh).replace(/\n/g, '<br>')}</p>`;
+    html +=
+      `<details class="ebook-translation-toggle">` +
+      `<summary>👁️ 顯示中文翻譯</summary>` +
+      `<div class="ebook-translation-content">${ebookEscapeHtml(zh).replace(/\n/g, '<br>')}</div>` +
+      `</details>`;
   }
-  html += '</section>';
+  html += '</div></section>';
   return html;
 }
 
 /**
- * 將文章轉成純淨閱讀 HTML（略過單字、測驗、寫作）
  * @param {Object} item
  * @returns {string}
  */
@@ -134,9 +158,8 @@ function buildEbookContentHtml(item) {
   const subject = String(item.subjectName || '').trim();
 
   let body = '';
-
-  // Phase 11.8 practice：只取 content_chunks 的中英段落
   const chunks = Array.isArray(item.content_chunks) ? item.content_chunks : [];
+
   if (chunks.length > 0) {
     chunks.forEach((chunk, i) => {
       if (!chunk || typeof chunk !== 'object') return;
@@ -156,7 +179,6 @@ function buildEbookContentHtml(item) {
       item.article_zh || item.case_note_zh
     );
   } else {
-    // literature／相容舊格式
     body += buildEbookParagraphHtml(
       '學術摘要',
       item.simplified_article || item.simplified_en || item.article_en,
@@ -193,7 +215,160 @@ function buildEbookContentHtml(item) {
 }
 
 /**
- * 更新上一篇／下一篇按鈕狀態與進度
+ * 綁定翻譯 details 的 summary 文案切換
+ * @param {HTMLElement} container
+ */
+function bindEbookTranslationToggles(container) {
+  if (!container) return;
+  container.querySelectorAll('.ebook-translation-toggle').forEach((details) => {
+    const summary = details.querySelector('summary');
+    if (!summary) return;
+    details.addEventListener('toggle', () => {
+      summary.textContent = details.open ? '🙈 隱藏中文翻譯' : '👁️ 顯示中文翻譯';
+    });
+  });
+}
+
+/**
+ * 讀取字級
+ * @returns {number}
+ */
+function getEbookFontSize() {
+  const raw = Number(localStorage.getItem(EBOOK_FONT_KEY));
+  if (!Number.isFinite(raw)) return EBOOK_FONT_DEFAULT;
+  return Math.max(EBOOK_FONT_MIN, Math.min(EBOOK_FONT_MAX, raw));
+}
+
+/**
+ * 套用字級到容器
+ * @param {number} [size]
+ */
+function applyEbookFontSize(size) {
+  const container = document.getElementById('ebook-text-container');
+  if (!container) return;
+  const next = Math.round((Number(size) || EBOOK_FONT_DEFAULT) * 10) / 10;
+  const clamped = Math.max(EBOOK_FONT_MIN, Math.min(EBOOK_FONT_MAX, next));
+  container.style.setProperty('--ebook-font-size', `${clamped}rem`);
+  localStorage.setItem(EBOOK_FONT_KEY, String(clamped));
+}
+
+/**
+ * @param {number} delta
+ */
+function changeEbookFontSize(delta) {
+  applyEbookFontSize(getEbookFontSize() + delta);
+}
+
+/**
+ * @returns {string}
+ */
+function getEbookTheme() {
+  const saved = String(localStorage.getItem(EBOOK_THEME_KEY) || '');
+  return EBOOK_THEMES.includes(saved) ? saved : 'theme-sepia';
+}
+
+/**
+ * @param {string} theme
+ */
+function applyEbookTheme(theme) {
+  const overlay = document.getElementById('ebook-reader-overlay');
+  if (!overlay) return;
+  const next = EBOOK_THEMES.includes(theme) ? theme : 'theme-sepia';
+  EBOOK_THEMES.forEach((t) => overlay.classList.remove(t));
+  overlay.classList.add(next);
+  localStorage.setItem(EBOOK_THEME_KEY, next);
+}
+
+/**
+ * 循環切換主題
+ */
+function cycleEbookTheme() {
+  const current = getEbookTheme();
+  const idx = EBOOK_THEMES.indexOf(current);
+  const next = EBOOK_THEMES[(idx + 1) % EBOOK_THEMES.length];
+  applyEbookTheme(next);
+}
+
+/**
+ * 更新朗讀按鈕文案
+ */
+function updateEbookReadButton() {
+  const btn = document.getElementById('btn-ebook-read');
+  if (!btn) return;
+  if (ebookIsSpeaking) {
+    btn.textContent = '⏹️ 停止';
+    btn.setAttribute('aria-label', '停止朗讀');
+  } else {
+    btn.textContent = '🔊 朗讀';
+    btn.setAttribute('aria-label', '朗讀英文');
+  }
+}
+
+/**
+ * 停止朗讀
+ */
+function stopEbookSpeech() {
+  if (typeof stopSpeaking === 'function') {
+    stopSpeaking();
+  } else if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  ebookIsSpeaking = false;
+  updateEbookReadButton();
+}
+
+/**
+ * 提取目前頁面英文並朗讀／停止
+ */
+function toggleEbookSpeech() {
+  if (ebookIsSpeaking) {
+    stopEbookSpeech();
+    return;
+  }
+
+  const container = document.getElementById('ebook-text-container');
+  if (!container) return;
+
+  const parts = Array.from(container.querySelectorAll('.ebook-en-text'))
+    .map((el) => String(el.textContent || '').trim())
+    .filter(Boolean);
+  const text = parts.join('\n\n');
+  if (!text) {
+    alert('此篇沒有可朗讀的英文內容。');
+    return;
+  }
+
+  ebookIsSpeaking = true;
+  updateEbookReadButton();
+
+  const onEnd = () => {
+    ebookIsSpeaking = false;
+    updateEbookReadButton();
+  };
+
+  if (typeof speakText === 'function') {
+    speakText(text, 'en-US', onEnd);
+    return;
+  }
+
+  if (!window.speechSynthesis) {
+    ebookIsSpeaking = false;
+    updateEbookReadButton();
+    alert('您的瀏覽器不支援語音合成功能');
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  utterance.onend = onEnd;
+  utterance.onerror = onEnd;
+  window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * 更新翻頁與進度
  */
 function updateEbookNavState() {
   const prevBtn = document.getElementById('btn-ebook-prev');
@@ -209,7 +384,7 @@ function updateEbookNavState() {
 }
 
 /**
- * 渲染目錄清單
+ * 渲染目錄
  */
 function renderEbookToc() {
   const list = document.getElementById('ebook-toc-list');
@@ -218,7 +393,8 @@ function renderEbookToc() {
   list.innerHTML = '';
   ebookArticles.forEach((item, index) => {
     const li = document.createElement('li');
-    li.className = 'ebook-toc-item' + (index === currentEbookIndex ? ' is-active' : '');
+    li.className =
+      'ebook-toc-item' + (index === currentEbookIndex ? ' is-active' : '');
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -241,22 +417,24 @@ function renderEbookToc() {
 }
 
 /**
- * 渲染目前索引的文章
+ * 渲染目前文章
  */
 function renderEbookContent() {
   const container = document.getElementById('ebook-text-container');
   if (!container) return;
 
+  stopEbookSpeech();
+
   const item = ebookArticles[currentEbookIndex];
   container.innerHTML = buildEbookContentHtml(item);
   container.scrollTop = 0;
+  bindEbookTranslationToggles(container);
 
   updateEbookNavState();
   renderEbookToc();
 }
 
 /**
- * 開關目錄側邊欄
  * @param {boolean} [force]
  */
 function setEbookTocOpen(force) {
@@ -271,7 +449,6 @@ function setEbookTocOpen(force) {
 }
 
 /**
- * 進入電子書模式
  * @param {number} [startIndex]
  */
 function openEbookReader(startIndex) {
@@ -284,7 +461,6 @@ function openEbookReader(startIndex) {
 
   let index = Number(startIndex);
   if (!Number.isFinite(index) || index < 0) {
-    // 若文章庫有選中文章，從該篇開始
     const activeRow = document.querySelector(
       '#library-articles-list .library-item.is-active'
     );
@@ -301,6 +477,9 @@ function openEbookReader(startIndex) {
   const overlay = document.getElementById('ebook-reader-overlay');
   if (!overlay) return;
 
+  applyEbookTheme(getEbookTheme());
+  applyEbookFontSize(getEbookFontSize());
+
   overlay.classList.remove('ebook-hidden');
   overlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('ebook-reader-open');
@@ -309,9 +488,10 @@ function openEbookReader(startIndex) {
 }
 
 /**
- * 退出電子書模式
+ * 退出電子書
  */
 function closeEbookReader() {
+  stopEbookSpeech();
   const overlay = document.getElementById('ebook-reader-overlay');
   if (overlay) {
     overlay.classList.add('ebook-hidden');
@@ -324,13 +504,15 @@ function closeEbookReader() {
 }
 
 /**
- * 切換至指定索引
  * @param {number} index
  */
 function goToEbookIndex(index) {
   if (!ebookArticles.length) return;
   const next = Math.max(0, Math.min(ebookArticles.length - 1, Number(index)));
-  if (next === currentEbookIndex && document.getElementById('ebook-text-container')?.innerHTML) {
+  if (
+    next === currentEbookIndex &&
+    document.getElementById('ebook-text-container')?.innerHTML
+  ) {
     setEbookTocOpen(false);
     return;
   }
@@ -340,14 +522,15 @@ function goToEbookIndex(index) {
 }
 
 /**
- * 同步列表頁入口按鈕可用狀態
+ * 同步入口按鈕
  */
 function syncEbookEntryButton() {
   const btn = document.getElementById('btn-enter-ebook');
   if (!btn) return;
   const articles = getEbookArticles();
   btn.disabled = articles.length === 0;
-  btn.title = articles.length === 0 ? '請先收藏至少一篇文章' : '進入純淨電子書閱讀模式';
+  btn.title =
+    articles.length === 0 ? '請先收藏至少一篇文章' : '進入純淨電子書閱讀模式';
 }
 
 /**
@@ -372,6 +555,26 @@ function bindEbookModeEvents() {
     tocBtn.addEventListener('click', () => setEbookTocOpen());
   }
 
+  const readBtn = document.getElementById('btn-ebook-read');
+  if (readBtn) {
+    readBtn.addEventListener('click', () => toggleEbookSpeech());
+  }
+
+  const fontMinus = document.getElementById('btn-ebook-font-minus');
+  if (fontMinus) {
+    fontMinus.addEventListener('click', () => changeEbookFontSize(-EBOOK_FONT_STEP));
+  }
+
+  const fontPlus = document.getElementById('btn-ebook-font-plus');
+  if (fontPlus) {
+    fontPlus.addEventListener('click', () => changeEbookFontSize(EBOOK_FONT_STEP));
+  }
+
+  const themeBtn = document.getElementById('btn-ebook-theme');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => cycleEbookTheme());
+  }
+
   const prevBtn = document.getElementById('btn-ebook-prev');
   if (prevBtn) {
     prevBtn.addEventListener('click', () => goToEbookIndex(currentEbookIndex - 1));
@@ -391,7 +594,6 @@ function bindEbookModeEvents() {
     });
   }
 
-  // 點擊側邊欄外關閉目錄
   const overlay = document.getElementById('ebook-reader-overlay');
   if (overlay) {
     overlay.addEventListener('click', (event) => {
@@ -432,10 +634,12 @@ function bindEbookModeEvents() {
 }
 
 /**
- * 初始化電子書模組
+ * 初始化
  */
 function initEbookModeModule() {
   bindEbookModeEvents();
+  applyEbookTheme(getEbookTheme());
+  applyEbookFontSize(getEbookFontSize());
   syncEbookEntryButton();
 }
 
@@ -444,6 +648,5 @@ window.openEbookReader = openEbookReader;
 window.closeEbookReader = closeEbookReader;
 window.syncEbookEntryButton = syncEbookEntryButton;
 window.initEbookModeModule = initEbookModeModule;
-// 相容舊名稱
 window.enterEbookMode = openEbookReader;
 window.exitEbookMode = closeEbookReader;
