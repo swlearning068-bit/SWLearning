@@ -67,21 +67,22 @@ function getEbookArticles() {
 }
 
 /**
+ * 電子書主標題（英文優先）
  * @param {Object} item
  * @returns {string}
  */
-function getEbookTitle(item) {
-  if (!item) return '（無標題）';
+function getEbookTitleEn(item) {
+  if (!item) return '(Untitled)';
   if (
     item.type === 'practice' ||
     (Array.isArray(item.content_chunks) && item.content_chunks.length)
   ) {
-    return String(item.title_zh || item.title_en || item.title || '（無標題演練）');
+    return String(item.title_en || item.title || item.title_zh || '(Untitled)');
   }
   if (item.type === 'story') {
     if (item.title) return String(item.title);
     const text = String(item.story_en || '').replace(/\s+/g, ' ').trim();
-    return text ? (text.length > 80 ? `${text.slice(0, 80)}…` : text) : '（無標題故事）';
+    return text ? (text.length > 80 ? `${text.slice(0, 80)}…` : text) : '(Untitled story)';
   }
   if (item.type === 'case_note') {
     if (item.title) return String(item.title);
@@ -92,9 +93,32 @@ function getEbookTitle(item) {
       ? text.length > 80
         ? `${text.slice(0, 80)}…`
         : text
-      : '（無標題臨床挑戰）';
+      : '(Untitled case note)';
   }
-  return String(item.original_title || item.title || '（無標題）');
+  return String(item.original_title || item.title || item.title_en || '(Untitled)');
+}
+
+/**
+ * 電子書副標題（中文）
+ * @param {Object} item
+ * @returns {string}
+ */
+function getEbookTitleZh(item) {
+  if (!item) return '';
+  const zh = String(item.title_zh || '').trim();
+  if (!zh) return '';
+  const en = getEbookTitleEn(item);
+  if (zh === en) return '';
+  return zh;
+}
+
+/**
+ * 目錄／相容用標題（英文主標）
+ * @param {Object} item
+ * @returns {string}
+ */
+function getEbookTitle(item) {
+  return getEbookTitleEn(item);
 }
 
 /**
@@ -244,7 +268,8 @@ function buildEbookContentHtml(item) {
     return '<p class="ebook-empty">找不到文章內容。</p>';
   }
 
-  const title = getEbookTitle(item);
+  const title = getEbookTitleEn(item);
+  const titleZh = getEbookTitleZh(item);
   const typeLabel = getEbookTypeLabel(item);
   const subject = String(item.subjectName || '').trim();
   const vocabList = getEbookVocabularyList(item);
@@ -302,9 +327,14 @@ function buildEbookContentHtml(item) {
     ? `<p class="ebook-meta">${ebookEscapeHtml(metaParts.join(' ｜ '))}</p>`
     : '';
 
+  const titleZhHtml = titleZh
+    ? `<p class="ebook-title-zh">${ebookEscapeHtml(titleZh)}</p>`
+    : '';
+
   return (
     `<header class="ebook-article-header">` +
     `<h1 class="ebook-title">${ebookEscapeHtml(title)}</h1>` +
+    titleZhHtml +
     metaHtml +
     `</header>` +
     `<div class="ebook-body">${body}</div>`
@@ -500,13 +530,23 @@ function renderEbookToc() {
 
     const titleSpan = document.createElement('span');
     titleSpan.className = 'ebook-toc-title';
-    titleSpan.textContent = getEbookTitle(item);
+    titleSpan.textContent = getEbookTitleEn(item);
+
+    const titleZh = getEbookTitleZh(item);
+    if (titleZh) {
+      const zhSpan = document.createElement('span');
+      zhSpan.className = 'ebook-toc-title-zh';
+      zhSpan.textContent = titleZh;
+      btn.appendChild(titleSpan);
+      btn.appendChild(zhSpan);
+    } else {
+      btn.appendChild(titleSpan);
+    }
 
     const typeSpan = document.createElement('span');
     typeSpan.className = 'ebook-toc-type';
     typeSpan.textContent = getEbookTypeLabel(item);
 
-    btn.appendChild(titleSpan);
     btn.appendChild(typeSpan);
     li.appendChild(btn);
     list.appendChild(li);
