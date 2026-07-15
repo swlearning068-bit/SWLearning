@@ -491,6 +491,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     initArticleLibraryModule();
   }
 
+  // 10.5 Phase 11.9：純淨電子書閱讀器
+  if (typeof initEbookModeModule === 'function') {
+    initEbookModeModule();
+  }
+
   // 11. 初始化遊戲化獎勵／印花模組（定義於 reward.js）
   if (typeof initRewardModule === 'function') {
     initRewardModule();

@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=48">
+  <link rel="stylesheet" href="css/style.css?v=49">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -682,6 +682,12 @@
       <h2 class="section-title">📚 文章庫</h2>
       <p class="section-desc">收藏的社工小故事與模擬學術文獻，離線也可重看、複習與寫作練習。</p>
 
+      <div class="ebook-entry-bar">
+        <button id="btn-enter-ebook" class="primary-btn" type="button" disabled>
+          📖 進入電子書閱讀模式
+        </button>
+      </div>
+
       <p id="article-library-empty" class="library-empty hidden">
         尚未收藏任何文章。<br>
         請先到「閱讀練習」產生社工小故事或模擬學術文獻後，點「⭐ 收藏文章」。
@@ -1066,8 +1072,27 @@
       }
     })();
   </script>
-  <!-- 文章庫：電子書模式退出按鈕（僅 body.ebook-active 時顯示） -->
-  <button id="btn-exit-ebook" type="button" aria-label="退出電子書模式">❌ 退出電子書模式</button>
+  <!-- ==================== Phase 11.9：純淨電子書閱讀器（全螢幕 overlay） ==================== -->
+  <div id="ebook-reader-overlay" class="ebook-hidden" aria-hidden="true" role="dialog" aria-label="電子書閱讀模式">
+    <div class="ebook-header">
+      <button id="btn-ebook-toc" type="button" aria-label="開啟目錄" aria-expanded="false">☰ 目錄</button>
+      <span id="ebook-progress" class="ebook-progress" aria-live="polite"></span>
+      <button id="btn-ebook-exit" type="button" aria-label="退出電子書模式">❌ 退出</button>
+    </div>
+
+    <div id="ebook-sidebar" class="ebook-sidebar-hidden" aria-hidden="true">
+      <h3>收藏文章清單</h3>
+      <ul id="ebook-toc-list"></ul>
+    </div>
+
+    <div class="ebook-content-wrapper">
+      <button id="btn-ebook-prev" class="ebook-nav-btn" type="button" aria-label="上一篇">❮</button>
+      <div id="ebook-text-container">
+        <!-- 純文字文章渲染於此 -->
+      </div>
+      <button id="btn-ebook-next" class="ebook-nav-btn" type="button" aria-label="下一篇">❯</button>
+    </div>
+  </div>
 
   <script src="js/utils.js?v=4"></script>
   <script src="js/deepseek.js?v=32"></script>
@@ -1077,12 +1102,13 @@
   <script src="js/literature.js?v=11"></script>
   <script src="js/reading.js?v=27"></script>
   <script src="js/story.js?v=9"></script>
-  <script src="js/article-library.js?v=18"></script>
+  <script src="js/article-library.js?v=19"></script>
+  <script src="js/ebook-mode.js?v=1"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=5"></script>
-  <script src="js/app.js?v=20"></script>
+  <script src="js/app.js?v=21"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=16"></script>
 </body>

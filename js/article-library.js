@@ -283,7 +283,6 @@ function renderArticlesList(filterType = 'all') {
   articleFilterType = filterType || 'all';
   clozeModeActive = false;
   activeArticleId = null;
-  exitEbookMode();
 
   const allArticles = loadSavedArticles();
   const filtered = allArticles.filter((item) =>
@@ -300,6 +299,7 @@ function renderArticlesList(filterType = 'all') {
   if (allArticles.length === 0) {
     if (emptyEl) emptyEl.classList.remove('hidden');
     if (layoutEl) layoutEl.classList.add('is-empty');
+    if (typeof syncEbookEntryButton === 'function') syncEbookEntryButton();
     return;
   }
 
@@ -319,6 +319,7 @@ function renderArticlesList(filterType = 'all') {
     emptyFilter.textContent =
       emptyMsgs[articleFilterType] || '此分類尚無文章。';
     listEl.appendChild(emptyFilter);
+    if (typeof syncEbookEntryButton === 'function') syncEbookEntryButton();
     return;
   }
 
@@ -358,7 +359,6 @@ function renderArticlesList(filterType = 'all') {
       const id = item.id;
       if (String(activeArticleId) === String(id) && !clozeModeActive) {
         activeArticleId = null;
-        exitEbookMode();
         if (detailEl) detailEl.innerHTML = getArticleDetailPlaceholderHtml();
         listEl.querySelectorAll('.library-item.is-active').forEach((el) => {
           el.classList.remove('is-active');
@@ -384,6 +384,10 @@ function renderArticlesList(filterType = 'all') {
 
     listEl.appendChild(row);
   });
+
+  if (typeof syncEbookEntryButton === 'function') {
+    syncEbookEntryButton();
+  }
 }
 
 /* ============================================================
@@ -1007,80 +1011,6 @@ function renderPracticeArticleDetail(item, detailEl) {
 }
 
 /**
- * 在右側詳情頂部插入「電子書模式」按鈕
- * @param {HTMLElement} detailEl
- */
-function prependEbookModeButton(detailEl) {
-  if (!detailEl) return;
-  if (detailEl.querySelector('.article-library-placeholder')) return;
-  if (detailEl.querySelector('#btn-ebook-mode')) return;
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'ebook-mode-toolbar';
-
-  const btn = document.createElement('button');
-  btn.id = 'btn-ebook-mode';
-  btn.type = 'button';
-  btn.className = 'btn btn-secondary secondary-btn ebook-mode-btn';
-  btn.textContent = '📖 電子書模式';
-  btn.setAttribute('aria-label', '進入電子書閱讀模式');
-  toolbar.appendChild(btn);
-
-  detailEl.insertBefore(toolbar, detailEl.firstChild);
-}
-
-/**
- * 進入電子書沉浸閱讀模式
- */
-function enterEbookMode() {
-  const detailEl = document.getElementById('library-article-detail');
-  if (!detailEl || detailEl.querySelector('.article-library-placeholder')) return;
-  document.body.classList.add('ebook-active');
-  detailEl.scrollTop = 0;
-}
-
-/**
- * 退出電子書沉浸閱讀模式
- */
-function exitEbookMode() {
-  document.body.classList.remove('ebook-active');
-}
-
-/**
- * 綁定電子書模式進出事件（按鈕、ESC、離開文章庫 Tab）
- */
-function bindEbookModeEvents() {
-  if (bindEbookModeEvents._bound) return;
-  bindEbookModeEvents._bound = true;
-
-  document.addEventListener('click', (event) => {
-    if (event.target.closest('#btn-ebook-mode')) {
-      enterEbookMode();
-      return;
-    }
-    if (event.target.closest('#btn-exit-ebook')) {
-      exitEbookMode();
-    }
-  });
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && document.body.classList.contains('ebook-active')) {
-      exitEbookMode();
-    }
-  });
-
-  const tabNav = document.querySelector('.tab-nav');
-  if (tabNav) {
-    tabNav.addEventListener('click', (event) => {
-      const tabBtn = event.target.closest('[data-tab]');
-      if (tabBtn && tabBtn.getAttribute('data-tab') !== 'articles') {
-        exitEbookMode();
-      }
-    });
-  }
-}
-
-/**
  * 依 type 分派詳情渲染（開啟收藏文章時一律離線渲染，不呼叫文章生成 API）
  * @param {Object} item
  */
@@ -1095,15 +1025,20 @@ function renderArticleDetail(item) {
       isInteractivePracticeArticle(item))
   ) {
     renderPracticeArticleDetail(item, detailEl);
-  } else if (item.type === 'story') {
-    renderStoryArticleDetail(item, detailEl);
-  } else if (item.type === 'case_note') {
-    renderCaseNoteArticleDetail(item, detailEl);
-  } else {
-    renderLiteratureArticleDetail(item, detailEl);
+    return;
   }
 
-  prependEbookModeButton(detailEl);
+  if (item.type === 'story') {
+    renderStoryArticleDetail(item, detailEl);
+    return;
+  }
+
+  if (item.type === 'case_note') {
+    renderCaseNoteArticleDetail(item, detailEl);
+    return;
+  }
+
+  renderLiteratureArticleDetail(item, detailEl);
 }
 
 /* ============================================================
@@ -1550,7 +1485,9 @@ function renderArticleChallenge(container, challenge, articleItem) {
 function refreshArticleLibraryView() {
   activeArticleId = null;
   clozeModeActive = false;
-  exitEbookMode();
+  if (typeof closeEbookReader === 'function') {
+    closeEbookReader();
+  }
   renderArticlesList(articleFilterType || 'all');
 }
 
@@ -1563,7 +1500,6 @@ function initArticleLibraryModule() {
     filters.addEventListener('click', handleArticleFilterClick);
   }
 
-  bindEbookModeEvents();
   renderArticlesList('all');
 }
 
@@ -1571,8 +1507,6 @@ window.loadSavedArticles = loadSavedArticles;
 window.renderArticlesList = renderArticlesList;
 window.refreshArticleLibraryView = refreshArticleLibraryView;
 window.initArticleLibraryModule = initArticleLibraryModule;
-window.enterEbookMode = enterEbookMode;
-window.exitEbookMode = exitEbookMode;
 
 // 相容舊呼叫名稱（若有殘留引用）
 window.refreshLibraryView = refreshArticleLibraryView;
