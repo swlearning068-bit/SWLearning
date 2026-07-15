@@ -586,6 +586,54 @@ function setEbookTocOpen(force) {
 }
 
 /**
+ * 進入瀏覽器全螢幕（失敗則仍以 CSS 固定覆蓋）
+ * @param {HTMLElement} overlay
+ */
+function requestEbookFullscreen(overlay) {
+  if (!overlay) return;
+  const req =
+    overlay.requestFullscreen ||
+    overlay.webkitRequestFullscreen ||
+    overlay.msRequestFullscreen;
+  if (typeof req !== 'function') return;
+  try {
+    const result = req.call(overlay);
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {
+        /* 使用者拒絕或不支援：保留 CSS 全螢幕覆蓋 */
+      });
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+/**
+ * 離開瀏覽器全螢幕
+ */
+function exitEbookFullscreen() {
+  const doc = document;
+  const active =
+    doc.fullscreenElement ||
+    doc.webkitFullscreenElement ||
+    doc.msFullscreenElement;
+  if (!active) return;
+  const exit =
+    doc.exitFullscreen ||
+    doc.webkitExitFullscreen ||
+    doc.msExitFullscreen;
+  if (typeof exit !== 'function') return;
+  try {
+    const result = exit.call(doc);
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {});
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+/**
  * @param {number} [startIndex]
  */
 function openEbookReader(startIndex) {
@@ -626,6 +674,7 @@ function openEbookReader(startIndex) {
 
   setEbookTocOpen(false);
   renderEbookContent();
+  requestEbookFullscreen(overlay);
 }
 
 /**
@@ -633,6 +682,7 @@ function openEbookReader(startIndex) {
  */
 function closeEbookReader() {
   stopEbookSpeech();
+  exitEbookFullscreen();
   const overlay = document.getElementById('ebook-reader-overlay');
   if (overlay) {
     overlay.classList.add('ebook-hidden');
