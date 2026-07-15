@@ -2073,12 +2073,15 @@ const INTERACTIVE_PRACTICE_JSON_CONTRACT = `
 硬性規則：
 1. content_chunks 必須剛好 3 或 4 段；每一段都要有完整 inline_quiz。
 2. inline_quiz.options 必須剛好 4 個字串；correct_answer 用 "A"|"B"|"C"|"D"（對應 options 第 1–4 項）。
-3. vocabulary 必須提供足夠的進階專有名詞／片語（數量以 user 訊息指定為準，通常約 6–24；含多詞片語，如 "family of origin", "identified patient"）。
-   - 每一個 term 都必須「原樣出現」在至少一段 paragraph_en 中（大小寫可不同），以便前端標成藍色可懸停翻譯。
-   - 請從全文均勻挑選；涵蓋理論概念、臨床用語與研究方法／評估工具詞。密度高時寧可多列文中實詞，勿只給少數幾個。
-4. writing_tasks.l1_cloze 的 sentence_en_template 必須含 _______；answer 為應填單字（可為片語）。
-5. explanation 與 task_instruction 必須結合已注入的科目理論知識庫，禁止空泛套話。
-6. 中文須為自然繁體、避免翻譯腔。`;
+3. vocabulary 必須提供足夠的進階專有名詞／片語（數量以 user 訊息指定為準；含多詞片語）。
+   - 每一個 term 都必須「原樣出現」在至少一段 paragraph_en 中（大小寫可不同）。
+   - 密度高時：寧可多列文中實詞／片語，目標是覆蓋段落中絕大多數社工、臨床、學術內容詞（勿只給 5–10 個）。
+4. 每一個 content_chunk 另可（高密度時必須）附上 highlight_terms：
+   "highlight_terms": [{ "term": "文中原樣英文", "zh": "繁中" }, ...]
+   請把該段幾乎所有專業／學術／臨床用詞與片語都列入（功能詞如 the/a/is/to 除外）。
+5. writing_tasks.l1_cloze 的 sentence_en_template 必須含 _______；answer 為應填單字（可為片語）。
+6. explanation 與 task_instruction 必須結合已注入的科目理論知識庫，禁止空泛套話。
+7. 中文須為自然繁體、避免翻譯腔。`;
 
 const INTERACTIVE_STORY_SYSTEM_PROMPT =
   `你是一位香港資深社會工作督導兼英文教師。請依當前科目生成一篇「社工小故事／個案情境」互動閱讀教材。` +
@@ -2153,9 +2156,22 @@ function normalizeInteractivePracticeArticle(result, track) {
         correct_answer = idx >= 0 ? String.fromCharCode(65 + idx) : 'A';
       }
 
+      const highlight_terms = Array.isArray(chunk.highlight_terms)
+        ? chunk.highlight_terms
+            .map((t) => {
+              if (!t || typeof t !== 'object') return null;
+              const term = String(t.term || t.word || '').trim();
+              const zh = String(t.zh || '').trim();
+              if (!term || !zh) return null;
+              return { term, zh, part_of_speech: '' };
+            })
+            .filter(Boolean)
+        : [];
+
       return {
         paragraph_en,
         paragraph_zh,
+        highlight_terms,
         inline_quiz: {
           question: String(quiz.question || '').trim(),
           options,
@@ -2169,6 +2185,22 @@ function normalizeInteractivePracticeArticle(result, track) {
   if (content_chunks.length < 3) {
     throw new Error('AI 回傳的段落不足（需要 3–4 段含測驗）。');
   }
+
+  // 合併各段 highlight_terms 進 vocabulary（去重，擴充藍字覆蓋）
+  const vocabByKey = new Map();
+  vocabulary.forEach((v) => {
+    const key = String(v.term || '').toLowerCase();
+    if (key) vocabByKey.set(key, v);
+  });
+  content_chunks.forEach((chunk) => {
+    (chunk.highlight_terms || []).forEach((t) => {
+      const key = String(t.term || '').toLowerCase();
+      if (key && !vocabByKey.has(key)) {
+        vocabByKey.set(key, t);
+      }
+    });
+  });
+  const mergedVocabulary = Array.from(vocabByKey.values());
 
   const wt = result.writing_tasks && typeof result.writing_tasks === 'object'
     ? result.writing_tasks
@@ -2207,7 +2239,7 @@ function normalizeInteractivePracticeArticle(result, track) {
     type: 'practice',
     title_en,
     title_zh: title_zh || title_en,
-    vocabulary,
+    vocabulary: mergedVocabulary,
     content_chunks: content_chunks.slice(0, 4),
     writing_tasks: { l1_cloze, l2_sentence },
     task_instruction
@@ -2215,7 +2247,8 @@ function normalizeInteractivePracticeArticle(result, track) {
 }
 
 /**
- * 依目前藍色單字密度推算 vocabulary 建議數量（約 6–24）
+ * 依目前藍色單字密度推算 vocabulary 建議數量
+ * 密度＝約略覆蓋全文「內容詞」的比例；100% 時要求高覆蓋（約 40–60 詞）
  * @returns {{min: number, max: number, density: number}}
  */
 function resolveVocabCountByDensity() {
@@ -2224,10 +2257,36 @@ function resolveVocabCountByDensity() {
       ? getVocabHighlightDensity()
       : 70;
   const pct = Math.max(0, Math.min(100, Number(density) || 70));
-  // 0% 仍請模型給一組完整單字表（供底部列表）；標藍由前端密度控制
-  const max = Math.max(8, Math.round(8 + (pct / 100) * 16)); // 8–24
-  const min = Math.max(6, Math.round(max * 0.75));
+  // 0%→約 10–14；50%→約 25–32；100%→約 45–60（盡量覆蓋全文專業詞）
+  const max = Math.max(12, Math.round(12 + (pct / 100) * 48)); // 12–60
+  const min = Math.max(10, Math.round(max * 0.75));
   return { min, max, density: pct };
+}
+
+/**
+ * 組出密度相關的 vocabulary／highlight 指示句
+ * @param {{min: number, max: number, density: number}} opts
+ * @returns {string}
+ */
+function buildVocabDensityInstruction(opts) {
+  const { min, max, density } = opts;
+  let extra = '';
+  if (density >= 90) {
+    extra =
+      `\n【高密度要求】藍色單字密度 ${density}%：請盡量把各段 paragraph_en 中的社工／臨床／學術內容詞與片語都列入 vocabulary，` +
+      `並在每一段 content_chunks 附上豐富的 highlight_terms。` +
+      `目標是讀者瀏覽英文時，絕大部分專業用語皆可標藍（排除 the/a/an/is/are/to/of/and 等功能詞）。` +
+      `宁可多列，勿只給少數幾個。`;
+  } else if (density >= 50) {
+    extra =
+      `\n【中密度】請讓 vocabulary + 各段 highlight_terms 合計約能覆蓋文中一半以上的專業內容詞。`;
+  }
+  return (
+    `\n目前使用者設定藍色單字密度約 ${density}%（= 約略覆蓋全文內容詞的比例）。` +
+    `\nvocabulary 請列出至少 ${min}–${max} 個文中實際出現的專有名詞／片語（含多詞）。` +
+    `\n每一段請附 highlight_terms（該段專業詞／片語 + 繁中），密度越高 highlight_terms 越多。` +
+    extra
+  );
 }
 
 /**
@@ -2240,18 +2299,18 @@ async function generateInteractiveStoryAPI() {
   const theme = themes[Math.floor(Math.random() * themes.length)];
   const taskType =
     normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story';
-  const { min, max, density } = resolveVocabCountByDensity();
+  const densityOpts = resolveVocabCountByDensity();
 
   const userContent =
     `請為科目「${subject.name}」生成一篇互動社工小故事教材。` +
     `\n主題方向：${theme}` +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
-    `\n目前使用者設定藍色單字密度約 ${density}%，vocabulary 請列出 ${min}–${max} 個文中實際出現的專有名詞／片語（含多詞），供藍色懸停翻譯使用。`;
+    buildVocabDensityInstruction(densityOpts);
 
   const result = await requestDeepSeekJSON(
     INTERACTIVE_STORY_SYSTEM_PROMPT,
     userContent,
-    8192,
+    densityOpts.density >= 80 ? 10000 : 8192,
     taskType,
     { subjectId: subject.id }
   );
@@ -2277,19 +2336,19 @@ async function generateInteractiveLiteratureAPI() {
         .join('；')
     : '';
 
-  const { min, max, density } = resolveVocabCountByDensity();
+  const densityOpts = resolveVocabCountByDensity();
 
   const userContent =
     `請為科目「${subject.name}」生成一篇互動模擬學術文獻教材。` +
     (theoryHint ? `\n理論焦點：${theoryHint}` : '') +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
-    `\n目前使用者設定藍色單字密度約 ${density}%，vocabulary 請列出 ${min}–${max} 個文中實際出現的專有名詞／片語（含多詞，如 genogram、differentiation、identified patient），供藍色懸停翻譯使用。` +
+    buildVocabDensityInstruction(densityOpts) +
     `\n文體須像教學用模擬論文／理論短文，並在適處加學術免責意識（不必另開欄位）。`;
 
   const result = await requestDeepSeekJSON(
     INTERACTIVE_LITERATURE_SYSTEM_PROMPT,
     userContent,
-    8192,
+    densityOpts.density >= 80 ? 10000 : 8192,
     'literature',
     { subjectId: subject.id }
   );

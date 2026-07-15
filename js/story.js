@@ -49,24 +49,92 @@ function setVocabHighlightDensity(pct) {
   return next;
 }
 
+/** 不列入「內容詞覆蓋率」計算的功能詞 */
+const VOCAB_DENSITY_STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'if', 'then', 'so', 'as', 'at', 'by',
+  'for', 'from', 'in', 'into', 'of', 'on', 'to', 'with', 'without', 'via',
+  'is', 'are', 'was', 'were', 'be', 'been', 'been', 'am', 'do', 'does', 'did',
+  'has', 'have', 'had', 'not', 'no', 'nor', 'this', 'that', 'these', 'those',
+  'it', 'its', 'he', 'she', 'they', 'them', 'his', 'her', 'their', 'we', 'our',
+  'you', 'your', 'i', 'my', 'me', 'who', 'whom', 'which', 'what', 'when',
+  'where', 'why', 'how', 'can', 'could', 'may', 'might', 'must', 'shall',
+  'should', 'will', 'would', 'also', 'than', 'too', 'very', 'just', 'only',
+  'about', 'over', 'under', 'after', 'before', 'between', 'during', 'while',
+  'such', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'any',
+  'all', 'own', 'same', 'than', 'too', 'up', 'out', 'off', 'again', 'further',
+  'once', 'here', 'there', 'mr', 'mrs', 'ms', 'dr'
+]);
+
 /**
- * 依密度挑選要標藍的關鍵字（長詞優先；100% = 全部）
+ * 抽出英文內容詞（排除功能詞與過短詞）
+ * @param {string} text
+ * @returns {string[]}
+ */
+function extractContentTokens(text) {
+  const raw = String(text || '').toLowerCase().match(/[a-z][a-z'-]*/g) || [];
+  return raw.filter(
+    (w) => w.length >= 3 && !VOCAB_DENSITY_STOPWORDS.has(w)
+  );
+}
+
+/**
+ * 依「全文內容詞覆蓋率」挑選要標藍的關鍵字
+ * 100% = 標出詞表中所有能匹配到文中的詞／片語（不再只取詞表的一部分）
  * @param {Array<{word: string, zh: string}>} keywords
  * @param {number} [densityPct]
+ * @param {string} [articleText]
  * @returns {Array<{word: string, zh: string}>}
  */
-function selectKeywordsByDensity(keywords, densityPct) {
+function selectKeywordsByDensity(keywords, densityPct, articleText) {
   const list = Array.isArray(keywords) ? keywords : [];
   const pct = Math.max(
     0,
     Math.min(100, Number(densityPct ?? getVocabHighlightDensity()) || 0)
   );
   if (pct <= 0 || list.length === 0) return [];
-  if (pct >= 100) return list;
 
-  const sorted = [...list].sort((a, b) => b.word.length - a.word.length);
-  const count = Math.max(1, Math.ceil((sorted.length * pct) / 100));
-  return sorted.slice(0, count);
+  const text = String(articleText || '');
+  const textLower = text.toLowerCase();
+
+  // 只保留實際出現在文中的詞
+  const matched = list.filter((item) => {
+    const w = String(item.word || '').trim();
+    if (!w) return false;
+    const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const isPhrase = /\s/.test(w);
+    const pattern = isPhrase
+      ? escaped.replace(/\s+/g, '\\s+')
+      : `\\b${escaped}\\b`;
+    try {
+      return new RegExp(pattern, 'i').test(text);
+    } catch (_) {
+      return textLower.includes(w.toLowerCase());
+    }
+  });
+
+  if (matched.length === 0) return [];
+  if (pct >= 100) {
+    // 100%：詞表能對上全文的全部標出（長詞優先避免短詞搶標）
+    return [...matched].sort((a, b) => b.word.length - a.word.length);
+  }
+
+  const contentTokens = extractContentTokens(text);
+  const targetCover = Math.max(
+    1,
+    Math.ceil((contentTokens.length * pct) / 100)
+  );
+
+  const sorted = [...matched].sort((a, b) => b.word.length - a.word.length);
+  const selected = [];
+  const covered = new Set();
+
+  for (const item of sorted) {
+    selected.push(item);
+    extractContentTokens(item.word).forEach((tok) => covered.add(tok));
+    if (covered.size >= targetCover) break;
+  }
+
+  return selected;
 }
 
 /**
@@ -586,8 +654,23 @@ function renderPracticeArticle(article, targetRoot, options) {
     pack.appendChild(saveWrap);
   }
 
-  const allKeywords = normalizePracticeKeywords(article.vocabulary);
-  const keywords = selectKeywordsByDensity(allKeywords, getVocabHighlightDensity());
+  // 合併全域 vocabulary + 各段 highlight_terms
+  const chunkTerms = [];
+  (article.content_chunks || []).forEach((chunk) => {
+    if (Array.isArray(chunk.highlight_terms)) {
+      chunkTerms.push(...chunk.highlight_terms);
+    }
+  });
+  const allKeywords = normalizePracticeKeywords([
+    ...(article.vocabulary || []),
+    ...chunkTerms
+  ]);
+  const articleText = buildPracticeArticleContext(article);
+  const keywords = selectKeywordsByDensity(
+    allKeywords,
+    getVocabHighlightDensity(),
+    articleText
+  );
   const chunksWrap = document.createElement('div');
   chunksWrap.className = 'practice-chunks';
   article.content_chunks.forEach((chunk, i) => {
@@ -614,8 +697,11 @@ function renderPracticeArticle(article, targetRoot, options) {
   writingMount.className = 'progressive-writing-mount';
   pack.appendChild(writingMount);
 
-  // 重點單字表置於最下方（寫作區之後）
-  const vocabEl = renderPracticeVocabulary(article.vocabulary);
+  // 重點單字表置於最下方（寫作區之後；顯示完整合併詞表）
+  const vocabEl = renderPracticeVocabulary(allKeywords.map((k) => ({
+    term: k.word,
+    zh: k.zh
+  })));
   if (vocabEl) {
     vocabEl.classList.add('practice-vocab--bottom');
     pack.appendChild(vocabEl);
