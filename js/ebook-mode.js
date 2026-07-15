@@ -620,6 +620,10 @@ function openEbookReader(startIndex) {
   overlay.classList.remove('ebook-hidden');
   overlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('ebook-reader-open');
+
+  const mainEl = document.querySelector('main.main-content');
+  if (mainEl) mainEl.setAttribute('aria-hidden', 'true');
+
   setEbookTocOpen(false);
   renderEbookContent();
 }
@@ -635,6 +639,8 @@ function closeEbookReader() {
     overlay.setAttribute('aria-hidden', 'true');
   }
   document.body.classList.remove('ebook-reader-open');
+  const mainEl = document.querySelector('main.main-content');
+  if (mainEl) mainEl.removeAttribute('aria-hidden');
   setEbookTocOpen(false);
   ebookArticles = [];
   currentEbookIndex = 0;
