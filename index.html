@@ -545,14 +545,14 @@
 
           </div><!-- /#reading-l2-panel -->
 
-          <!-- ---------- L3：個案紀錄與是非題（控制區） ---------- -->
+          <!-- ---------- L3：個案故事與臨床實務挑戰（控制區） ---------- -->
           <div id="reading-l3-panel" class="reading-level-panel hidden" data-reading-panel="l3">
 
-            <h2 class="section-title">L3 個案閱讀 — 任務式理解</h2>
-            <p class="section-desc">依目前科目生成專業個案紀錄，並以是非題測試閱讀理解。</p>
+            <h2 class="section-title">L3 個案閱讀 — 臨床實務挑戰</h2>
+            <p class="section-desc">依目前科目生成專業個案故事，並以 SOAP／理論倫理批判／關鍵對話等開放式任務鍛鍊臨床判斷。</p>
 
             <button id="btn-l3-generate" class="btn btn-primary" type="button">
-              📝 生成個案紀錄任務
+              📝 生成臨床實務挑戰
             </button>
 
           </div><!-- /#reading-l3-panel -->
@@ -632,8 +632,8 @@
 
           <div class="reading-results-panel hidden" data-reading-panel="l3">
             <div class="layout-placeholder" aria-hidden="true">
-              <p class="layout-placeholder-title">個案任務區</p>
-              <p class="layout-placeholder-desc">生成個案紀錄後，英文 Case Note 與是非題會顯示在這裡。</p>
+              <p class="layout-placeholder-title">臨床挑戰區</p>
+              <p class="layout-placeholder-desc">生成後，英文個案故事與開放式臨床實務挑戰會顯示在這裡。</p>
             </div>
 
             <div id="l3-reading-loading" class="skeleton-card hidden" aria-live="polite">
@@ -641,7 +641,7 @@
               <div class="skeleton-line skeleton-line--long"></div>
               <div class="skeleton-line skeleton-line--medium"></div>
               <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在生成個案紀錄...</p>
+              <p class="loading-text">正在生成個案故事與臨床挑戰...</p>
             </div>
 
             <div id="l3-reading-display" class="l3-reading-display hidden" aria-live="polite">
@@ -656,21 +656,35 @@
                 <p id="l3-case-zh" class="l3-case-zh"></p>
               </div>
 
-              <div class="l3-tf-task">
-                <span class="result-label">閱讀理解 — True / False</span>
+              <div class="l3-challenge-task">
+                <div class="l3-challenge-header">
+                  <span class="result-label">Clinical Challenge — 臨床實務挑戰</span>
+                  <span id="l3-task-type-badge" class="l3-task-type-badge hidden"></span>
+                </div>
                 <p id="l3-question-en" class="l3-question-en"></p>
                 <p id="l3-question-zh" class="l3-question-zh"></p>
 
-                <div class="l3-tf-buttons" role="group" aria-label="是非題作答">
-                  <button id="btn-l3-true" class="btn-tf btn-tf--true" type="button">
-                    True
-                  </button>
-                  <button id="btn-l3-false" class="btn-tf btn-tf--false" type="button">
-                    False
-                  </button>
+                <label class="label-text" for="l3-answer-input">你的回答（英文或中文皆可）：</label>
+                <textarea
+                  id="l3-answer-input"
+                  class="user-textarea l3-answer-textarea"
+                  rows="6"
+                  placeholder="Write your Assessment &amp; Plan / critique / empathic response here…"
+                ></textarea>
+
+                <button id="btn-l3-submit-supervisor" class="btn btn-primary" type="button">
+                  送出給督導 (Submit to Supervisor)
+                </button>
+
+                <div id="l3-supervision-loading" class="l3-supervision-loading hidden" aria-live="polite">
+                  <p class="loading-text">督導正在閱讀你的答案…</p>
                 </div>
 
-                <p id="l3-tf-feedback" class="l3-tf-feedback hidden" role="status"></p>
+                <div id="l3-supervision-feedback" class="l3-supervision-feedback hidden" role="status" aria-live="polite">
+                  <span class="result-label">督導回饋 (Supervision Feedback)</span>
+                  <p id="l3-feedback-zh" class="l3-feedback-zh"></p>
+                  <p id="l3-feedback-en" class="l3-feedback-en"></p>
+                </div>
               </div>
 
             </div><!-- /#l3-reading-display -->

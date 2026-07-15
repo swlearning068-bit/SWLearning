@@ -1307,69 +1307,154 @@ async function expandLiteratureFromAbstractAPI(
 }
 
 /**
- * L3 閱讀：依當前科目生成個案紀錄 + 是非題
+ * L3 閱讀：依當前科目生成個案故事 + 臨床實務挑戰任務
  */
-const CASE_NOTE_READING_SYSTEM_PROMPT = `請根據當前選擇的社工科目，生成一篇約 150 字的專業個案紀錄 (Case Note)，英文難度適合社工學生。
-內容必須嚴格貼合該科目核心；若科目為社會工作倫理與價值，個案紀錄必須清楚呈現倫理兩難與道德抉擇的掙扎，並只隨機帶入 1–2 個背景元素，不要一次塞滿。
-並提供一題是非題 (True/False) 來測試閱讀理解。
+const CASE_NOTE_READING_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。請根據當前選擇的社工科目，先生成一篇約 180–220 字的 L3 英文個案故事（Case Note／個案情境），英文難度適合準備實習的社工學生。
+內容必須嚴格貼合該科目核心與已注入的理論知識庫；若科目為社會工作倫理與價值，個案必須清楚呈現倫理兩難與道德抉擇的掙扎，並只隨機帶入 1–2 個背景元素，不要一次塞滿。
+
+接著，請為社工學生設計一個『臨床實務挑戰任務 (Clinical Challenge Task)』。
+請絕對不要問能在文章中直接找到答案的表面問題（禁止 True/False、細節回憶、選詞填空等閱讀測驗式題目）。
+請從以下三種任務類型中『隨機挑選一種』來出題：
+
+1. soap — SOAP 紀錄撰寫：要求學生根據文章，用英文簡潔寫出該個案的 Assessment（評估）與 Plan（介入計畫）。
+2. theory_ethics — 理論與倫理批判：結合該科目的核心理論（如家庭系統、倫理六原則），詢問學生文章中社工的決策是否有盲點，並要求提出更好的介入建議。
+3. key_dialogue — 關鍵對話回應：擷取文章中案主最抗拒或情緒最高漲的一句話，要求學生寫出他們當下會如何用英文進行同理與回應。
+
+【任務指令語氣】必須像一位嚴格但具啟發性的督導；task_en 與 task_zh 皆為完整可獨立閱讀的任務說明（雙語對照）。
 
 請務必以 JSON 格式回傳：
 {
-  "case_note_en": "約 150 字的英文個案紀錄",
+  "case_note_en": "約 180–220 字的英文個案故事",
   "case_note_zh": "繁體中文翻譯",
-  "question_en": "是非題題幹（英文）",
-  "question_zh": "是非題題幹（繁體中文）",
-  "answer": true
+  "task_type": "soap",
+  "task_en": "英文任務指令（督導語氣）",
+  "task_zh": "繁體中文任務指令（督導語氣）"
 }
-answer 必須是布林值 true 或 false，表示正確答案。`;
+task_type 必須是 "soap"、"theory_ethics" 或 "key_dialogue" 其中之一。`;
+
+/** L3 督導回饋 System Prompt */
+const L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。學生剛完成一份臨床實務挑戰任務。
+請根據「個案文章、任務題目、學生答案」，給予一段嚴格但具啟發性的督導回饋 (Supervision Feedback)。
+
+回饋重點：
+1. 肯定學生答案中值得保留的專業判斷或同理語言（若有）。
+2. 指出盲點、遺漏的風險評估、倫理考量，或理論應用不足之處。
+3. 給出 1–2 個可操作的改進建議（可用英文示範句）。
+4. 語氣像督導面談：直接、具體、鼓勵批判性思考；禁止只說「很好」或複述文章。
+5. 必須結合該科目核心理論／關鍵概念至少一點。
+
+請以 JSON 回傳：
+{
+  "feedback_zh": "繁體中文督導回饋（約 120–220 字）",
+  "feedback_en": "Optional short English coaching note (2–4 sentences)"
+}`;
 
 /**
- * 生成 L3 個案紀錄閱讀任務
+ * 生成 L3 個案故事 + 臨床實務挑戰任務
  *
- * @returns {Promise<{case_note_en: string, case_note_zh: string, question_en: string, question_zh: string, answer: boolean}>}
+ * @returns {Promise<{case_note_en: string, case_note_zh: string, task_type: string, task_en: string, task_zh: string, question_en: string, question_zh: string}>}
  */
 async function generateCaseNoteReading() {
   const subject = resolveCurrentSubject();
   const userContent =
-    `請為科目「${subject.name}」生成一篇專業個案紀錄與一題是非題。`;
+    `請為科目「${subject.name}」生成一篇 L3 英文個案故事，並隨機挑選一種臨床實務挑戰任務出題。`;
 
   const result = await requestDeepSeekJSON(
     CASE_NOTE_READING_SYSTEM_PROMPT,
     userContent,
-    900
+    4096,
+    'challenge',
+    { subjectId: subject.id }
   );
 
-  const {
-    case_note_en,
-    case_note_zh,
-    question_en,
-    question_zh,
-    answer
-  } = result;
+  const case_note_en = result.case_note_en;
+  const case_note_zh = result.case_note_zh;
+  // 相容舊欄位命名（若模型仍回 question_*）
+  const task_en = result.task_en || result.question_en;
+  const task_zh = result.task_zh || result.question_zh;
+  const rawType = String(result.task_type || '').trim().toLowerCase();
 
-  if (!case_note_en || !case_note_zh || !question_en || !question_zh) {
-    throw new Error('AI 回傳資料不完整，缺少個案紀錄或是非題。');
+  if (!case_note_en || !case_note_zh || !task_en || !task_zh) {
+    throw new Error('AI 回傳資料不完整，缺少個案故事或臨床挑戰任務。');
   }
 
-  // 正規化 answer：允許布林或字串 "true"/"false"
-  let answerBool;
-  if (typeof answer === 'boolean') {
-    answerBool = answer;
-  } else if (typeof answer === 'string') {
-    const lower = answer.trim().toLowerCase();
-    if (lower === 'true') answerBool = true;
-    else if (lower === 'false') answerBool = false;
-    else throw new Error('AI 回傳的是非題答案格式無效。');
-  } else {
-    throw new Error('AI 回傳的是非題答案格式無效。');
-  }
+  const allowedTypes = ['soap', 'theory_ethics', 'key_dialogue'];
+  const task_type = allowedTypes.includes(rawType) ? rawType : 'soap';
+
+  const taskEn = String(task_en).trim();
+  const taskZh = String(task_zh).trim();
 
   return {
     case_note_en: String(case_note_en).trim(),
     case_note_zh: String(case_note_zh).trim(),
-    question_en: String(question_en).trim(),
-    question_zh: String(question_zh).trim(),
-    answer: answerBool
+    task_type,
+    task_en: taskEn,
+    task_zh: taskZh,
+    // 供舊 UI／呼叫端相容
+    question_en: taskEn,
+    question_zh: taskZh
+  };
+}
+
+/**
+ * L3：送出學生答案，取得督導回饋
+ *
+ * @param {{caseNoteEn: string, caseNoteZh?: string, taskEn: string, taskZh?: string, taskType?: string, studentAnswer: string}} payload
+ * @returns {Promise<{feedback_zh: string, feedback_en: string}>}
+ */
+async function getL3SupervisionFeedbackAPI(payload) {
+  const caseNoteEn = String(payload?.caseNoteEn || '').trim();
+  const caseNoteZh = String(payload?.caseNoteZh || '').trim();
+  const taskEn = String(payload?.taskEn || '').trim();
+  const taskZh = String(payload?.taskZh || '').trim();
+  const taskType = String(payload?.taskType || '').trim();
+  const studentAnswer = String(payload?.studentAnswer || '').trim();
+
+  if (!caseNoteEn) {
+    throw new Error('缺少個案文章，無法請督導批改。');
+  }
+  if (!taskEn && !taskZh) {
+    throw new Error('缺少任務題目，無法請督導批改。');
+  }
+  if (!studentAnswer) {
+    throw new Error('請先輸入你的答案再送出給督導。');
+  }
+
+  const subject = resolveCurrentSubject();
+  const userContent = `科目：${subject.name}
+任務類型：${taskType || '（未標示）'}
+
+【個案文章 Case Note】
+${caseNoteEn}
+${caseNoteZh ? `\n（中文參考）\n${caseNoteZh}` : ''}
+
+【臨床實務挑戰任務】
+${taskEn || ''}
+${taskZh ? `\n${taskZh}` : ''}
+
+【學生答案】
+${studentAnswer}
+
+請給予督導回饋。`;
+
+  const result = await requestDeepSeekJSON(
+    L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT,
+    userContent,
+    4096,
+    'challenge',
+    { subjectId: subject.id }
+  );
+
+  const feedback_zh = String(result.feedback_zh || '').trim();
+  const feedback_en = String(result.feedback_en || '').trim();
+
+  if (!feedback_zh && !feedback_en) {
+    throw new Error('AI 回傳資料不完整，缺少督導回饋。');
+  }
+
+  return {
+    feedback_zh: feedback_zh || feedback_en,
+    feedback_en
   };
 }
 
@@ -1843,6 +1928,7 @@ window.generateSimulatedLiteratureAPI = generateSimulatedLiteratureAPI;
 window.expandLiteratureFromAbstractAPI = expandLiteratureFromAbstractAPI;
 window.buildExpandLiteratureSystemPrompt = buildExpandLiteratureSystemPrompt;
 window.generateCaseNoteReading = generateCaseNoteReading;
+window.getL3SupervisionFeedbackAPI = getL3SupervisionFeedbackAPI;
 window.generateWritingPromptsAPI = generateWritingPromptsAPI;
 window.generateNewVocabAPI = generateNewVocabAPI;
 window.generateLiteratureTagsAPI = generateLiteratureTagsAPI;

@@ -4,7 +4,7 @@
  * 職責：
  * 1. L1：社工小故事 + 懸停關鍵字翻譯
  * 2. L2：OpenAlex 真實摘要（背景）→ DeepSeek IMRaD 無縫擴寫 → AI 模擬文獻
- * 3. L3：依科目生成個案紀錄 + 是非題即時核對
+ * 3. L3：依科目生成個案故事 + 臨床實務挑戰（開放式督導回饋）
  * 4. 管理難度切換、Loading 與錯誤提示
  */
 
@@ -15,11 +15,11 @@
 /** 目前閱讀難度：'l1' | 'l2' | 'l3' */
 let currentReadingLevel = 'l1';
 
-/** L3 是非題正確答案（布林）；尚未生成時為 null */
-let l3CorrectAnswer = null;
-
-/** L3 是否已作答 */
-let l3Answered = false;
+/**
+ * 目前 L3 臨床挑戰資料（供督導回饋打包）
+ * @type {{case_note_en: string, case_note_zh: string, task_type: string, task_en: string, task_zh: string}|null}
+ */
+let l3CurrentChallenge = null;
 
 /** L2 推薦標籤是否正在載入（避免重複請求） */
 let suggestedTagsLoading = false;
@@ -1241,8 +1241,15 @@ async function handleGenerateLiterature() {
 }
 
 /* ============================================================
-   L3：個案紀錄與是非題
+   L3：個案故事與臨床實務挑戰
    ============================================================ */
+
+/** @type {Record<string, string>} */
+const L3_TASK_TYPE_LABELS = {
+  soap: 'SOAP 紀錄撰寫',
+  theory_ethics: '理論與倫理批判',
+  key_dialogue: '關鍵對話回應'
+};
 
 /**
  * 重置 L3 結果區
@@ -1251,12 +1258,15 @@ function resetL3ReadingArea() {
   const loading = document.getElementById('l3-reading-loading');
   const display = document.getElementById('l3-reading-display');
   const errorEl = document.getElementById('l3-reading-error');
-  const feedback = document.getElementById('l3-tf-feedback');
-  const trueBtn = document.getElementById('btn-l3-true');
-  const falseBtn = document.getElementById('btn-l3-false');
+  const answerInput = document.getElementById('l3-answer-input');
+  const submitBtn = document.getElementById('btn-l3-submit-supervisor');
+  const supervLoading = document.getElementById('l3-supervision-loading');
+  const feedbackBox = document.getElementById('l3-supervision-feedback');
+  const feedbackZh = document.getElementById('l3-feedback-zh');
+  const feedbackEn = document.getElementById('l3-feedback-en');
+  const typeBadge = document.getElementById('l3-task-type-badge');
 
-  l3CorrectAnswer = null;
-  l3Answered = false;
+  l3CurrentChallenge = null;
 
   if (loading) loading.classList.add('hidden');
   if (display) display.classList.add('hidden');
@@ -1264,17 +1274,21 @@ function resetL3ReadingArea() {
     errorEl.classList.add('hidden');
     errorEl.textContent = '';
   }
-  if (feedback) {
-    feedback.className = 'l3-tf-feedback hidden';
-    feedback.textContent = '';
+  if (answerInput) {
+    answerInput.value = '';
+    answerInput.disabled = false;
   }
-  if (trueBtn) {
-    trueBtn.disabled = false;
-    trueBtn.classList.remove('is-correct', 'is-wrong');
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '送出給督導 (Submit to Supervisor)';
   }
-  if (falseBtn) {
-    falseBtn.disabled = false;
-    falseBtn.classList.remove('is-correct', 'is-wrong');
+  if (supervLoading) supervLoading.classList.add('hidden');
+  if (feedbackBox) feedbackBox.classList.add('hidden');
+  if (feedbackZh) feedbackZh.textContent = '';
+  if (feedbackEn) feedbackEn.textContent = '';
+  if (typeBadge) {
+    typeBadge.classList.add('hidden');
+    typeBadge.textContent = '';
   }
 }
 
@@ -1290,8 +1304,8 @@ function showL3ReadingError(message) {
 }
 
 /**
- * 渲染 L3 個案紀錄與是非題
- * @param {{case_note_en: string, case_note_zh: string, question_en: string, question_zh: string, answer: boolean}} data
+ * 渲染 L3 個案故事與臨床挑戰
+ * @param {{case_note_en: string, case_note_zh: string, task_type?: string, task_en?: string, task_zh?: string, question_en?: string, question_zh?: string}} data
  */
 function renderL3CaseNote(data) {
   const display = document.getElementById('l3-reading-display');
@@ -1299,22 +1313,56 @@ function renderL3CaseNote(data) {
   const zhEl = document.getElementById('l3-case-zh');
   const qEn = document.getElementById('l3-question-en');
   const qZh = document.getElementById('l3-question-zh');
+  const typeBadge = document.getElementById('l3-task-type-badge');
+  const answerInput = document.getElementById('l3-answer-input');
+  const submitBtn = document.getElementById('btn-l3-submit-supervisor');
+  const feedbackBox = document.getElementById('l3-supervision-feedback');
 
   if (!display) return;
 
+  const taskEn = data.task_en || data.question_en || '';
+  const taskZh = data.task_zh || data.question_zh || '';
+  const taskType = data.task_type || '';
+
   if (enEl) enEl.textContent = data.case_note_en;
   if (zhEl) zhEl.textContent = data.case_note_zh;
-  if (qEn) qEn.textContent = data.question_en;
-  if (qZh) qZh.textContent = data.question_zh;
+  if (qEn) qEn.textContent = taskEn;
+  if (qZh) qZh.textContent = taskZh;
 
-  l3CorrectAnswer = data.answer;
-  l3Answered = false;
+  if (typeBadge) {
+    const label = L3_TASK_TYPE_LABELS[taskType];
+    if (label) {
+      typeBadge.textContent = label;
+      typeBadge.classList.remove('hidden');
+    } else {
+      typeBadge.textContent = '';
+      typeBadge.classList.add('hidden');
+    }
+  }
+
+  if (answerInput) {
+    answerInput.value = '';
+    answerInput.disabled = false;
+  }
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '送出給督導 (Submit to Supervisor)';
+  }
+  if (feedbackBox) feedbackBox.classList.add('hidden');
+
+  l3CurrentChallenge = {
+    case_note_en: data.case_note_en,
+    case_note_zh: data.case_note_zh,
+    task_type: taskType,
+    task_en: taskEn,
+    task_zh: taskZh
+  };
 
   display.classList.remove('hidden');
 }
 
 /**
- * 生成 L3 個案紀錄
+ * 生成 L3 個案故事與臨床挑戰
  */
 async function handleGenerateCaseNote() {
   const genBtn = document.getElementById('btn-l3-generate');
@@ -1341,48 +1389,90 @@ async function handleGenerateCaseNote() {
 
   } catch (error) {
     if (loading) loading.classList.add('hidden');
-    showL3ReadingError(error.message || '生成個案紀錄失敗，請稍後再試。');
+    showL3ReadingError(error.message || '生成臨床實務挑戰失敗，請稍後再試。');
 
   } finally {
     if (genBtn) {
       genBtn.disabled = false;
-      genBtn.textContent = '📝 生成個案紀錄任務';
+      genBtn.textContent = '📝 生成臨床實務挑戰';
     }
   }
 }
 
 /**
- * 處理 L3 是非題作答
- * @param {boolean} userAnswer
+ * 送出學生答案給督導，取得 AI 督導回饋
  */
-function handleL3TrueFalse(userAnswer) {
-  if (l3Answered || l3CorrectAnswer === null) return;
+async function handleL3SubmitToSupervisor() {
+  if (!l3CurrentChallenge) {
+    showL3ReadingError('請先生成臨床實務挑戰。');
+    return;
+  }
 
-  l3Answered = true;
-  const isCorrect = userAnswer === l3CorrectAnswer;
+  const answerInput = document.getElementById('l3-answer-input');
+  const submitBtn = document.getElementById('btn-l3-submit-supervisor');
+  const supervLoading = document.getElementById('l3-supervision-loading');
+  const feedbackBox = document.getElementById('l3-supervision-feedback');
+  const feedbackZh = document.getElementById('l3-feedback-zh');
+  const feedbackEn = document.getElementById('l3-feedback-en');
+  const errorEl = document.getElementById('l3-reading-error');
 
-  const trueBtn = document.getElementById('btn-l3-true');
-  const falseBtn = document.getElementById('btn-l3-false');
-  const feedback = document.getElementById('l3-tf-feedback');
+  const studentAnswer = answerInput ? answerInput.value.trim() : '';
+  if (!studentAnswer) {
+    showL3ReadingError('請先輸入你的答案再送出給督導。');
+    return;
+  }
 
-  if (trueBtn) trueBtn.disabled = true;
-  if (falseBtn) falseBtn.disabled = true;
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+  }
 
-  const chosenBtn = userAnswer ? trueBtn : falseBtn;
-  const correctBtn = l3CorrectAnswer ? trueBtn : falseBtn;
+  if (typeof getL3SupervisionFeedbackAPI !== 'function') {
+    showL3ReadingError('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
+    return;
+  }
 
-  if (correctBtn) correctBtn.classList.add('is-correct');
-  if (!isCorrect && chosenBtn) chosenBtn.classList.add('is-wrong');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '督導批改中...';
+  }
+  if (answerInput) answerInput.disabled = true;
+  if (feedbackBox) feedbackBox.classList.add('hidden');
+  if (supervLoading) supervLoading.classList.remove('hidden');
 
-  if (feedback) {
-    feedback.classList.remove('hidden');
-    if (isCorrect) {
-      feedback.className = 'l3-tf-feedback l3-tf-feedback--correct';
-      feedback.textContent = '✅ 正確！你理解了這段個案紀錄。';
-    } else {
-      feedback.className = 'l3-tf-feedback l3-tf-feedback--wrong';
-      feedback.textContent = `❌ 不正確。正確答案是 ${l3CorrectAnswer ? 'True' : 'False'}。`;
+  try {
+    const result = await getL3SupervisionFeedbackAPI({
+      caseNoteEn: l3CurrentChallenge.case_note_en,
+      caseNoteZh: l3CurrentChallenge.case_note_zh,
+      taskEn: l3CurrentChallenge.task_en,
+      taskZh: l3CurrentChallenge.task_zh,
+      taskType: l3CurrentChallenge.task_type,
+      studentAnswer
+    });
+
+    if (feedbackZh) feedbackZh.textContent = result.feedback_zh || '';
+    if (feedbackEn) {
+      feedbackEn.textContent = result.feedback_en || '';
+      feedbackEn.classList.toggle('hidden', !result.feedback_en);
     }
+    if (feedbackBox) feedbackBox.classList.remove('hidden');
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '再次請督導批改';
+    }
+    if (answerInput) answerInput.disabled = false;
+
+  } catch (error) {
+    showL3ReadingError(error.message || '取得督導回饋失敗，請稍後再試。');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送出給督導 (Submit to Supervisor)';
+    }
+    if (answerInput) answerInput.disabled = false;
+
+  } finally {
+    if (supervLoading) supervLoading.classList.add('hidden');
   }
 }
 
@@ -1800,17 +1890,13 @@ function initReadingModule() {
 
   // --- L3 ---
   const l3GenBtn = document.getElementById('btn-l3-generate');
-  const l3TrueBtn = document.getElementById('btn-l3-true');
-  const l3FalseBtn = document.getElementById('btn-l3-false');
+  const l3SubmitBtn = document.getElementById('btn-l3-submit-supervisor');
 
   if (l3GenBtn) {
     l3GenBtn.addEventListener('click', handleGenerateCaseNote);
   }
-  if (l3TrueBtn) {
-    l3TrueBtn.addEventListener('click', () => handleL3TrueFalse(true));
-  }
-  if (l3FalseBtn) {
-    l3FalseBtn.addEventListener('click', () => handleL3TrueFalse(false));
+  if (l3SubmitBtn) {
+    l3SubmitBtn.addEventListener('click', handleL3SubmitToSupervisor);
   }
 
   // 預設顯示 L1
