@@ -118,16 +118,35 @@ function escapeRegExp(text) {
  * @returns {string} 含 .hover-word 的 HTML 字串
  */
 function wrapKeywordsWithHover(storyEn, keywords) {
-  const sorted = [...keywords].sort((a, b) => b.word.length - a.word.length);
+  const cleaned = (Array.isArray(keywords) ? keywords : [])
+    .map((item) => {
+      const word = String(item?.word || item?.term || '').trim();
+      const zh = String(item?.zh || '').trim();
+      if (!word || !zh) return null;
+      return { word, zh };
+    })
+    .filter(Boolean);
+
+  // 長詞優先，避免短詞先吃掉片語（如 family 蓋過 family of origin）
+  const sorted = [...cleaned].sort((a, b) => b.word.length - a.word.length);
 
   let html = escapeHtml(storyEn);
   const placeholders = [];
 
   for (const { word, zh } of sorted) {
-    const pattern = escapeRegExp(escapeHtml(word));
-    const regex = new RegExp(`\\b(${pattern})\\b`, 'gi');
+    const escaped = escapeRegExp(escapeHtml(word));
+    // 多詞片語：允許中間空白彈性匹配
+    const isPhrase = /\s/.test(word);
+    const pattern = isPhrase
+      ? escaped.replace(/\\\s+/g, '\\s+').replace(/\s+/g, '\\s+')
+      : escaped;
+    const regex = isPhrase
+      ? new RegExp(`(${pattern})`, 'gi')
+      : new RegExp(`\\b(${pattern})\\b`, 'gi');
 
     html = html.replace(regex, (match) => {
+      // 已在 placeholder 標記內則略過（避免重疊）
+      if (match.includes('\uE000')) return match;
       const index = placeholders.length;
       const safeZh = escapeHtml(zh);
       placeholders.push(
