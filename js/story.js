@@ -11,12 +11,88 @@
 /** @type {Object|null} 目前畫面上的互動文章 */
 let currentPracticeArticle = null;
 
+/** localStorage：藍色單字密度（0–100） */
+const STORAGE_KEY_VOCAB_DENSITY = 'sw_vocab_highlight_density';
+
+/** 預設密度 */
+const DEFAULT_VOCAB_DENSITY = 70;
+
 /**
  * @param {string} id
  * @returns {HTMLElement|null}
  */
 function practice$(id) {
   return document.getElementById(id);
+}
+
+/**
+ * 讀取藍色單字密度（0–100）
+ * @returns {number}
+ */
+function getVocabHighlightDensity() {
+  const raw = Number(localStorage.getItem(STORAGE_KEY_VOCAB_DENSITY));
+  if (!Number.isFinite(raw)) return DEFAULT_VOCAB_DENSITY;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+/**
+ * 寫入藍色單字密度
+ * @param {number} pct
+ * @returns {number}
+ */
+function setVocabHighlightDensity(pct) {
+  const next = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  localStorage.setItem(STORAGE_KEY_VOCAB_DENSITY, String(next));
+  if (typeof window.__swNotifyDataChanged === 'function') {
+    window.__swNotifyDataChanged(STORAGE_KEY_VOCAB_DENSITY);
+  }
+  return next;
+}
+
+/**
+ * 依密度挑選要標藍的關鍵字（長詞優先；100% = 全部）
+ * @param {Array<{word: string, zh: string}>} keywords
+ * @param {number} [densityPct]
+ * @returns {Array<{word: string, zh: string}>}
+ */
+function selectKeywordsByDensity(keywords, densityPct) {
+  const list = Array.isArray(keywords) ? keywords : [];
+  const pct = Math.max(
+    0,
+    Math.min(100, Number(densityPct ?? getVocabHighlightDensity()) || 0)
+  );
+  if (pct <= 0 || list.length === 0) return [];
+  if (pct >= 100) return list;
+
+  const sorted = [...list].sort((a, b) => b.word.length - a.word.length);
+  const count = Math.max(1, Math.ceil((sorted.length * pct) / 100));
+  return sorted.slice(0, count);
+}
+
+/**
+ * 同步密度滑桿 UI 文案
+ * @param {number} [pct]
+ */
+function syncVocabDensityUi(pct) {
+  const value = pct != null ? pct : getVocabHighlightDensity();
+  const range = practice$('vocab-density-range');
+  const label = practice$('vocab-density-value');
+  if (range && String(range.value) !== String(value)) {
+    range.value = String(value);
+  }
+  if (label) label.textContent = `${value}%`;
+}
+
+/**
+ * 密度變更：即時重渲目前文章（不重打生成 API）
+ * @param {number} pct
+ */
+function applyVocabDensityAndRerender(pct) {
+  const next = setVocabHighlightDensity(pct);
+  syncVocabDensityUi(next);
+  if (currentPracticeArticle && isInteractivePracticeArticle(currentPracticeArticle)) {
+    renderPracticeArticle(currentPracticeArticle, null, { skipScroll: true });
+  }
 }
 
 /**
@@ -445,8 +521,9 @@ function renderPracticeVocabulary(vocabulary) {
  * 渲染完整互動文章（主畫面或文章庫共用）
  * @param {Object} article
  * @param {HTMLElement} [targetRoot]
+ * @param {{skipScroll?: boolean}} [options]
  */
-function renderPracticeArticle(article, targetRoot) {
+function renderPracticeArticle(article, targetRoot, options) {
   const root = targetRoot || practice$('practice-article-root');
   const placeholder = practice$('practice-placeholder');
   if (!root || !article || !isInteractivePracticeArticle(article)) return;
@@ -509,7 +586,8 @@ function renderPracticeArticle(article, targetRoot) {
     pack.appendChild(saveWrap);
   }
 
-  const keywords = normalizePracticeKeywords(article.vocabulary);
+  const allKeywords = normalizePracticeKeywords(article.vocabulary);
+  const keywords = selectKeywordsByDensity(allKeywords, getVocabHighlightDensity());
   const chunksWrap = document.createElement('div');
   chunksWrap.className = 'practice-chunks';
   article.content_chunks.forEach((chunk, i) => {
@@ -551,7 +629,9 @@ function renderPracticeArticle(article, targetRoot) {
 
   if (!targetRoot) {
     syncPracticeSaveButton();
-    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!options?.skipScroll) {
+      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }
 
@@ -616,6 +696,17 @@ function initCasePracticeModule() {
   practice$('btn-generate-literature-track')?.addEventListener('click', () => {
     handleGeneratePracticeTrack('literature');
   });
+
+  const densityRange = practice$('vocab-density-range');
+  if (densityRange) {
+    const initial = getVocabHighlightDensity();
+    densityRange.value = String(initial);
+    syncVocabDensityUi(initial);
+    densityRange.addEventListener('input', () => {
+      applyVocabDensityAndRerender(Number(densityRange.value));
+    });
+  }
+
   resetPracticeDisplay();
 }
 
@@ -624,3 +715,5 @@ window.buildPracticeArticleContext = buildPracticeArticleContext;
 window.renderPracticeArticle = renderPracticeArticle;
 window.initCasePracticeModule = initCasePracticeModule;
 window.getCurrentPracticeArticle = () => currentPracticeArticle;
+window.getVocabHighlightDensity = getVocabHighlightDensity;
+window.selectKeywordsByDensity = selectKeywordsByDensity;

@@ -429,6 +429,25 @@
                 📄 生成模擬學術文獻
               </button>
             </div>
+
+            <div class="vocab-density-control" aria-label="藍色單字密度">
+              <div class="vocab-density-header">
+                <label class="label-text" for="vocab-density-range">藍色單字密度</label>
+                <span id="vocab-density-value" class="vocab-density-value">70%</span>
+              </div>
+              <input
+                id="vocab-density-range"
+                class="vocab-density-range"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value="70"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+              <p class="vocab-density-hint hint-text">0% 不標藍字；100% 標出單字表全部可匹配詞（含片語）</p>
+            </div>
           </div>
 
           <div class="layout-right">
@@ -1036,13 +1055,13 @@
     })();
   </script>
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=30"></script>
+  <script src="js/deepseek.js?v=31"></script>
   <script src="js/task-ui.js?v=3"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
   <script src="js/reading.js?v=27"></script>
-  <script src="js/story.js?v=6"></script>
+  <script src="js/story.js?v=7"></script>
   <script src="js/article-library.js?v=16"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>

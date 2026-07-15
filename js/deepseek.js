@@ -2073,9 +2073,9 @@ const INTERACTIVE_PRACTICE_JSON_CONTRACT = `
 硬性規則：
 1. content_chunks 必須剛好 3 或 4 段；每一段都要有完整 inline_quiz。
 2. inline_quiz.options 必須剛好 4 個字串；correct_answer 用 "A"|"B"|"C"|"D"（對應 options 第 1–4 項）。
-3. vocabulary 必須提供 12–18 個進階專有名詞／片語（含多詞片語，如 "family of origin", "identified patient"）。
+3. vocabulary 必須提供足夠的進階專有名詞／片語（數量以 user 訊息指定為準，通常約 6–24；含多詞片語，如 "family of origin", "identified patient"）。
    - 每一個 term 都必須「原樣出現」在至少一段 paragraph_en 中（大小寫可不同），以便前端標成藍色可懸停翻譯。
-   - 請從全文均勻挑選，避免只列 2–3 個；涵蓋理論概念、臨床用語與研究方法／評估工具詞。
+   - 請從全文均勻挑選；涵蓋理論概念、臨床用語與研究方法／評估工具詞。密度高時寧可多列文中實詞，勿只給少數幾個。
 4. writing_tasks.l1_cloze 的 sentence_en_template 必須含 _______；answer 為應填單字（可為片語）。
 5. explanation 與 task_instruction 必須結合已注入的科目理論知識庫，禁止空泛套話。
 6. 中文須為自然繁體、避免翻譯腔。`;
@@ -2215,6 +2215,22 @@ function normalizeInteractivePracticeArticle(result, track) {
 }
 
 /**
+ * 依目前藍色單字密度推算 vocabulary 建議數量（約 6–24）
+ * @returns {{min: number, max: number, density: number}}
+ */
+function resolveVocabCountByDensity() {
+  const density =
+    typeof getVocabHighlightDensity === 'function'
+      ? getVocabHighlightDensity()
+      : 70;
+  const pct = Math.max(0, Math.min(100, Number(density) || 70));
+  // 0% 仍請模型給一組完整單字表（供底部列表）；標藍由前端密度控制
+  const max = Math.max(8, Math.round(8 + (pct / 100) * 16)); // 8–24
+  const min = Math.max(6, Math.round(max * 0.75));
+  return { min, max, density: pct };
+}
+
+/**
  * Phase 11.8：生成互動社工小故事（段落測驗 + 寫作題）
  * @returns {Promise<Object>}
  */
@@ -2224,12 +2240,13 @@ async function generateInteractiveStoryAPI() {
   const theme = themes[Math.floor(Math.random() * themes.length)];
   const taskType =
     normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story';
+  const { min, max, density } = resolveVocabCountByDensity();
 
   const userContent =
     `請為科目「${subject.name}」生成一篇互動社工小故事教材。` +
     `\n主題方向：${theme}` +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
-    `\nvocabulary 請列出 12–18 個文中實際出現的專有名詞／片語（含多詞），供藍色懸停翻譯使用。`;
+    `\n目前使用者設定藍色單字密度約 ${density}%，vocabulary 請列出 ${min}–${max} 個文中實際出現的專有名詞／片語（含多詞），供藍色懸停翻譯使用。`;
 
   const result = await requestDeepSeekJSON(
     INTERACTIVE_STORY_SYSTEM_PROMPT,
@@ -2260,11 +2277,13 @@ async function generateInteractiveLiteratureAPI() {
         .join('；')
     : '';
 
+  const { min, max, density } = resolveVocabCountByDensity();
+
   const userContent =
     `請為科目「${subject.name}」生成一篇互動模擬學術文獻教材。` +
     (theoryHint ? `\n理論焦點：${theoryHint}` : '') +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
-    `\nvocabulary 請列出 12–18 個文中實際出現的專有名詞／片語（含多詞，如 genogram、differentiation、identified patient），供藍色懸停翻譯使用。` +
+    `\n目前使用者設定藍色單字密度約 ${density}%，vocabulary 請列出 ${min}–${max} 個文中實際出現的專有名詞／片語（含多詞，如 genogram、differentiation、identified patient），供藍色懸停翻譯使用。` +
     `\n文體須像教學用模擬論文／理論短文，並在適處加學術免責意識（不必另開欄位）。`;
 
   const result = await requestDeepSeekJSON(

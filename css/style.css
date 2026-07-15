@@ -4969,6 +4969,46 @@ body {
   width: 100%;
 }
 
+.vocab-density-control {
+  margin-top: 14px;
+  padding: 12px 12px 10px;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 10px;
+  background: #FAFAFA;
+}
+
+.vocab-density-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vocab-density-header .label-text {
+  margin: 0;
+}
+
+.vocab-density-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2563EB;
+  min-width: 3ch;
+  text-align: right;
+}
+
+.vocab-density-range {
+  width: 100%;
+  accent-color: #2563EB;
+  cursor: pointer;
+}
+
+.vocab-density-hint {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .practice-article-root {
   display: flex;
   flex-direction: column;
