@@ -194,19 +194,42 @@ function isInlineQuizCorrect(userLetter, quiz) {
 }
 
 /**
+ * 將 vocabulary 正規化為 wrapKeywordsWithHover 可用格式
+ * @param {Array} vocabulary
+ * @returns {Array<{word: string, zh: string}>}
+ */
+function normalizePracticeKeywords(vocabulary) {
+  return (Array.isArray(vocabulary) ? vocabulary : [])
+    .map((v) => {
+      const word = String((v && (v.term || v.word)) || '').trim();
+      const zh = String((v && v.zh) || '').trim();
+      if (!word || !zh) return null;
+      return { word, zh };
+    })
+    .filter(Boolean);
+}
+
+/**
  * 渲染單一段落 + 穿插選擇題
  * @param {Object} chunk
  * @param {number} index
+ * @param {Array<{word: string, zh: string}>} [keywords]
  * @returns {HTMLElement}
  */
-function renderPracticeChunk(chunk, index) {
+function renderPracticeChunk(chunk, index, keywords) {
   const section = document.createElement('section');
   section.className = 'practice-chunk';
   section.dataset.chunkIndex = String(index);
 
   const en = document.createElement('p');
   en.className = 'practice-chunk-en';
-  en.textContent = chunk.paragraph_en || '';
+  const paragraphEn = String(chunk.paragraph_en || '');
+  const kw = Array.isArray(keywords) ? keywords : [];
+  if (kw.length > 0 && typeof wrapKeywordsWithHover === 'function') {
+    en.innerHTML = wrapKeywordsWithHover(paragraphEn, kw);
+  } else {
+    en.textContent = paragraphEn;
+  }
   section.appendChild(en);
 
   const zhToggle = document.createElement('button');
@@ -486,19 +509,39 @@ function renderPracticeArticle(article, targetRoot) {
     pack.appendChild(saveWrap);
   }
 
-  const vocabEl = renderPracticeVocabulary(article.vocabulary);
-  if (vocabEl) pack.appendChild(vocabEl);
-
+  const keywords = normalizePracticeKeywords(article.vocabulary);
   const chunksWrap = document.createElement('div');
   chunksWrap.className = 'practice-chunks';
   article.content_chunks.forEach((chunk, i) => {
-    chunksWrap.appendChild(renderPracticeChunk(chunk, i));
+    chunksWrap.appendChild(renderPracticeChunk(chunk, i, keywords));
   });
+  // 觸控裝置：點擊藍色關鍵字顯示中文
+  chunksWrap.addEventListener(
+    'click',
+    typeof handleHoverWordTap === 'function'
+      ? handleHoverWordTap
+      : (event) => {
+          const wordEl = event.target.closest('.hover-word');
+          if (!wordEl || !chunksWrap.contains(wordEl)) return;
+          const wasActive = wordEl.classList.contains('is-active');
+          chunksWrap.querySelectorAll('.hover-word.is-active').forEach((el) => {
+            el.classList.remove('is-active');
+          });
+          if (!wasActive) wordEl.classList.add('is-active');
+        }
+  );
   pack.appendChild(chunksWrap);
 
   const writingMount = document.createElement('div');
   writingMount.className = 'progressive-writing-mount';
   pack.appendChild(writingMount);
+
+  // 重點單字表置於最下方（寫作區之後）
+  const vocabEl = renderPracticeVocabulary(article.vocabulary);
+  if (vocabEl) {
+    vocabEl.classList.add('practice-vocab--bottom');
+    pack.appendChild(vocabEl);
+  }
 
   root.appendChild(pack);
 

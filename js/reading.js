@@ -666,16 +666,23 @@ function handleToggleTranslation() {
 }
 
 /**
- * 手機點擊關鍵字時切換 Tooltip
+ * 手機點擊關鍵字時切換 Tooltip（支援 #story-en 與 .practice-chunks）
  * @param {MouseEvent|TouchEvent} event
  */
 function handleHoverWordTap(event) {
   const wordEl = event.target.closest('.hover-word');
-  const storyEn = document.getElementById('story-en');
-  if (!storyEn) return;
+  const scope =
+    (wordEl &&
+      (wordEl.closest('.practice-chunks') ||
+        wordEl.closest('#story-en') ||
+        wordEl.closest('.practice-article-pack'))) ||
+    document.getElementById('story-en') ||
+    event.currentTarget;
 
-  if (!wordEl) {
-    storyEn.querySelectorAll('.hover-word.is-active').forEach((el) => {
+  if (!scope || typeof scope.querySelectorAll !== 'function') return;
+
+  if (!wordEl || !scope.contains(wordEl)) {
+    scope.querySelectorAll('.hover-word.is-active').forEach((el) => {
       el.classList.remove('is-active');
     });
     return;
@@ -685,7 +692,7 @@ function handleHoverWordTap(event) {
 
   const wasActive = wordEl.classList.contains('is-active');
 
-  storyEn.querySelectorAll('.hover-word.is-active').forEach((el) => {
+  scope.querySelectorAll('.hover-word.is-active').forEach((el) => {
     el.classList.remove('is-active');
   });
 
@@ -2095,3 +2102,5 @@ window.invalidateSuggestedTags = invalidateSuggestedTags;
 window.getSavedArticles = getSavedArticles;
 window.saveArticleToLibrary = saveArticleToLibrary;
 window.createLiteratureVocabSection = createLiteratureVocabSection;
+window.wrapKeywordsWithHover = wrapKeywordsWithHover;
+window.handleHoverWordTap = handleHoverWordTap;

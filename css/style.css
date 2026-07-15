@@ -2079,9 +2079,9 @@ body {
 /* ---------- 懸停翻譯關鍵字 ---------- */
 .hover-word {
   position: relative;
-  color: var(--text-primary);
+  color: #2563EB;
   font-weight: 600;
-  border-bottom: 1.5px dotted #9CA3AF;
+  border-bottom: 1.5px dotted #60A5FA;
   cursor: help;
   /* 觸控時避免長按選取干擾 Tooltip */
   -webkit-tap-highlight-color: transparent;
@@ -5142,5 +5142,11 @@ body {
 .literature-vocab-pos {
   color: #9CA3AF;
   font-size: 0.85em;
+}
+
+.practice-vocab--bottom {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #E5E7EB);
 }
 
