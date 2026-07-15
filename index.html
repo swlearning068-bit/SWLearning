@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=36">
+  <link rel="stylesheet" href="css/style.css?v=37">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -505,19 +505,19 @@
 
           </div><!-- /#reading-l1-panel -->
 
-          <!-- ---------- L2：學術文獻簡化（控制區） ---------- -->
+          <!-- ---------- L2：學術文獻無縫擴寫（控制區） ---------- -->
           <div id="reading-l2-panel" class="reading-level-panel hidden" data-reading-panel="l2">
 
-            <h2 class="section-title">L2 學術文獻 — 搜尋與簡化</h2>
-            <p class="section-desc">輸入關鍵字後，可搜尋 OpenAlex 真實論文，或由 AI 依目前科目生成模擬文獻摘要，再改寫成學習用短文並抽出生字。</p>
+            <h2 class="section-title">L2 學術文獻 — AI 模擬擴寫</h2>
+            <p class="section-desc">輸入關鍵字（可選）後點擊生成：系統會在背景從 OpenAlex 擷取真實摘要，再以 AI 擴寫成約 800 字的 IMRaD 模擬文獻。畫面上只顯示擴寫結果與學術免責聲明，不會直接顯示真實摘要。</p>
 
             <div class="input-area">
-              <label class="label-text" for="l2-keyword-input">搜尋關鍵字：</label>
+              <label class="label-text" for="l2-keyword-input">搜尋關鍵字（可選）：</label>
               <input
                 id="l2-keyword-input"
                 class="l2-keyword-input"
                 type="text"
-                placeholder="例如：attachment theory"
+                placeholder="例如：attachment theory（空白則依目前科目搜尋）"
                 autocomplete="off"
               >
             </div>
@@ -538,11 +538,8 @@
             </div>
 
             <div class="l2-action-buttons">
-              <button id="btn-l2-search" class="btn btn-primary" type="button">
-                🔍 搜尋真實文獻
-              </button>
-              <button id="btn-generate-simulated" class="btn btn-secondary" type="button">
-                ✨ AI 生成模擬文獻
+              <button id="btn-generate-literature" class="btn btn-primary" type="button">
+                📄 生成 AI 模擬文獻
               </button>
             </div>
 
@@ -616,7 +613,7 @@
           <div class="reading-results-panel hidden" data-reading-panel="l2">
             <div class="layout-placeholder" aria-hidden="true">
               <p class="layout-placeholder-title">文獻結果區</p>
-              <p class="layout-placeholder-desc">搜尋或生成文獻後，簡化摘要與生字會顯示在這裡。</p>
+              <p class="layout-placeholder-desc">生成後，AI 擴寫的模擬文獻與生字會顯示在這裡。</p>
             </div>
 
             <div id="l2-reading-loading" class="skeleton-card hidden" aria-live="polite">
@@ -624,7 +621,7 @@
               <div class="skeleton-line skeleton-line--long"></div>
               <div class="skeleton-line skeleton-line--medium"></div>
               <div class="skeleton-line skeleton-line--long"></div>
-              <p class="loading-text">正在從 OpenAlex 搜尋真實文獻...</p>
+              <p class="loading-text">正在擷取真實摘要並擴寫模擬文獻...</p>
             </div>
 
             <!-- 文獻簡化結果（由 reading.js 動態填入） -->
@@ -1256,11 +1253,11 @@
     })();
   </script>
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=25"></script>
+  <script src="js/deepseek.js?v=26"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
-  <script src="js/literature.js?v=10"></script>
-  <script src="js/reading.js?v=20"></script>
+  <script src="js/literature.js?v=11"></script>
+  <script src="js/reading.js?v=21"></script>
   <script src="js/article-library.js?v=12"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>

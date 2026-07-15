@@ -3,7 +3,7 @@
  *
  * 職責：
  * 1. L1：社工小故事 + 懸停關鍵字翻譯
- * 2. L2：OpenAlex 真實文獻搜尋／AI 模擬文獻 → DeepSeek 簡化 → 生字加入學習
+ * 2. L2：OpenAlex 真實摘要（背景）→ DeepSeek IMRaD 無縫擴寫 → AI 模擬文獻
  * 3. L3：依科目生成個案紀錄 + 是非題即時核對
  * 4. 管理難度切換、Loading 與錯誤提示
  */
@@ -985,7 +985,7 @@ function createSimulatedLiteratureCard(data) {
   const pack = document.createElement('article');
   pack.className = 'sim-lit-pack';
 
-  if (data.notice) {
+  if (data.notice && !data.skipNoticeDisplay) {
     const noticeEl = document.createElement('p');
     noticeEl.className = 'literature-notice';
     noticeEl.textContent = data.notice;
@@ -1060,7 +1060,7 @@ function createSimulatedLiteratureCard(data) {
 
   pack.appendChild(
     createToggleableSection({
-      heading: '📄 學術摘要 (Theory & Abstract)',
+      heading: '📄 學術正文 (IMRaD)',
       enText: data.simplified_article,
       zhText: data.article_zh,
       variant: 'theory'
@@ -1091,202 +1091,92 @@ function createSimulatedLiteratureCard(data) {
 }
 
 /**
- * 渲染 OpenAlex 搜尋結果列表，供使用者選擇要簡化的論文
- * @param {Array<{id: string, title: string, abstract: string, year: number|null}>} papers
+ * 學術免責聲明 HTML（Phase 11.4：強制置於文章頂部）
+ * @returns {string}
  */
-function renderOpenAlexPaperList(papers) {
+function getAcademicDisclaimerHTML() {
+  return `
+<div class="academic-disclaimer" style="background-color: #FDF2F8; color: #BE185D; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 20px; border-left: 4px solid #BE185D;">
+    <strong>⚠️ AI 模擬文獻聲明：</strong><br>
+    本文獻係以真實學術摘要為基礎，由 AI 擴寫而成之模擬教材（包含虛構之研究數據）。僅供英文閱讀訓練使用，請勿引用於真實學術研究。
+</div>`;
+}
+
+/**
+ * 渲染擴寫後的 AI 模擬文獻（含強制免責聲明；不顯示真實摘要）
+ * @param {Object} aiResponse - DeepSeek 擴寫結果
+ * @param {{title?: string, doi?: string, doiUrl?: string, year?: number|null}|null} [realArticle]
+ */
+function renderArticle(aiResponse, realArticle) {
   const results = document.getElementById('l2-reading-results');
-  if (!results) return;
+  if (!results || !aiResponse) return;
 
-  results.innerHTML = '';
+  const subjectName =
+    typeof window.getCurrentSubjectName === 'function'
+      ? window.getCurrentSubjectName()
+      : typeof resolveCurrentSubject === 'function'
+        ? resolveCurrentSubject().name
+        : '社會工作';
 
-  const heading = document.createElement('p');
-  heading.className = 'literature-list-heading';
-  heading.textContent = `找到 ${papers.length} 篇含摘要的論文，請選擇一篇進行簡化：`;
-  results.appendChild(heading);
+  results.innerHTML = getAcademicDisclaimerHTML();
 
-  papers.forEach((paper, index) => {
-    const card = document.createElement('article');
-    card.className = 'literature-pick-card';
-
-    const titleEl = document.createElement('h3');
-    titleEl.className = 'literature-title';
-    titleEl.textContent = paper.year
-      ? `${paper.title}（${paper.year}）`
-      : paper.title;
-    card.appendChild(titleEl);
-
-    const preview = document.createElement('p');
-    preview.className = 'literature-abstract-preview';
-    const abs = paper.abstract || '';
-    preview.textContent = abs.length > 220 ? `${abs.slice(0, 220)}…` : abs;
-    card.appendChild(preview);
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-primary';
-    btn.textContent = '✨ 簡化此篇文獻';
-    btn.addEventListener('click', () => {
-      handleSimplifySelectedPaper(paper);
-    });
-    card.appendChild(btn);
-
-    // 第一篇標示建議
-    if (index === 0) {
-      const tip = document.createElement('p');
-      tip.className = 'literature-pick-tip';
-      tip.textContent = '來源：OpenAlex 真實文獻';
-      card.insertBefore(tip, titleEl);
-    }
-
-    results.appendChild(card);
+  const card = createSimulatedLiteratureCard({
+    original_title: aiResponse.original_title,
+    simplified_article:
+      aiResponse.simplified_article || aiResponse.simplified_en || '',
+    article_zh:
+      aiResponse.article_zh ||
+      aiResponse.translation_zh ||
+      aiResponse.chinese_translation ||
+      '',
+    case_scenario_en: aiResponse.case_scenario_en || '',
+    case_scenario_zh: aiResponse.case_scenario_zh || '',
+    practical_application_en: aiResponse.practical_application_en || '',
+    practical_application_zh: aiResponse.practical_application_zh || '',
+    vocab: aiResponse.vocab,
+    key_vocabulary: aiResponse.key_vocabulary,
+    subjectName,
+    // 收藏用備註；畫面頂部已有 academic-disclaimer，故不重複顯示
+    notice:
+      '⚠️ AI 模擬文獻：以真實摘要為基礎擴寫（含虛構數據），僅供英文閱讀訓練，請勿學術引用。',
+    skipNoticeDisplay: true
   });
+
+  results.appendChild(card);
+
+  // 可選：僅顯示 DOI 連結作為靈感來源（仍不顯示真實摘要）
+  if (realArticle && (realArticle.doiUrl || realArticle.doi)) {
+    const doiNote = document.createElement('p');
+    doiNote.className = 'literature-doi-note';
+    const href =
+      realArticle.doiUrl ||
+      `https://doi.org/${String(realArticle.doi).replace(/^https?:\/\/doi\.org\//i, '')}`;
+    const label = realArticle.doi || href;
+    doiNote.innerHTML =
+      `靈感來源 DOI：<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>` +
+      '（正文為 AI 擴寫模擬教材，請勿作為學術引用）';
+    results.appendChild(doiNote);
+  }
 
   results.classList.remove('hidden');
 }
 
 /**
- * 將選中的真實論文交給 DeepSeek 簡化並渲染結果卡
- * @param {{title: string, abstract: string}} paper
+ * L2：無縫擴寫主流程
+ * OpenAlex 真實摘要（背景）→ DeepSeek IMRaD 擴寫 → 只顯示 AI 模擬文獻
  */
-async function handleSimplifySelectedPaper(paper) {
-  const searchBtn = document.getElementById('btn-l2-search');
-  const simulateBtn = document.getElementById('btn-generate-simulated');
-  const loading = document.getElementById('l2-reading-loading');
-  const results = document.getElementById('l2-reading-results');
-  const loadingText = loading ? loading.querySelector('.loading-text') : null;
-  const errorEl = document.getElementById('l2-reading-error');
-
-  if (errorEl) {
-    errorEl.classList.add('hidden');
-    errorEl.textContent = '';
-  }
-
-  if (results) results.classList.add('hidden');
-  if (loading) loading.classList.remove('hidden');
-  if (loadingText) loadingText.textContent = '正在以 AI 簡化文獻摘要...';
-
-  if (searchBtn) {
-    searchBtn.disabled = true;
-    searchBtn.textContent = '簡化中...';
-  }
-  if (simulateBtn) simulateBtn.disabled = true;
-
-  // 簡化過程中暫時鎖住結果區按鈕（已隱藏）
-  try {
-    if (typeof simplifyAbstractAPI !== 'function') {
-      throw new Error('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
-    }
-
-    const simplified = await simplifyAbstractAPI(paper.title, paper.abstract);
-
-    if (loading) loading.classList.add('hidden');
-
-    if (results) {
-      results.innerHTML = '';
-      results.appendChild(
-        createLiteratureCard({
-          title: paper.title,
-          simplified_en: simplified.simplified_en,
-          translation_zh: simplified.translation_zh,
-          vocab: simplified.vocab,
-          source: 'openalex',
-          notice: '📚 來源：OpenAlex 真實學術文獻（經 AI 改寫為學習用短文）'
-        })
-      );
-      results.classList.remove('hidden');
-    }
-  } catch (error) {
-    if (loading) loading.classList.add('hidden');
-    showL2ReadingError(error.message || '文獻簡化失敗，請稍後再試。');
-  } finally {
-    if (searchBtn) {
-      searchBtn.disabled = false;
-      searchBtn.textContent = '🔍 搜尋真實文獻';
-    }
-    if (simulateBtn) simulateBtn.disabled = false;
-  }
-}
-
-/**
- * L2：以 OpenAlex 搜尋真實文獻，再交由使用者選擇並簡化
- */
-async function handleL2SearchLiterature() {
+async function handleGenerateLiterature() {
   const input = document.getElementById('l2-keyword-input');
-  const searchBtn = document.getElementById('btn-l2-search');
-  const simulateBtn = document.getElementById('btn-generate-simulated');
+  const generateBtn = document.getElementById('btn-generate-literature');
   const loading = document.getElementById('l2-reading-loading');
-  const results = document.getElementById('l2-reading-results');
   const loadingText = loading ? loading.querySelector('.loading-text') : null;
 
   const keyword = input ? input.value.trim() : '';
-  if (!keyword) {
-    showL2ReadingError('請先輸入關鍵字（建議英文，例如 attachment theory）。');
-    return;
-  }
-
-  resetL2ReadingArea();
-
-  if (loading) loading.classList.remove('hidden');
-  if (loadingText) loadingText.textContent = '正在從 OpenAlex 搜尋真實文獻...';
-
-  if (searchBtn) {
-    searchBtn.disabled = true;
-    searchBtn.textContent = '搜尋中...';
-  }
-  if (simulateBtn) simulateBtn.disabled = true;
-
-  try {
-    if (typeof searchOpenAlex !== 'function') {
-      throw new Error('文獻模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
-    }
-
-    const papers = await searchOpenAlex(keyword, 5);
-
-    if (loading) loading.classList.add('hidden');
-    renderOpenAlexPaperList(papers);
-
-  } catch (error) {
-    if (loading) loading.classList.add('hidden');
-    showL2ReadingError(error.message || '文獻搜尋失敗，請稍後再試。');
-
-  } finally {
-    if (searchBtn) {
-      searchBtn.disabled = false;
-      searchBtn.textContent = '🔍 搜尋真實文獻';
-    }
-    if (simulateBtn) simulateBtn.disabled = false;
-  }
-}
-
-/**
- * L2：由 AI 依關鍵字與目前科目生成模擬文獻，並直接渲染簡化結果
- */
-async function handleGenerateSimulatedLiterature() {
-  const input = document.getElementById('l2-keyword-input');
-  const searchBtn = document.getElementById('btn-l2-search');
-  const simulateBtn = document.getElementById('btn-generate-simulated');
-  const loading = document.getElementById('l2-reading-loading');
-  const results = document.getElementById('l2-reading-results');
-  const loadingText = loading ? loading.querySelector('.loading-text') : null;
-
-  const keyword = input ? input.value.trim() : '';
-  if (!keyword) {
-    showL2ReadingError('請先輸入關鍵字（例如 attachment theory 或 依附理論）。');
-    return;
-  }
-
-  const subjectName =
-    typeof window.getCurrentSubjectName === 'function'
-      ? window.getCurrentSubjectName()
-      : (typeof resolveCurrentSubject === 'function'
-          ? resolveCurrentSubject().name
-          : '社會工作');
 
   const currentSubjectId =
     typeof resolveCurrentSubject === 'function'
       ? resolveCurrentSubject().id
-      : (typeof normalizeSubjectId === 'function'
+      : typeof normalizeSubjectId === 'function'
         ? normalizeSubjectId(
             localStorage.getItem(
               typeof STORAGE_KEY_SUBJECT === 'string'
@@ -1294,61 +1184,59 @@ async function handleGenerateSimulatedLiterature() {
                 : 'swlearning_current_subject'
             ) || ''
           )
-        : null);
+        : null;
 
   resetL2ReadingArea();
 
   if (loading) loading.classList.remove('hidden');
-  if (loadingText) loadingText.textContent = '正在生成理論摘要、情境案例與實踐應用...';
-
-  if (simulateBtn) {
-    simulateBtn.disabled = true;
-    simulateBtn.textContent = '生成中...';
+  if (loadingText) {
+    loadingText.textContent = '正在擷取真實摘要，並擴寫為 AI 模擬文獻...';
   }
-  if (searchBtn) searchBtn.disabled = true;
+
+  if (generateBtn) {
+    generateBtn.disabled = true;
+    generateBtn.textContent = '生成中...';
+  }
 
   try {
-    if (typeof generateSimulatedLiteratureAPI !== 'function') {
+    if (typeof fetchOpenAlexArticle !== 'function') {
+      throw new Error('文獻模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
+    }
+    if (typeof expandLiteratureFromAbstractAPI !== 'function') {
       throw new Error('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
     }
 
-    const data = await generateSimulatedLiteratureAPI(
-      keyword,
-      subjectName,
-      'literature',
-      currentSubjectId
+    // 1) 背景抓取真實文獻（含標題、摘要、DOI）——不直接顯示
+    if (loadingText) {
+      loadingText.textContent = '正在從 OpenAlex 擷取真實摘要...';
+    }
+    const realArticle = await fetchOpenAlexArticle(currentSubjectId, keyword);
+    if (!realArticle || !realArticle.abstract) {
+      throw new Error('無法獲取真實文獻摘要，請重試。');
+    }
+
+    // 2) 以真實摘要為種子，呼叫 DeepSeek 進行 IMRaD 擴寫（literature → Pro + 知識注入）
+    if (loadingText) {
+      loadingText.textContent = '正在以 AI 擴寫約 800 字模擬文獻...';
+    }
+    const aiResponse = await expandLiteratureFromAbstractAPI(
+      realArticle.title,
+      realArticle.abstract,
+      currentSubjectId,
+      'literature'
     );
 
+    // 3) 只渲染擴寫結果 + 免責聲明
     if (loading) loading.classList.add('hidden');
-
-    if (results) {
-      results.innerHTML = '';
-      results.appendChild(
-        createSimulatedLiteratureCard({
-          original_title: data.original_title,
-          simplified_article: data.simplified_article || data.simplified_en,
-          article_zh: data.article_zh || data.translation_zh || data.chinese_translation,
-          case_scenario_en: data.case_scenario_en,
-          case_scenario_zh: data.case_scenario_zh,
-          practical_application_en: data.practical_application_en,
-          practical_application_zh: data.practical_application_zh,
-          vocab: data.vocab,
-          key_vocabulary: data.key_vocabulary,
-          subjectName,
-          notice: '✨ 來源：AI 模擬教材（理論＋虛構情境＋實踐手法，非真實論文）'
-        })
-      );
-      results.classList.remove('hidden');
-    }
+    renderArticle(aiResponse, realArticle);
   } catch (error) {
     if (loading) loading.classList.add('hidden');
-    showL2ReadingError(error.message || '模擬文獻生成失敗，請稍後再試。');
+    showL2ReadingError(error.message || '文獻生成失敗，請稍後再試。');
   } finally {
-    if (simulateBtn) {
-      simulateBtn.disabled = false;
-      simulateBtn.textContent = '✨ AI 生成模擬文獻';
+    if (generateBtn) {
+      generateBtn.disabled = false;
+      generateBtn.textContent = '📄 生成 AI 模擬文獻';
     }
-    if (searchBtn) searchBtn.disabled = false;
   }
 }
 
@@ -1878,25 +1766,20 @@ function initReadingModule() {
   });
 
   // --- L2 ---
-  const l2SearchBtn = document.getElementById('btn-l2-search');
-  const l2SimulateBtn = document.getElementById('btn-generate-simulated');
+  const l2GenerateBtn = document.getElementById('btn-generate-literature');
   const l2Input = document.getElementById('l2-keyword-input');
   const tagsContainer = document.getElementById('suggested-tags-container');
   const shuffleTagsBtn = document.getElementById('btn-shuffle-tags');
 
-  if (l2SearchBtn) {
-    l2SearchBtn.addEventListener('click', handleL2SearchLiterature);
-  }
-
-  if (l2SimulateBtn) {
-    l2SimulateBtn.addEventListener('click', handleGenerateSimulatedLiterature);
+  if (l2GenerateBtn) {
+    l2GenerateBtn.addEventListener('click', handleGenerateLiterature);
   }
 
   if (l2Input) {
     l2Input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        handleL2SearchLiterature();
+        handleGenerateLiterature();
       }
     });
   }

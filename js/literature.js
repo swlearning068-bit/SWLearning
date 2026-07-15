@@ -67,7 +67,7 @@ function isCorsOrNetworkError(error) {
  *
  * @param {string} keyword - 搜尋關鍵字（建議英文，例如 "attachment theory"）
  * @param {number} [perPage=5] - 回傳筆數（1–25）
- * @returns {Promise<Array<{id: string, title: string, abstract: string, year: number|null, source: string}>>}
+ * @returns {Promise<Array<{id: string, title: string, abstract: string, year: number|null, doi: string, doiUrl: string, source: string}>>}
  */
 async function searchOpenAlex(keyword, perPage = 5) {
   const query = String(keyword || '').trim();
@@ -127,11 +127,23 @@ async function searchOpenAlex(keyword, perPage = 5) {
         ? work.publication_year
         : null;
 
+      const rawDoi = work.doi ? String(work.doi).trim() : '';
+      const doiUrl = rawDoi
+        ? rawDoi.startsWith('http')
+          ? rawDoi
+          : `https://doi.org/${rawDoi.replace(/^doi:/i, '')}`
+        : '';
+      const doi = doiUrl
+        ? doiUrl.replace(/^https?:\/\/doi\.org\//i, '')
+        : '';
+
       return {
         id,
         title,
         abstract,
         year,
+        doi,
+        doiUrl,
         source: 'openalex'
       };
     })
@@ -146,6 +158,50 @@ async function searchOpenAlex(keyword, perPage = 5) {
   return papers;
 }
 
+/**
+ * 依科目（與可選關鍵字）從 OpenAlex 取得「一篇」含摘要的真實文獻
+ * 供 L2「無縫擴寫」流程在背景使用；回傳結果不應直接呈現給使用者。
+ *
+ * @param {string|null} [subjectId] - 目前科目 ID（用於組搜尋詞）
+ * @param {string} [keyword=''] - 使用者輸入的關鍵字；空則以科目名稱搜尋
+ * @returns {Promise<{id: string, title: string, abstract: string, year: number|null, doi: string, doiUrl: string, source: string}>}
+ */
+async function fetchOpenAlexArticle(subjectId, keyword = '') {
+  let query = String(keyword || '').trim();
+
+  if (!query) {
+    let subjectName = '';
+    if (typeof resolveCurrentSubject === 'function') {
+      const subject = resolveCurrentSubject();
+      subjectName = subject && subject.name ? String(subject.name).trim() : '';
+    }
+    // 無關鍵字時：以科目名 + social work 提高命中率
+    query = subjectName
+      ? `${subjectName} social work`
+      : 'social work practice';
+
+    // subjectId 僅作日誌／除錯參考（實際搜尋靠關鍵字／科目名）
+    if (subjectId) {
+      console.log(
+        `[OpenAlex] fetchOpenAlexArticle subjectId=${subjectId}, query="${query}"`
+      );
+    }
+  }
+
+  const papers = await searchOpenAlex(query, 5);
+  const candidates = papers.filter((p) => p && p.abstract);
+  if (candidates.length === 0) {
+    throw new Error('無法獲取真實文獻摘要，請重試。');
+  }
+
+  // 在前幾篇中隨機選一篇，避免每次都拿到同一篇
+  const poolSize = Math.min(candidates.length, 3);
+  const pick = candidates[Math.floor(Math.random() * poolSize)];
+
+  return pick;
+}
+
 window.reconstructAbstractFromInvertedIndex = reconstructAbstractFromInvertedIndex;
 window.searchOpenAlex = searchOpenAlex;
+window.fetchOpenAlexArticle = fetchOpenAlexArticle;
 window.isCorsOrNetworkError = isCorsOrNetworkError;

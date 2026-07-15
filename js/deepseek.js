@@ -1141,6 +1141,172 @@ async function generateSimulatedLiteratureAPI(
 }
 
 /**
+ * L2 無縫擴寫：以真實摘要為種子，擴寫成約 800 字 IMRaD 模擬文獻
+ * （Phase 11.3 中文翻譯規範 + Phase 11.4 混合模式）
+ */
+function buildExpandLiteratureSystemPrompt(subjectName) {
+  const safeSubject = String(subjectName || '').trim() || '社會工作';
+
+  return `你是一位香港社工系教授，同時擅長學術英文寫作教學。使用者正在學習科目「${safeSubject}」。
+我會提供一篇「真實學術論文」的標題與摘要。請以其核心概念為種子，擴寫成一份供英文閱讀訓練用的「AI 模擬文獻」。
+
+【擴寫要求】
+1. 英文正文約 800 字，嚴格採 IMRaD 結構書寫，並以清楚小標標示：
+   - Introduction
+   - Methods
+   - Results
+   - Discussion
+2. Methods / Results 可虛構合理的研究設計與數據（樣本數、量表、統計結果等），但語氣須像正式學術論文。
+3. 難度控制在高中至大學一年級可讀範圍，保留社工專業詞彙。
+4. 內容必須嚴格服務於科目「${safeSubject}」；若該科為社會工作倫理與價值，討論核心須呈現倫理兩難與道德抉擇。
+5. ⚠️ 絕對不可包含任何真實人物的個人資料；案例與數據皆須為虛構。
+6. 另外撰寫簡短的「情境案例」與「實踐應用」，方便社工學生連結前線實務。
+
+請強制以 JSON 格式回傳：
+{
+  "original_title": "模擬文獻標題（英文，可微調原標題使其適合作為教材）",
+  "simplified_article": "約 800 字的英文 IMRaD 正文（含 Introduction/Methods/Results/Discussion 小標）",
+  "article_zh": "高質量的繁體中文意譯，嚴禁生硬直譯與翻譯腔，需符合香港社工中文實務書寫習慣。",
+  "case_scenario_en": "基於該研究主題的虛構社工情境案例（英文，約 80–120 字）",
+  "case_scenario_zh": "高質量的繁體中文意譯",
+  "practical_application_en": "社工在此情境下的具體介入／實踐手法（英文，約 80–120 字）",
+  "practical_application_zh": "高質量的繁體中文意譯",
+  "key_vocabulary": [{"term": "...", "pos": "...", "zh": "..."}]
+}
+
+【中文翻譯規範 (CRITICAL)】：
+article_zh、case_scenario_zh、practical_application_zh 欄位的翻譯必須徹底擺脫『翻譯腔 (Translationese)』，達到信、達、雅的要求。
+1. **意譯優於直譯**：請根據上下文的真實語境進行翻譯。例如 "competing values" 應譯為『互相衝突的價值觀』，而非『相競的價值』。
+2. **符合中文語法**：避免使用英文思維的『死物主詞』或『過度冗長的名詞片語』。例如不要寫『評估架構揭示了...』，請改為『社工透過評估架構發現...』。
+3. **香港實務口吻**：請使用香港社會工作者撰寫中文個案紀錄時自然、專業且流暢的語氣。文字應具備溫度與臨床嚴謹性。
+key_vocabulary 請提取 5 到 8 個重要專業生字。`;
+}
+
+/**
+ * 將真實摘要無縫擴寫為 AI 模擬文獻（IMRaD ≈ 800 字）
+ *
+ * @param {string} title - 真實論文標題
+ * @param {string} abstract - 真實論文摘要（僅作 Prompt 種子，不直接顯示）
+ * @param {string|null} [subjectId=null] - 科目 ID；供理論知識注入
+ * @param {string} [taskType='literature'] - 模型路由（預設 Pro）
+ * @returns {Promise<{
+ *   original_title: string,
+ *   simplified_article: string,
+ *   article_zh: string,
+ *   case_scenario_en: string,
+ *   case_scenario_zh: string,
+ *   practical_application_en: string,
+ *   practical_application_zh: string,
+ *   key_vocabulary: Array<{term: string, pos: string, zh: string}>,
+ *   simplified_en: string,
+ *   translation_zh: string,
+ *   vocab: Array<{word: string, zh: string, pos: string}>
+ * }>}
+ */
+async function expandLiteratureFromAbstractAPI(
+  title,
+  abstract,
+  subjectId = null,
+  taskType = 'literature'
+) {
+  const safeTitle = String(title || '').trim();
+  const safeAbstract = String(abstract || '').trim();
+
+  if (!safeTitle || !safeAbstract) {
+    throw new Error('論文標題或摘要為空，無法進行擴寫。');
+  }
+
+  const current = resolveCurrentSubject();
+  const resolvedSubjectId = subjectId
+    ? normalizeSubjectId(subjectId)
+    : current.id;
+  const subjectName = current.name || '社會工作';
+
+  const systemPrompt = buildExpandLiteratureSystemPrompt(subjectName);
+  const userContent =
+    `科目：${subjectName}\n` +
+    `真實論文標題：${safeTitle}\n\n` +
+    `真實論文摘要（請以此為種子擴寫，勿原樣照抄）：\n${safeAbstract}\n\n` +
+    `請依 IMRaD 結構擴寫成約 800 字的 AI 模擬文獻，並附情境案例、實踐應用與生字。`;
+
+  // 800 字英文 + 中譯 + 情境／實踐：需要較大 token 預算
+  const result = await requestDeepSeekJSON(
+    systemPrompt,
+    userContent,
+    4500,
+    taskType || 'literature',
+    { subjectId: resolvedSubjectId }
+  );
+
+  const {
+    original_title,
+    simplified_article,
+    article_zh,
+    case_scenario_en,
+    case_scenario_zh,
+    practical_application_en,
+    practical_application_zh,
+    key_vocabulary,
+    chinese_translation
+  } = result;
+
+  const articleZh = String(article_zh || chinese_translation || '').trim();
+
+  if (
+    !original_title ||
+    !simplified_article ||
+    !articleZh ||
+    !case_scenario_en ||
+    !case_scenario_zh ||
+    !practical_application_en ||
+    !practical_application_zh ||
+    !Array.isArray(key_vocabulary)
+  ) {
+    throw new Error('AI 回傳資料不完整，缺少擴寫正文、情境案例、實踐應用或生字。');
+  }
+
+  const validVocab = key_vocabulary
+    .filter(
+      (item) =>
+        item &&
+        typeof item.term === 'string' &&
+        typeof item.zh === 'string' &&
+        item.term.trim() &&
+        item.zh.trim()
+    )
+    .slice(0, 8)
+    .map((item) => ({
+      term: item.term.trim(),
+      word: item.term.trim(),
+      zh: item.zh.trim(),
+      pos:
+        typeof item.pos === 'string' && item.pos.trim()
+          ? item.pos.trim()
+          : ''
+    }));
+
+  if (validVocab.length === 0) {
+    throw new Error('AI 回傳的生字格式無效，請再試一次。');
+  }
+
+  const simplifiedArticle = String(simplified_article).trim();
+
+  return {
+    original_title: String(original_title).trim(),
+    simplified_article: simplifiedArticle,
+    article_zh: articleZh,
+    case_scenario_en: String(case_scenario_en).trim(),
+    case_scenario_zh: String(case_scenario_zh).trim(),
+    practical_application_en: String(practical_application_en).trim(),
+    practical_application_zh: String(practical_application_zh).trim(),
+    key_vocabulary: validVocab.map(({ term, pos, zh }) => ({ term, pos, zh })),
+    simplified_en: simplifiedArticle,
+    translation_zh: articleZh,
+    vocab: validVocab.map(({ word, pos, zh }) => ({ word, pos, zh }))
+  };
+}
+
+/**
  * L3 閱讀：依當前科目生成個案紀錄 + 是非題
  */
 const CASE_NOTE_READING_SYSTEM_PROMPT = `請根據當前選擇的社工科目，生成一篇約 150 字的專業個案紀錄 (Case Note)，英文難度適合社工學生。
@@ -1674,6 +1840,8 @@ window.callL2WritingAPI = callL2WritingAPI;
 window.callL3WritingAPI = callL3WritingAPI;
 window.simplifyAbstractAPI = simplifyAbstractAPI;
 window.generateSimulatedLiteratureAPI = generateSimulatedLiteratureAPI;
+window.expandLiteratureFromAbstractAPI = expandLiteratureFromAbstractAPI;
+window.buildExpandLiteratureSystemPrompt = buildExpandLiteratureSystemPrompt;
 window.generateCaseNoteReading = generateCaseNoteReading;
 window.generateWritingPromptsAPI = generateWritingPromptsAPI;
 window.generateNewVocabAPI = generateNewVocabAPI;
