@@ -1340,10 +1340,11 @@ const CASE_NOTE_READING_SYSTEM_PROMPT = `你是一位香港資深社會工作督
 }
 task_type 必須是 "soap"、"theory_ethics" 或 "key_dialogue" 其中之一。`;
 
-/** L3 督導回饋 System Prompt（分欄 O/A/I + 詞彙修正） */
-const L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT = `你是一位香港資深社會工作督導。學生剛以 Observation／Assessment／Intervention 三欄完成臨床實務紀錄表。
+/** L3 督導回饋 System Prompt（分欄 O/A/I + 詞彙修正；與 task-ui Submit 路徑對齊） */
+const L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT = `你是一位社工督導，請針對學生撰寫的實務紀錄給予回饋，重點修正其英文文法與學術用詞，並給出臨床建議。
 
-請根據「個案文章、任務題目／引導、學生三欄答案 JSON」，分別對三個欄位給予評語，並重點加強英文學術詞彙的修正建議 (Vocab Correction)。
+學生以 Observation／Assessment／Intervention 三欄完成臨床實務紀錄表。
+請根據「個案文章（背景 Context）、任務提示、學生三欄英文答案」給予回饋。
 
 回饋重點：
 1. 對 Observation／Assessment／Intervention 各自評語：肯定可取之處，指出盲點、風險、倫理或理論應用不足。
@@ -1521,11 +1522,12 @@ ${answersJson}
 
 請分別對 Observation／Assessment／Intervention 給予評語，並提供 Vocab Correction。`;
 
+  // Phase 11.7：寫作批改走 standard（與 task-ui Submit 一致）；文章生成才用 challenge
   const result = await requestDeepSeekJSON(
     L3_SUPERVISION_FEEDBACK_SYSTEM_PROMPT,
     userContent,
     4096,
-    'challenge',
+    'standard',
     { subjectId: subject.id }
   );
 

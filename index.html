@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=39">
+  <link rel="stylesheet" href="css/style.css?v=40">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -656,6 +656,13 @@
                 <p id="l3-case-zh" class="l3-case-zh"></p>
               </div>
 
+              <!-- 收藏至文章庫（含 task_instruction，供免 AI 再次練習） -->
+              <div class="save-story-wrap save-case-note-wrap">
+                <button id="btn-save-case-note" class="save-story-btn btn btn-primary" type="button">
+                  ⭐ 收藏文章
+                </button>
+              </div>
+
               <div class="l3-challenge-task">
                 <div class="l3-challenge-header">
                   <span class="result-label">Clinical Challenge — 臨床實務挑戰</span>
@@ -931,11 +938,11 @@
     >
 
       <h2 class="section-title">📚 文章庫</h2>
-      <p class="section-desc">統一管理已收藏的學術文獻與社工小故事。左側分類瀏覽，右側閱讀學習（填空挑戰不消耗 API）。</p>
+      <p class="section-desc">統一管理已收藏的學術文獻、社工小故事與臨床挑戰。左側分類瀏覽；臨床文章可免 AI 再次寫作練習（僅 Submit 批改時呼叫 API）。</p>
 
       <p id="article-library-empty" class="library-empty hidden">
         尚未收藏任何文章。<br>
-        請先到「閱讀練習」生成 L1 小故事或 L2 文獻後，點「收藏至文章庫」。
+        請先到「閱讀練習」生成文章後，點「收藏至文章庫／收藏文章」。
       </p>
 
       <div class="layout-container">
@@ -944,6 +951,7 @@
             <button class="filter-chip active" type="button" data-type="all" aria-pressed="true">🗂️ 全部</button>
             <button class="filter-chip" type="button" data-type="literature" aria-pressed="false">📄 學術文獻</button>
             <button class="filter-chip" type="button" data-type="story" aria-pressed="false">📖 社工故事</button>
+            <button class="filter-chip" type="button" data-type="case_note" aria-pressed="false">📝 臨床挑戰</button>
           </div>
           <div id="library-articles-list" class="library-list list-container" aria-live="polite"></div>
         </div>
@@ -1308,13 +1316,13 @@
     })();
   </script>
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=27"></script>
-  <script src="js/task-ui.js?v=1"></script>
+  <script src="js/deepseek.js?v=28"></script>
+  <script src="js/task-ui.js?v=2"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
-  <script src="js/reading.js?v=22"></script>
-  <script src="js/article-library.js?v=12"></script>
+  <script src="js/reading.js?v=23"></script>
+  <script src="js/article-library.js?v=13"></script>
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>

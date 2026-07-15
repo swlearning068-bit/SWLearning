@@ -3737,6 +3737,11 @@ body {
   color: #4B5563;
 }
 
+.article-type-badge--case-note {
+  background-color: #E0F2FE;
+  color: #0369A1;
+}
+
 .article-type-badge--story {
   background-color: #F3F4F6;
   color: #374151;
@@ -3745,6 +3750,12 @@ body {
 .article-type-badge--literature {
   background-color: #111827;
   color: #FFFFFF;
+}
+
+.library-clinical-practice {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
 }
 
 #article-library-section .library-item,

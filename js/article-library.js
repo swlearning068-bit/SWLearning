@@ -1,18 +1,19 @@
 /**
- * article-library.js — 模組 8.5：統一文章庫（文獻 + 社工小故事）
+ * article-library.js — 模組 8.5：統一文章庫（文獻 + 社工小故事 + 臨床挑戰）
  *
  * 職責：
  * 1. 讀取 localStorage「sw_saved_articles」並依 type 過濾列表
  * 2. 依文章 type 動態渲染右側詳情（文獻含填空挑戰；故事含翻譯與生字）
- * 3. 保留純前端、零 Token 的翻譯切換與克漏字填空
+ * 3. case_note：免 AI 渲染文章＋寫作表單（task_instruction 來自收藏）
+ * 4. 保留純前端、零 Token 的翻譯切換與克漏字填空
  *
- * 依賴：reading.js（getSavedArticles／遷移邏輯）
+ * 依賴：reading.js（getSavedArticles／遷移邏輯）、task-ui.js（寫作表單）
  */
 
 /** localStorage 鍵名（與 reading.js 共用） */
 const ARTICLE_LIBRARY_STORAGE_KEY = 'sw_saved_articles';
 
-/** @type {'all'|'literature'|'story'} 目前過濾類型 */
+/** @type {'all'|'literature'|'story'|'case_note'} 目前過濾類型 */
 let articleFilterType = 'all';
 
 /** 目前展開中的文章 id；無則為 null */
@@ -99,13 +100,36 @@ function extractArticleVocabTerms(vocab) {
  */
 function getArticleListTitle(item) {
   if (!item) return '（無標題）';
-  if (item.type === 'story') {
+  if (item.type === 'story' || item.type === 'case_note') {
     if (item.title) return String(item.title);
-    const text = String(item.story_en || '').replace(/\s+/g, ' ').trim();
-    if (!text) return '（無標題故事）';
+    const text = String(
+      item.type === 'case_note'
+        ? item.article_en || item.case_note_en || ''
+        : item.story_en || ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) {
+      return item.type === 'case_note' ? '（無標題臨床挑戰）' : '（無標題故事）';
+    }
     return text.length > 42 ? `${text.slice(0, 42)}…` : text;
   }
   return item.original_title || '（無標題）';
+}
+
+/**
+ * 文章類型徽章文案與 CSS modifier
+ * @param {Object} item
+ * @returns {{label: string, modifier: string}}
+ */
+function getArticleTypeBadgeMeta(item) {
+  if (item?.type === 'story') {
+    return { label: '故事', modifier: 'article-type-badge--story' };
+  }
+  if (item?.type === 'case_note') {
+    return { label: '臨床', modifier: 'article-type-badge--case-note' };
+  }
+  return { label: '文獻', modifier: 'article-type-badge--literature' };
 }
 
 /**
@@ -168,7 +192,7 @@ function buildArticleClozeHtml(text, terms) {
 
 /**
  * 同步 filter-chip 的 active 樣式
- * @param {'all'|'literature'|'story'} filterType
+ * @param {'all'|'literature'|'story'|'case_note'} filterType
  */
 function syncArticleFilterChips(filterType) {
   const chips = document.querySelectorAll('#article-library-section .filter-chip');
@@ -201,7 +225,7 @@ function handleArticleFilterClick(event) {
 
 /**
  * 渲染左側文章列表
- * @param {'all'|'literature'|'story'} [filterType='all']
+ * @param {'all'|'literature'|'story'|'case_note'} [filterType='all']
  */
 function renderArticlesList(filterType = 'all') {
   const listEl = document.getElementById('library-articles-list');
@@ -240,10 +264,13 @@ function renderArticlesList(filterType = 'all') {
   if (filtered.length === 0) {
     const emptyFilter = document.createElement('p');
     emptyFilter.className = 'article-filter-empty text-gray';
+    const emptyMsgs = {
+      literature: '此分類尚無學術文獻。',
+      story: '此分類尚無社工故事。',
+      case_note: '此分類尚無臨床挑戰文章。'
+    };
     emptyFilter.textContent =
-      articleFilterType === 'literature'
-        ? '此分類尚無學術文獻。'
-        : '此分類尚無社工故事。';
+      emptyMsgs[articleFilterType] || '此分類尚無文章。';
     listEl.appendChild(emptyFilter);
     return;
   }
@@ -260,11 +287,10 @@ function renderArticlesList(filterType = 'all') {
     const topRow = document.createElement('div');
     topRow.className = 'article-item-top';
 
+    const badgeMeta = getArticleTypeBadgeMeta(item);
     const badge = document.createElement('span');
-    badge.className =
-      'article-type-badge' +
-      (item.type === 'story' ? ' article-type-badge--story' : ' article-type-badge--literature');
-    badge.textContent = item.type === 'story' ? '故事' : '文獻';
+    badge.className = `article-type-badge ${badgeMeta.modifier}`;
+    badge.textContent = badgeMeta.label;
     topRow.appendChild(badge);
 
     const titleSpan = document.createElement('span');
@@ -296,6 +322,7 @@ function renderArticlesList(filterType = 'all') {
       listEl.querySelectorAll('.library-item').forEach((el) => {
         el.classList.toggle('is-active', el.dataset.id === String(id));
       });
+      // 絕對不呼叫文章生成 API；僅從儲存庫渲染
       renderArticleDetail(item);
     };
 
@@ -660,7 +687,184 @@ function renderStoryArticleDetail(item, detailEl) {
 }
 
 /**
- * 依 type 分派詳情渲染
+ * 渲染臨床挑戰詳情（免 AI 生成文章；底部掛寫作表單供再次練習）
+ * @param {Object} item
+ * @param {HTMLElement} detailEl
+ */
+function renderCaseNoteArticleDetail(item, detailEl) {
+  clozeModeActive = false;
+  detailEl.innerHTML = '';
+
+  const articleEn = String(item.article_en || item.case_note_en || '').trim();
+  const articleZh = String(item.article_zh || item.case_note_zh || '').trim();
+  const taskInstruction =
+    typeof buildStoredTaskInstruction === 'function'
+      ? buildStoredTaskInstruction(item)
+      : String(
+          item.task_instruction ||
+            item.guidance_zh ||
+            item.task_zh ||
+            item.task_en ||
+            ''
+        ).trim();
+
+  const pack = document.createElement('article');
+  pack.className = 'library-detail-pack case-note-library-detail-pack';
+  pack.dataset.articleId = String(item.id);
+  pack.dataset.articleType = 'case_note';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'tts-title-row';
+
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'literature-title';
+  titleEl.textContent = getArticleListTitle(item);
+  titleRow.appendChild(titleEl);
+
+  if (typeof createArticleSpeakControls === 'function') {
+    titleRow.appendChild(createArticleSpeakControls(() => articleEn));
+  }
+  pack.appendChild(titleRow);
+
+  const metaEl = document.createElement('p');
+  metaEl.className = 'library-detail-meta';
+  metaEl.textContent = `📝 臨床挑戰｜科目：${item.subjectName || '未指定'}｜免 AI 再次練習`;
+  pack.appendChild(metaEl);
+
+  // 不掛「AI 深度挑戰」：開啟收藏文章時不得呼叫文章生成 API
+
+  const enBlock = document.createElement('div');
+  enBlock.className = 'story-en-block';
+  const enLabel = document.createElement('span');
+  enLabel.className = 'result-label';
+  enLabel.textContent = 'Case Note（英文）';
+  enBlock.appendChild(enLabel);
+  const enP = document.createElement('p');
+  enP.className = 'story-en l3-case-en';
+  enP.textContent = articleEn;
+  enBlock.appendChild(enP);
+  pack.appendChild(enBlock);
+
+  if (articleZh) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn btn-secondary story-library-zh-toggle';
+    toggleBtn.textContent = '👀 顯示完整翻譯';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    pack.appendChild(toggleBtn);
+
+    const zhBlock = document.createElement('div');
+    zhBlock.className = 'story-zh-block hidden';
+    const zhLabel = document.createElement('span');
+    zhLabel.className = 'result-label';
+    zhLabel.textContent = '中文翻譯';
+    zhBlock.appendChild(zhLabel);
+    const zhP = document.createElement('p');
+    zhP.className = 'story-zh l3-case-zh';
+    zhP.textContent = articleZh;
+    zhBlock.appendChild(zhP);
+    pack.appendChild(zhBlock);
+
+    toggleBtn.addEventListener('click', () => {
+      const willShow = zhBlock.classList.contains('hidden');
+      zhBlock.classList.toggle('hidden', !willShow);
+      toggleBtn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+      toggleBtn.textContent = willShow ? '🙈 隱藏完整翻譯' : '👀 顯示完整翻譯';
+    });
+  }
+
+  const vocabulary = Array.isArray(item.vocabulary)
+    ? item.vocabulary
+    : Array.isArray(item.keywords)
+      ? item.keywords
+      : [];
+
+  if (vocabulary.length > 0) {
+    const vocabWrap = document.createElement('div');
+    vocabWrap.className = 'literature-vocab story-library-vocab';
+    vocabWrap.innerHTML = '<span class="result-label">關鍵生字</span>';
+
+    const ul = document.createElement('ul');
+    ul.className = 'literature-vocab-list';
+
+    vocabulary.forEach((v) => {
+      const word = String((v && (v.word || v.term)) || '').trim();
+      if (!word) return;
+      const li = document.createElement('li');
+      li.className = 'literature-vocab-item';
+
+      const wordRow = document.createElement('div');
+      wordRow.className = 'literature-vocab-word-row';
+
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'literature-vocab-word';
+      wordSpan.textContent = word;
+      wordRow.appendChild(wordSpan);
+
+      if (typeof createVocabSpeakButton === 'function') {
+        wordRow.appendChild(createVocabSpeakButton(word));
+      }
+      li.appendChild(wordRow);
+
+      const zhSpan = document.createElement('span');
+      zhSpan.className = 'literature-vocab-zh';
+      zhSpan.textContent = (v && v.zh) || '';
+      li.appendChild(zhSpan);
+
+      ul.appendChild(li);
+    });
+
+    vocabWrap.appendChild(ul);
+    pack.appendChild(vocabWrap);
+  }
+
+  // 文章底部：Phase 11.6 臨床督導實務紀錄表（空白表單 + 已存 task_instruction）
+  if (typeof createClinicalTaskPracticeBlock === 'function') {
+    const subjectId =
+      (item.subjectId && String(item.subjectId).trim()) ||
+      resolveArticleSubjectId(item.subjectName) ||
+      null;
+
+    let knowledge = null;
+    if (typeof getSubjectKnowledge === 'function' && subjectId) {
+      knowledge = getSubjectKnowledge(subjectId);
+    }
+
+    const practiceBlock = createClinicalTaskPracticeBlock({
+      articleEn,
+      articleZh,
+      taskInstruction,
+      taskEn: item.task_en || '',
+      taskZh: item.task_zh || '',
+      guidanceZh: item.guidance_zh || taskInstruction,
+      taskType: item.task_type || '',
+      subjectId,
+      knowledge,
+      subjectName: item.subjectName || '',
+      onError: (message) => {
+        if (typeof showToast === 'function') {
+          showToast(`❌ ${message}`);
+        } else {
+          alert(message);
+        }
+      }
+    });
+    pack.appendChild(practiceBlock);
+  } else {
+    const fallback = document.createElement('p');
+    fallback.className = 'hint-text';
+    fallback.textContent =
+      '寫作表單模組尚未載入。請重新整理頁面後再試。任務提示：' +
+      (taskInstruction || '（無）');
+    pack.appendChild(fallback);
+  }
+
+  detailEl.appendChild(pack);
+  detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/**
+ * 依 type 分派詳情渲染（開啟收藏文章時一律離線渲染，不呼叫文章生成 API）
  * @param {Object} item
  */
 function renderArticleDetail(item) {
@@ -669,6 +873,11 @@ function renderArticleDetail(item) {
 
   if (item.type === 'story') {
     renderStoryArticleDetail(item, detailEl);
+    return;
+  }
+
+  if (item.type === 'case_note') {
+    renderCaseNoteArticleDetail(item, detailEl);
     return;
   }
 

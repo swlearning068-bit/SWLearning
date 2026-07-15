@@ -4,7 +4,8 @@
  * 職責：
  * 1. 管理表格化填寫 UI 與科目專屬 placeholder
  * 2. 注入／顯示 AI 客製化引導（#task-instruction）
- * 3. 打包三欄位為 JSON，並渲染督導分欄回饋＋詞彙修正
+ * 3. 「發送給督導 (Submit)」為寫作批改的唯一 API 觸發點
+ * 4. 提供文章庫免 AI 再練習用的表單區塊建立器
  */
 
 /* ============================================================
@@ -17,11 +18,45 @@ const CLINICAL_FIELD_IDS = {
   intervention: 'clinical-field-intervention'
 };
 
+const CLINICAL_FIELD_CLASSES = {
+  observation: 'clinical-field-observation',
+  assessment: 'clinical-field-assessment',
+  intervention: 'clinical-field-intervention'
+};
+
 const DEFAULT_PLACEHOLDERS = {
   observation: '案主的具體行為、語氣或環境細節為何？',
   assessment: '結合理論（如：三角關係／復元模式），你的專業評估是？',
   intervention: '你打算如何回應？請嘗試撰寫你的介入對話。'
 };
+
+/** 督導批改 System Prompt（Submit 唯一 API 路徑） */
+const CLINICAL_SUPERVISION_SYSTEM_PROMPT =
+  '你是一位社工督導，請針對學生撰寫的實務紀錄給予回饋，重點修正其英文文法與學術用詞，並給出臨床建議。\n\n' +
+  '學生以 Observation／Assessment／Intervention 三欄完成臨床實務紀錄表。' +
+  '請根據「個案文章（背景 Context）、任務提示、學生三欄英文答案」給予回饋。\n\n' +
+  '回饋重點：\n' +
+  '1. 對 Observation／Assessment／Intervention 各自評語：肯定可取之處，指出盲點、風險、倫理或理論應用不足。\n' +
+  '2. 重點修正英文文法與學術／社工用詞（Vocab Correction）。\n' +
+  '3. 給予可操作的臨床建議；Intervention 可附 1 句英文示範對話（若合適）。\n' +
+  '4. 語氣像督導面談：直接、具體、親切鼓勵；禁止只說「很好」或複述文章。\n\n' +
+  '請以 JSON 回傳：\n' +
+  '{\n' +
+  '  "feedback_zh": "繁體中文總評（約 80–160 字）",\n' +
+  '  "feedback_en": "Optional short English coaching note (2–4 sentences)",\n' +
+  '  "field_feedback": {\n' +
+  '    "observation": "對 Observation 的繁體中文評語",\n' +
+  '    "assessment": "對 Assessment 的繁體中文評語",\n' +
+  '    "intervention": "對 Intervention 的繁體中文評語"\n' +
+  '  },\n' +
+  '  "vocab_corrections": [\n' +
+  '    {\n' +
+  '      "original": "學生用詞或片語",\n' +
+  '      "suggestion": "更合適的學術／社工英文",\n' +
+  '      "note": "一句簡短說明（繁中或英皆可）"\n' +
+  '    }\n' +
+  '  ]\n' +
+  '}';
 
 /* ============================================================
    科目知識 → 提示詞
@@ -78,6 +113,26 @@ function buildFallbackGuidance(knowledge, subjectName) {
   return `請以 Observation → Assessment → Intervention 完成這份實務紀錄，並盡量連結「${focus}」。科目：${name}。`;
 }
 
+/**
+ * 組出收藏用的 task_instruction 字串
+ * @param {{
+ *   task_instruction?: string,
+ *   guidance_zh?: string,
+ *   task_zh?: string,
+ *   task_en?: string
+ * }} data
+ * @returns {string}
+ */
+function buildStoredTaskInstruction(data) {
+  return String(
+    data?.task_instruction ||
+      data?.guidance_zh ||
+      data?.task_zh ||
+      data?.task_en ||
+      ''
+  ).trim();
+}
+
 /* ============================================================
    DOM 操作
    ============================================================ */
@@ -91,11 +146,26 @@ function clinical$(id) {
 }
 
 /**
- * 將 AI／科目引導寫入 #task-instruction
- * @param {string} text
+ * 在 root 內查詢（無 root 則用 document）
+ * @param {ParentNode|null|undefined} root
+ * @param {string} selector
+ * @returns {Element|null}
  */
-function setTaskInstruction(text) {
-  const el = clinical$('task-instruction');
+function clinicalQuery(root, selector) {
+  const scope = root && typeof root.querySelector === 'function' ? root : document;
+  return scope.querySelector(selector);
+}
+
+/**
+ * 將 AI／科目引導寫入 #task-instruction（或 scoped .task-instruction）
+ * @param {string} text
+ * @param {ParentNode|null} [root]
+ */
+function setTaskInstruction(text, root) {
+  const el =
+    clinicalQuery(root, '#task-instruction') ||
+    clinicalQuery(root, '.task-instruction') ||
+    clinical$('task-instruction');
   if (!el) return;
   el.textContent = String(text || '').trim();
 }
@@ -103,24 +173,37 @@ function setTaskInstruction(text) {
 /**
  * 依科目知識更新三個 textarea 的 placeholder
  * @param {Object|null} knowledge
+ * @param {ParentNode|null} [root]
  */
-function applySubjectPlaceholders(knowledge) {
+function applySubjectPlaceholders(knowledge, root) {
   const placeholders = buildSubjectFieldPlaceholders(knowledge);
   Object.keys(CLINICAL_FIELD_IDS).forEach((key) => {
-    const el = clinical$(CLINICAL_FIELD_IDS[key]);
+    const el =
+      clinicalQuery(root, `#${CLINICAL_FIELD_IDS[key]}`) ||
+      clinicalQuery(root, `.${CLINICAL_FIELD_CLASSES[key]}`) ||
+      clinical$(CLINICAL_FIELD_IDS[key]);
     if (el) el.placeholder = placeholders[key];
   });
 }
 
 /**
- * 讀取表格三欄位（trim 後）
+ * 讀取表格三欄位（trim 後）；可指定 scoped root（文章庫動態表單）
+ * @param {ParentNode|null} [root]
  * @returns {{observation: string, assessment: string, intervention: string}}
  */
-function getClinicalTaskAnswers() {
+function getClinicalTaskAnswers(root) {
+  const readField = (key) => {
+    const el =
+      clinicalQuery(root, `#${CLINICAL_FIELD_IDS[key]}`) ||
+      clinicalQuery(root, `.${CLINICAL_FIELD_CLASSES[key]}`) ||
+      clinical$(CLINICAL_FIELD_IDS[key]);
+    return String(el?.value || '').trim();
+  };
+
   return {
-    observation: String(clinical$(CLINICAL_FIELD_IDS.observation)?.value || '').trim(),
-    assessment: String(clinical$(CLINICAL_FIELD_IDS.assessment)?.value || '').trim(),
-    intervention: String(clinical$(CLINICAL_FIELD_IDS.intervention)?.value || '').trim()
+    observation: readField('observation'),
+    assessment: readField('assessment'),
+    intervention: readField('intervention')
   };
 }
 
@@ -136,46 +219,66 @@ function isClinicalTaskEmpty(answers) {
 
 /**
  * 重置表格與回饋區
+ * @param {ParentNode|null} [root]
  */
-function resetClinicalTaskForm() {
-  Object.values(CLINICAL_FIELD_IDS).forEach((id) => {
-    const el = clinical$(id);
+function resetClinicalTaskForm(root) {
+  Object.keys(CLINICAL_FIELD_IDS).forEach((key) => {
+    const el =
+      clinicalQuery(root, `#${CLINICAL_FIELD_IDS[key]}`) ||
+      clinicalQuery(root, `.${CLINICAL_FIELD_CLASSES[key]}`) ||
+      clinical$(CLINICAL_FIELD_IDS[key]);
     if (el) {
       el.value = '';
       el.disabled = false;
     }
   });
 
-  const submitBtn = clinical$('btn-submit-task') || clinical$('btn-l3-submit-supervisor');
+  const submitBtn =
+    clinicalQuery(root, '#btn-submit-task') ||
+    clinicalQuery(root, '.btn-submit-clinical-task') ||
+    clinical$('btn-submit-task') ||
+    clinical$('btn-l3-submit-supervisor');
   if (submitBtn) {
     submitBtn.disabled = false;
     submitBtn.textContent = '發送給督導 (Submit)';
   }
 
-  setTaskInstruction('');
-  clearClinicalFeedback();
+  setTaskInstruction('', root);
+  clearClinicalFeedback(root);
 }
 
 /**
  * 啟用／停用表格欄位
  * @param {boolean} disabled
+ * @param {ParentNode|null} [root]
  */
-function setClinicalTaskFormDisabled(disabled) {
-  Object.values(CLINICAL_FIELD_IDS).forEach((id) => {
-    const el = clinical$(id);
+function setClinicalTaskFormDisabled(disabled, root) {
+  Object.keys(CLINICAL_FIELD_IDS).forEach((key) => {
+    const el =
+      clinicalQuery(root, `#${CLINICAL_FIELD_IDS[key]}`) ||
+      clinicalQuery(root, `.${CLINICAL_FIELD_CLASSES[key]}`) ||
+      clinical$(CLINICAL_FIELD_IDS[key]);
     if (el) el.disabled = Boolean(disabled);
   });
 }
 
 /**
  * 清空督導回饋渲染區
+ * @param {ParentNode|null} [root]
  */
-function clearClinicalFeedback() {
-  const box = clinical$('l3-supervision-feedback');
-  const zh = clinical$('l3-feedback-zh');
-  const en = clinical$('l3-feedback-en');
-  const fields = clinical$('l3-field-feedback');
-  const vocab = clinical$('l3-vocab-corrections');
+function clearClinicalFeedback(root) {
+  const box =
+    clinicalQuery(root, '.l3-supervision-feedback') ||
+    clinical$('l3-supervision-feedback');
+  const zh =
+    clinicalQuery(root, '.l3-feedback-zh') || clinical$('l3-feedback-zh');
+  const en =
+    clinicalQuery(root, '.l3-feedback-en') || clinical$('l3-feedback-en');
+  const fields =
+    clinicalQuery(root, '.l3-field-feedback') || clinical$('l3-field-feedback');
+  const vocab =
+    clinicalQuery(root, '.l3-vocab-corrections') ||
+    clinical$('l3-vocab-corrections');
 
   if (box) box.classList.add('hidden');
   if (zh) zh.textContent = '';
@@ -201,13 +304,21 @@ function clearClinicalFeedback() {
  *   field_feedback?: {observation?: string, assessment?: string, intervention?: string},
  *   vocab_corrections?: Array<{original?: string, suggestion?: string, note?: string}>
  * }} result
+ * @param {ParentNode|null} [root]
  */
-function renderStructuredSupervisionFeedback(result) {
-  const box = clinical$('l3-supervision-feedback');
-  const zh = clinical$('l3-feedback-zh');
-  const en = clinical$('l3-feedback-en');
-  const fieldsEl = clinical$('l3-field-feedback');
-  const vocabEl = clinical$('l3-vocab-corrections');
+function renderStructuredSupervisionFeedback(result, root) {
+  const box =
+    clinicalQuery(root, '.l3-supervision-feedback') ||
+    clinical$('l3-supervision-feedback');
+  const zh =
+    clinicalQuery(root, '.l3-feedback-zh') || clinical$('l3-feedback-zh');
+  const en =
+    clinicalQuery(root, '.l3-feedback-en') || clinical$('l3-feedback-en');
+  const fieldsEl =
+    clinicalQuery(root, '.l3-field-feedback') || clinical$('l3-field-feedback');
+  const vocabEl =
+    clinicalQuery(root, '.l3-vocab-corrections') ||
+    clinical$('l3-vocab-corrections');
 
   if (zh) zh.textContent = result?.feedback_zh || '';
   if (en) {
@@ -310,25 +421,349 @@ function escapeHtml(text) {
  *   guidance_zh?: string,
  *   task_zh?: string,
  *   task_en?: string,
+ *   task_instruction?: string,
  *   knowledge?: Object|null,
- *   subjectName?: string
+ *   subjectName?: string,
+ *   root?: ParentNode|null
  * }} options
  */
 function hydrateClinicalTaskForm(options) {
   const knowledge = options?.knowledge || null;
-  applySubjectPlaceholders(knowledge);
+  const root = options?.root || null;
+  applySubjectPlaceholders(knowledge, root);
 
   const guidance =
+    String(options?.task_instruction || '').trim() ||
     String(options?.guidance_zh || '').trim() ||
     String(options?.task_zh || '').trim() ||
     buildFallbackGuidance(knowledge, options?.subjectName);
 
-  setTaskInstruction(guidance);
+  setTaskInstruction(guidance, root);
+}
+
+/**
+ * 解析督導 JSON 回傳
+ * @param {string} rawContent
+ * @returns {{
+ *   feedback_zh: string,
+ *   feedback_en: string,
+ *   field_feedback: {observation: string, assessment: string, intervention: string},
+ *   vocab_corrections: Array<{original: string, suggestion: string, note: string}>
+ * }}
+ */
+function parseSupervisionFeedbackPayload(rawContent) {
+  let result;
+  try {
+    result = JSON.parse(String(rawContent || '').trim());
+  } catch (_) {
+    throw new Error('AI 回傳的 JSON 格式有誤，請再試一次。');
+  }
+
+  const feedback_zh = String(result.feedback_zh || '').trim();
+  const feedback_en = String(result.feedback_en || '').trim();
+
+  if (!feedback_zh && !feedback_en) {
+    throw new Error('AI 回傳資料不完整，缺少督導回饋。');
+  }
+
+  const rawFields =
+    result.field_feedback && typeof result.field_feedback === 'object'
+      ? result.field_feedback
+      : {};
+
+  const field_feedback = {
+    observation: String(rawFields.observation || '').trim(),
+    assessment: String(rawFields.assessment || '').trim(),
+    intervention: String(rawFields.intervention || '').trim()
+  };
+
+  const vocab_corrections = Array.isArray(result.vocab_corrections)
+    ? result.vocab_corrections
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const original = String(item.original || '').trim();
+          const suggestion = String(item.suggestion || '').trim();
+          const note = String(item.note || '').trim();
+          if (!original && !suggestion) return null;
+          return { original, suggestion, note };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    feedback_zh: feedback_zh || feedback_en,
+    feedback_en,
+    field_feedback,
+    vocab_corrections
+  };
+}
+
+/**
+ * 寫作批改：Submit 為唯一 API 觸發點
+ * 收集文章 Context + O/A/I，呼叫 callDeepSeekChatAPI(..., 'standard', subjectId)
+ *
+ * @param {{
+ *   root?: ParentNode|null,
+ *   feedbackRoot?: ParentNode|null,
+ *   articleEn: string,
+ *   articleZh?: string,
+ *   taskInstruction?: string,
+ *   taskEn?: string,
+ *   taskZh?: string,
+ *   guidanceZh?: string,
+ *   taskType?: string,
+ *   subjectId?: string|null,
+ *   answers?: {observation?: string, assessment?: string, intervention?: string}|null,
+ *   loadingEl?: HTMLElement|null,
+ *   onError?: (message: string) => void
+ * }} options
+ * @returns {Promise<object|null>}
+ */
+async function submitClinicalTaskToSupervisor(options) {
+  const root = options?.root || null;
+  const feedbackRoot = options?.feedbackRoot || root || null;
+  const articleEn = String(options?.articleEn || '').trim();
+  const articleZh = String(options?.articleZh || '').trim();
+  const taskInstruction = String(
+    options?.taskInstruction || options?.guidanceZh || ''
+  ).trim();
+  const taskEn = String(options?.taskEn || '').trim();
+  const taskZh = String(options?.taskZh || '').trim();
+  const taskType = String(options?.taskType || '').trim();
+
+  const reportError = (message) => {
+    if (typeof options?.onError === 'function') {
+      options.onError(message);
+    } else if (typeof showToast === 'function') {
+      showToast(`❌ ${message}`);
+    } else {
+      alert(message);
+    }
+  };
+
+  if (!articleEn) {
+    reportError('缺少個案文章，無法請督導批改。');
+    return null;
+  }
+
+  const clinicalAnswers =
+    options?.answers || getClinicalTaskAnswers(root);
+
+  if (isClinicalTaskEmpty(clinicalAnswers)) {
+    reportError('請至少填寫一個欄位再送出給督導。');
+    return null;
+  }
+
+  const apiFn =
+    typeof callDeepSeekChatAPI === 'function'
+      ? callDeepSeekChatAPI
+      : typeof window.callDeepSeekChatAPI === 'function'
+        ? window.callDeepSeekChatAPI
+        : null;
+
+  if (!apiFn) {
+    reportError('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
+    return null;
+  }
+
+  let subjectId =
+    options?.subjectId != null && String(options.subjectId).trim() !== ''
+      ? String(options.subjectId).trim()
+      : null;
+
+  if (!subjectId && typeof resolveCurrentSubject === 'function') {
+    subjectId = resolveCurrentSubject().id || null;
+  }
+
+  const subjectName =
+    typeof window.getCurrentSubjectName === 'function'
+      ? window.getCurrentSubjectName()
+      : (typeof resolveCurrentSubject === 'function'
+        ? resolveCurrentSubject().name
+        : '社會工作');
+
+  const submitBtn =
+    clinicalQuery(root, '#btn-submit-task') ||
+    clinicalQuery(root, '.btn-submit-clinical-task') ||
+    clinical$('btn-submit-task') ||
+    clinical$('btn-l3-submit-supervisor');
+  const loadingEl = options?.loadingEl || null;
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '督導批改中...';
+  }
+  setClinicalTaskFormDisabled(true, root);
+  clearClinicalFeedback(feedbackRoot);
+  if (loadingEl) loadingEl.classList.remove('hidden');
+
+  const answersJson = JSON.stringify(clinicalAnswers, null, 2);
+  const userContent =
+    `科目：${subjectName || '社會工作'}\n` +
+    `任務類型：${taskType || '（未標示）'}\n\n` +
+    `【個案文章（背景 Context）】\n${articleEn}` +
+    (articleZh ? `\n\n（中文參考）\n${articleZh}` : '') +
+    `\n\n【任務提示 task_instruction】\n${taskInstruction || taskZh || taskEn || '（無）'}` +
+    (taskEn ? `\n\n【英文任務】\n${taskEn}` : '') +
+    (taskZh && taskZh !== taskInstruction ? `\n\n【中文任務】\n${taskZh}` : '') +
+    `\n\n【學生實務紀錄表 Observation / Assessment / Intervention（JSON）】\n${answersJson}\n\n` +
+    `請重點修正英文文法與學術用詞，並給出臨床建議與分欄評語。`;
+
+  const messages = [
+    { role: 'system', content: CLINICAL_SUPERVISION_SYSTEM_PROMPT },
+    { role: 'user', content: userContent }
+  ];
+
+  try {
+    // Phase 11.7：Submit 唯一 API；使用 standard 路由（flash）
+    const rawContent = await apiFn(messages, 'standard', subjectId, {
+      maxTokens: 4096,
+      temperature: 0.7,
+      jsonObject: true
+    });
+
+    const result = parseSupervisionFeedbackPayload(rawContent);
+    renderStructuredSupervisionFeedback(result, feedbackRoot);
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '再次請督導批改';
+    }
+    setClinicalTaskFormDisabled(false, root);
+    return result;
+  } catch (error) {
+    reportError(error?.message || '取得督導回饋失敗，請稍後再試。');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '發送給督導 (Submit)';
+    }
+    setClinicalTaskFormDisabled(false, root);
+    return null;
+  } finally {
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
+}
+
+/**
+ * 建立文章庫用的「臨床督導實務紀錄表」區塊（空白表單 + 已存 task_instruction）
+ * 開啟時不呼叫文章生成 API；僅 Submit 才打督導批改 API。
+ *
+ * @param {{
+ *   articleEn: string,
+ *   articleZh?: string,
+ *   taskInstruction?: string,
+ *   taskEn?: string,
+ *   taskZh?: string,
+ *   guidanceZh?: string,
+ *   taskType?: string,
+ *   subjectId?: string|null,
+ *   knowledge?: Object|null,
+ *   subjectName?: string,
+ *   onError?: (message: string) => void
+ * }} options
+ * @returns {HTMLElement}
+ */
+function createClinicalTaskPracticeBlock(options) {
+  const wrap = document.createElement('div');
+  wrap.className = 'l3-challenge-task library-clinical-practice';
+
+  const header = document.createElement('div');
+  header.className = 'l3-challenge-header';
+  header.innerHTML =
+    '<span class="result-label">Clinical Challenge — 再次寫作練習（免 AI 生成文章）</span>';
+  wrap.appendChild(header);
+
+  const form = document.createElement('div');
+  form.className = 'clinical-task-form card';
+  form.innerHTML =
+    '<h3 class="clinical-task-title">📝 臨床督導實務紀錄表</h3>' +
+    '<p class="task-instruction hint-text"></p>' +
+    '<table class="clinical-table">' +
+    '<thead><tr><th scope="col">欄位</th><th scope="col">你的專業思考（請輸入英文）</th></tr></thead>' +
+    '<tbody>' +
+    '<tr><td><strong>Observation</strong></td><td>' +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-observation" rows="3" ' +
+    'placeholder="案主的具體行為、語氣或環境細節為何？"></textarea></td></tr>' +
+    '<tr><td><strong>Assessment</strong></td><td>' +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-assessment" rows="3" ' +
+    'placeholder="結合理論（如：三角關係／復元模式），你的專業評估是？"></textarea></td></tr>' +
+    '<tr><td><strong>Intervention</strong></td><td>' +
+    '<textarea class="user-textarea clinical-field-textarea clinical-field-intervention" rows="3" ' +
+    'placeholder="你打算如何回應？請嘗試撰寫你的介入對話。"></textarea></td></tr>' +
+    '</tbody></table>' +
+    '<button class="btn btn-primary primary-btn btn-submit-clinical-task" type="button">' +
+    '發送給督導 (Submit)</button>';
+
+  wrap.appendChild(form);
+
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'l3-supervision-loading hidden';
+  loadingEl.setAttribute('aria-live', 'polite');
+  loadingEl.innerHTML = '<p class="loading-text">督導正在閱讀你的實務紀錄…</p>';
+  wrap.appendChild(loadingEl);
+
+  const feedback = document.createElement('div');
+  feedback.className = 'l3-supervision-feedback hidden';
+  feedback.setAttribute('role', 'status');
+  feedback.setAttribute('aria-live', 'polite');
+  feedback.innerHTML =
+    '<span class="result-label">督導回饋 (Supervision Feedback)</span>' +
+    '<p class="l3-feedback-zh"></p>' +
+    '<p class="l3-feedback-en hidden"></p>' +
+    '<div class="l3-field-feedback hidden"></div>' +
+    '<div class="l3-vocab-corrections hidden"></div>';
+  wrap.appendChild(feedback);
+
+  const instruction = buildStoredTaskInstruction({
+    task_instruction: options?.taskInstruction,
+    guidance_zh: options?.guidanceZh,
+    task_zh: options?.taskZh,
+    task_en: options?.taskEn
+  });
+
+  hydrateClinicalTaskForm({
+    root: form,
+    task_instruction: instruction,
+    guidance_zh: options?.guidanceZh,
+    task_zh: options?.taskZh,
+    task_en: options?.taskEn,
+    knowledge: options?.knowledge || null,
+    subjectName: options?.subjectName
+  });
+
+  // 表格預設空白，供再次練習
+  Object.keys(CLINICAL_FIELD_CLASSES).forEach((key) => {
+    const el = form.querySelector(`.${CLINICAL_FIELD_CLASSES[key]}`);
+    if (el) el.value = '';
+  });
+
+  const submitBtn = form.querySelector('.btn-submit-clinical-task');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      submitClinicalTaskToSupervisor({
+        root: form,
+        feedbackRoot: wrap,
+        articleEn: options?.articleEn || '',
+        articleZh: options?.articleZh || '',
+        taskInstruction: instruction,
+        taskEn: options?.taskEn || '',
+        taskZh: options?.taskZh || '',
+        guidanceZh: options?.guidanceZh || instruction,
+        taskType: options?.taskType || '',
+        subjectId: options?.subjectId || null,
+        loadingEl,
+        onError: options?.onError
+      });
+    });
+  }
+
+  return wrap;
 }
 
 // 對外 API
 window.buildSubjectFieldPlaceholders = buildSubjectFieldPlaceholders;
 window.buildFallbackGuidance = buildFallbackGuidance;
+window.buildStoredTaskInstruction = buildStoredTaskInstruction;
 window.setTaskInstruction = setTaskInstruction;
 window.applySubjectPlaceholders = applySubjectPlaceholders;
 window.getClinicalTaskAnswers = getClinicalTaskAnswers;
@@ -338,3 +773,5 @@ window.setClinicalTaskFormDisabled = setClinicalTaskFormDisabled;
 window.clearClinicalFeedback = clearClinicalFeedback;
 window.renderStructuredSupervisionFeedback = renderStructuredSupervisionFeedback;
 window.hydrateClinicalTaskForm = hydrateClinicalTaskForm;
+window.submitClinicalTaskToSupervisor = submitClinicalTaskToSupervisor;
+window.createClinicalTaskPracticeBlock = createClinicalTaskPracticeBlock;

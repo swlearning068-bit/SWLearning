@@ -312,7 +312,7 @@ function getSavedArticles() {
 
 /**
  * 將文章寫入統一文章庫
- * @param {Object} article - 必須含 type: 'literature' | 'story'
+ * @param {Object} article - 必須含 type: 'literature' | 'story' | 'case_note'
  * @returns {{ok: boolean, already?: boolean, message?: string}}
  */
 function saveArticleToLibrary(article) {
@@ -325,6 +325,12 @@ function saveArticleToLibrary(article) {
   }
   if (article.type === 'story' && !article.story_en) {
     return { ok: false, message: '故事資料不完整，無法收藏。' };
+  }
+  if (article.type === 'case_note') {
+    const articleEn = article.article_en || article.case_note_en;
+    if (!articleEn) {
+      return { ok: false, message: '個案文章資料不完整，無法收藏。' };
+    }
   }
 
   const list = getSavedArticles();
@@ -344,6 +350,16 @@ function saveArticleToLibrary(article) {
         item.story_en === article.story_en &&
         item.subjectName === article.subjectName
     );
+  } else if (article.type === 'case_note') {
+    const articleEn = String(article.article_en || article.case_note_en || '');
+    already = list.some((item) => {
+      if (!item || item.type !== 'case_note') return false;
+      const existingEn = String(item.article_en || item.case_note_en || '');
+      return (
+        existingEn === articleEn &&
+        item.subjectName === article.subjectName
+      );
+    });
   }
 
   if (already) {
@@ -1252,6 +1268,131 @@ const L3_TASK_TYPE_LABELS = {
 };
 
 /**
+ * 組出要寫入收藏的 task_instruction（優先 guidance，其次中／英任務）
+ * @param {{guidance_zh?: string, task_zh?: string, task_en?: string}} data
+ * @returns {string}
+ */
+function buildCaseNoteTaskInstruction(data) {
+  if (typeof buildStoredTaskInstruction === 'function') {
+    return buildStoredTaskInstruction(data);
+  }
+  return String(
+    data?.guidance_zh || data?.task_zh || data?.task_en || ''
+  ).trim();
+}
+
+/**
+ * 同步 L3「收藏文章」按鈕狀態
+ */
+function syncSaveCaseNoteButtonState() {
+  const btn = document.getElementById('btn-save-case-note');
+  if (!btn) return;
+
+  if (!l3CurrentChallenge || !l3CurrentChallenge.case_note_en) {
+    btn.disabled = true;
+    btn.textContent = '⭐ 收藏文章';
+    btn.classList.remove('is-saved');
+    return;
+  }
+
+  const subjectName =
+    typeof window.getCurrentSubjectName === 'function'
+      ? window.getCurrentSubjectName()
+      : '社會工作';
+  const articleEn = String(l3CurrentChallenge.case_note_en || '');
+
+  const already = getSavedArticles().some((item) => {
+    if (!item || item.type !== 'case_note') return false;
+    const existingEn = String(item.article_en || item.case_note_en || '');
+    return existingEn === articleEn && item.subjectName === subjectName;
+  });
+
+  if (already) {
+    btn.textContent = '✅ 已收藏至文章庫';
+    btn.disabled = true;
+    btn.classList.add('is-saved');
+  } else {
+    btn.textContent = '⭐ 收藏文章';
+    btn.disabled = false;
+    btn.classList.remove('is-saved');
+  }
+}
+
+/**
+ * 處理 L3「收藏文章」：一併寫入 task_instruction 供文章庫免 AI 再練習
+ */
+function handleSaveCaseNote() {
+  if (!l3CurrentChallenge || !l3CurrentChallenge.case_note_en) {
+    alert('目前沒有可收藏的個案文章，請先生成一篇。');
+    return;
+  }
+
+  const subjectName =
+    typeof window.getCurrentSubjectName === 'function'
+      ? window.getCurrentSubjectName()
+      : '社會工作';
+
+  const subjectId =
+    typeof resolveCurrentSubject === 'function'
+      ? resolveCurrentSubject().id
+      : (typeof normalizeSubjectId === 'function'
+        ? normalizeSubjectId(
+            localStorage.getItem(
+              typeof STORAGE_KEY_SUBJECT === 'string'
+                ? STORAGE_KEY_SUBJECT
+                : 'swlearning_current_subject'
+            ) || ''
+          )
+        : '');
+
+  const articleEn = String(l3CurrentChallenge.case_note_en || '').trim();
+  const articleZh = String(l3CurrentChallenge.case_note_zh || '').trim();
+  const taskInstruction = buildCaseNoteTaskInstruction(l3CurrentChallenge);
+  const vocabulary = Array.isArray(l3CurrentChallenge.vocabulary)
+    ? l3CurrentChallenge.vocabulary
+    : [];
+
+  const payload = {
+    id: Date.now(),
+    type: 'case_note',
+    subjectId: subjectId || '',
+    subjectName: subjectName || '社會工作',
+    timestamp: Date.now(),
+    title: buildStoryTitle(articleEn),
+    // Phase 11.7 統一欄位
+    article_en: articleEn,
+    article_zh: articleZh,
+    vocabulary,
+    task_instruction: taskInstruction,
+    // 相容既有 L3 欄位
+    case_note_en: articleEn,
+    case_note_zh: articleZh,
+    task_type: l3CurrentChallenge.task_type || '',
+    task_en: l3CurrentChallenge.task_en || '',
+    task_zh: l3CurrentChallenge.task_zh || '',
+    guidance_zh: l3CurrentChallenge.guidance_zh || taskInstruction,
+    savedAt: new Date().toISOString()
+  };
+
+  const result = saveArticleToLibrary(payload);
+  if (!result.ok) {
+    alert(result.message || '收藏失敗，請稍後再試。');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-case-note');
+  if (btn) {
+    btn.textContent = '✅ 已收藏至文章庫';
+    btn.disabled = true;
+    btn.classList.add('is-saved');
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(result.already ? '✅ 此個案文章已在文章庫中' : '✅ 已收藏至文章庫');
+  }
+}
+
+/**
  * 重置 L3 結果區
  */
 function resetL3ReadingArea() {
@@ -1281,6 +1422,8 @@ function resetL3ReadingArea() {
     const feedbackBox = document.getElementById('l3-supervision-feedback');
     if (feedbackBox) feedbackBox.classList.add('hidden');
   }
+
+  syncSaveCaseNoteButtonState();
 }
 
 /**
@@ -1387,9 +1530,16 @@ function renderL3CaseNote(data) {
     task_type: taskType,
     task_en: taskEn,
     task_zh: taskZh,
-    guidance_zh: guidanceZh || taskZh
+    guidance_zh: guidanceZh || taskZh,
+    task_instruction: buildCaseNoteTaskInstruction({
+      guidance_zh: guidanceZh || taskZh,
+      task_zh: taskZh,
+      task_en: taskEn
+    }),
+    vocabulary: Array.isArray(data.vocabulary) ? data.vocabulary : []
   };
 
+  syncSaveCaseNoteButtonState();
   display.classList.remove('hidden');
 }
 
@@ -1432,7 +1582,7 @@ async function handleGenerateCaseNote() {
 }
 
 /**
- * 送出實務紀錄表給督導，取得分欄回饋與詞彙修正
+ * 送出實務紀錄表給督導（唯一 API 觸發點委派至 task-ui.js）
  */
 async function handleL3SubmitToSupervisor() {
   if (!l3CurrentChallenge) {
@@ -1440,96 +1590,31 @@ async function handleL3SubmitToSupervisor() {
     return;
   }
 
-  const submitBtn =
-    document.getElementById('btn-submit-task') ||
-    document.getElementById('btn-l3-submit-supervisor');
-  const supervLoading = document.getElementById('l3-supervision-loading');
-  const errorEl = document.getElementById('l3-reading-error');
-
-  const clinicalAnswers =
-    typeof getClinicalTaskAnswers === 'function'
-      ? getClinicalTaskAnswers()
-      : { observation: '', assessment: '', intervention: '' };
-
-  if (
-    typeof isClinicalTaskEmpty === 'function'
-      ? isClinicalTaskEmpty(clinicalAnswers)
-      : !clinicalAnswers.observation &&
-        !clinicalAnswers.assessment &&
-        !clinicalAnswers.intervention
-  ) {
-    showL3ReadingError('請至少填寫一個欄位再送出給督導。');
+  if (typeof submitClinicalTaskToSupervisor !== 'function') {
+    showL3ReadingError('寫作模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
     return;
   }
 
-  if (errorEl) {
-    errorEl.classList.add('hidden');
-    errorEl.textContent = '';
-  }
+  const formRoot = document.getElementById('clinical-task-form');
+  const feedbackRoot =
+    document.getElementById('l3-supervision-feedback')?.parentElement ||
+    document.getElementById('l3-reading-display');
 
-  if (typeof getL3SupervisionFeedbackAPI !== 'function') {
-    showL3ReadingError('AI 模組尚未載入，請強制重新整理頁面（Ctrl+F5）後再試。');
-    return;
-  }
-
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = '督導批改中...';
-  }
-  if (typeof setClinicalTaskFormDisabled === 'function') {
-    setClinicalTaskFormDisabled(true);
-  }
-  if (typeof clearClinicalFeedback === 'function') {
-    clearClinicalFeedback();
-  }
-  if (supervLoading) supervLoading.classList.remove('hidden');
-
-  try {
-    const result = await getL3SupervisionFeedbackAPI({
-      caseNoteEn: l3CurrentChallenge.case_note_en,
-      caseNoteZh: l3CurrentChallenge.case_note_zh,
-      taskEn: l3CurrentChallenge.task_en,
-      taskZh: l3CurrentChallenge.task_zh,
-      guidanceZh: l3CurrentChallenge.guidance_zh,
-      taskType: l3CurrentChallenge.task_type,
-      clinicalAnswers
-    });
-
-    if (typeof renderStructuredSupervisionFeedback === 'function') {
-      renderStructuredSupervisionFeedback(result);
-    } else {
-      const feedbackBox = document.getElementById('l3-supervision-feedback');
-      const feedbackZh = document.getElementById('l3-feedback-zh');
-      const feedbackEn = document.getElementById('l3-feedback-en');
-      if (feedbackZh) feedbackZh.textContent = result.feedback_zh || '';
-      if (feedbackEn) {
-        feedbackEn.textContent = result.feedback_en || '';
-        feedbackEn.classList.toggle('hidden', !result.feedback_en);
-      }
-      if (feedbackBox) feedbackBox.classList.remove('hidden');
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = '再次請督導批改';
-    }
-    if (typeof setClinicalTaskFormDisabled === 'function') {
-      setClinicalTaskFormDisabled(false);
-    }
-
-  } catch (error) {
-    showL3ReadingError(error.message || '取得督導回饋失敗，請稍後再試。');
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = '發送給督導 (Submit)';
-    }
-    if (typeof setClinicalTaskFormDisabled === 'function') {
-      setClinicalTaskFormDisabled(false);
-    }
-
-  } finally {
-    if (supervLoading) supervLoading.classList.add('hidden');
-  }
+  await submitClinicalTaskToSupervisor({
+    root: formRoot,
+    feedbackRoot,
+    articleEn: l3CurrentChallenge.case_note_en,
+    articleZh: l3CurrentChallenge.case_note_zh,
+    taskInstruction:
+      l3CurrentChallenge.task_instruction ||
+      buildCaseNoteTaskInstruction(l3CurrentChallenge),
+    taskEn: l3CurrentChallenge.task_en,
+    taskZh: l3CurrentChallenge.task_zh,
+    guidanceZh: l3CurrentChallenge.guidance_zh,
+    taskType: l3CurrentChallenge.task_type,
+    loadingEl: document.getElementById('l3-supervision-loading'),
+    onError: (message) => showL3ReadingError(message)
+  });
 }
 
 /* ============================================================
@@ -1949,12 +2034,17 @@ function initReadingModule() {
   const l3SubmitBtn =
     document.getElementById('btn-submit-task') ||
     document.getElementById('btn-l3-submit-supervisor');
+  const l3SaveBtn = document.getElementById('btn-save-case-note');
 
   if (l3GenBtn) {
     l3GenBtn.addEventListener('click', handleGenerateCaseNote);
   }
   if (l3SubmitBtn) {
     l3SubmitBtn.addEventListener('click', handleL3SubmitToSupervisor);
+  }
+  if (l3SaveBtn) {
+    l3SaveBtn.addEventListener('click', handleSaveCaseNote);
+    syncSaveCaseNoteButtonState();
   }
 
   // 預設顯示 L1
