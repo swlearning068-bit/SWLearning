@@ -496,23 +496,20 @@ function renderSyncComparison(mode, result, errorMessage) {
     else closeBtn.textContent = '稍後再說';
   }
 
-  const showClear =
-    mode === 'manual' &&
+  const canClearLocal = Boolean(localFallback && localFallback.hasData);
+  const canClearCloud = Boolean(
     result &&
-    result.cloud &&
-    result.cloud.hasData &&
-    !result.cloud.error;
-
-  const showClearLocal = mode === 'manual' && localFallback.hasData;
-
-  if (clearBtn) {
-    clearBtn.classList.toggle('hidden', !showClear);
-    clearBtn.disabled = !showClear;
-  }
+      result.cloud &&
+      result.cloud.hasData &&
+      !result.cloud.error
+  );
 
   if (clearLocalBtn) {
-    clearLocalBtn.classList.toggle('hidden', !showClearLocal);
-    clearLocalBtn.disabled = !showClearLocal;
+    clearLocalBtn.disabled = !canClearLocal;
+  }
+
+  if (clearBtn) {
+    clearBtn.disabled = !canClearCloud;
   }
 
   if (errorMessage) {
@@ -523,11 +520,8 @@ function renderSyncComparison(mode, result, errorMessage) {
     }
     if (cloudEl) cloudEl.textContent = errorMessage;
     if (bannerEl) bannerEl.classList.add('hidden');
-    if (clearBtn) {
-      clearBtn.classList.add('hidden');
-      clearBtn.disabled = true;
-    }
-    // 雲端讀取失敗時仍可清除本機（按鈕狀態已依 localFallback 設定）
+    if (clearBtn) clearBtn.disabled = true;
+    if (clearLocalBtn) clearLocalBtn.disabled = !canClearLocal;
     if (uploadBtn) {
       uploadBtn.disabled = false;
       uploadBtn.classList.remove('hidden');
@@ -552,14 +546,8 @@ function renderSyncComparison(mode, result, errorMessage) {
     if (bannerEl) bannerEl.classList.add('hidden');
     if (uploadBtn) uploadBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
-    if (clearBtn) {
-      clearBtn.classList.add('hidden');
-      clearBtn.disabled = true;
-    }
-    if (clearLocalBtn) {
-      clearLocalBtn.classList.add('hidden');
-      clearLocalBtn.disabled = true;
-    }
+    if (clearBtn) clearBtn.disabled = true;
+    if (clearLocalBtn) clearLocalBtn.disabled = true;
     return;
   }
 
@@ -639,6 +627,9 @@ function renderSyncComparison(mode, result, errorMessage) {
       else downloadBtn.textContent = '⬇️ 從雲端重新載入';
     }
   }
+
+  if (clearLocalBtn) clearLocalBtn.disabled = !local.hasData;
+  if (clearBtn) clearBtn.disabled = !cloud.hasData || Boolean(cloud.error);
 }
 
 /**
@@ -1123,13 +1114,15 @@ async function runClearCloudWithGuards() {
   try {
     await clearCloudData(uid);
     const refreshed = await compareLocalAndCloud(uid);
-    renderSyncComparison('manual', refreshed);
+    const nextMode = refreshed.cloud.hasData
+      ? syncModalMode || 'manual'
+      : 'first-seed';
+    renderSyncComparison(nextMode, refreshed);
   } catch (error) {
     console.error('[sync] 清除雲端失敗：', error);
     const tip = describeFirestoreError(error);
     syncToast(tip.toast || '❌ 清除雲端失敗');
     window.alert(['清除雲端失敗', '', tip.detail || String(error)].join('\n'));
-  } finally {
     if (clearBtn) clearBtn.disabled = false;
   }
 }

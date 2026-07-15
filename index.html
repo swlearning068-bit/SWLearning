@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=46">
+  <link rel="stylesheet" href="css/style.css?v=47">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -773,10 +773,26 @@
         <div class="sync-summary-row">
           <span class="sync-summary-label">本機</span>
           <span id="sync-local-meta" class="sync-summary-value">檢查中…</span>
+          <button
+            id="btn-sync-clear-local"
+            class="sync-row-clear-btn"
+            type="button"
+            title="清除本機學習資料"
+          >
+            清除
+          </button>
         </div>
         <div class="sync-summary-row">
           <span class="sync-summary-label">雲端</span>
           <span id="sync-cloud-meta" class="sync-summary-value">檢查中…</span>
+          <button
+            id="btn-sync-clear-cloud"
+            class="sync-row-clear-btn"
+            type="button"
+            title="清除雲端學習資料"
+          >
+            清除
+          </button>
         </div>
       </div>
 
@@ -796,20 +812,6 @@
         </button>
         <button id="btn-sync-download" class="btn btn-secondary" type="button">
           ⬇️ 沿用雲端資料
-        </button>
-        <button
-          id="btn-sync-clear-cloud"
-          class="danger-btn sync-clear-btn hidden"
-          type="button"
-        >
-          🗑️ 清除雲端資料
-        </button>
-        <button
-          id="btn-sync-clear-local"
-          class="danger-btn sync-clear-btn hidden"
-          type="button"
-        >
-          🗑️ 清除本機資料
         </button>
         <button id="btn-close-sync-modal" class="text-btn" type="button">
           稍後再說
@@ -1048,6 +1050,6 @@
   <script src="js/reward.js?v=5"></script>
   <script src="js/app.js?v=20"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=15"></script>
+  <script type="module" src="js/sync.js?v=16"></script>
 </body>
 </html>

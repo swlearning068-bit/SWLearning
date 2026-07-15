@@ -191,9 +191,8 @@ body {
 
 .sync-summary-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
 }
 
 .sync-summary-label {
@@ -205,11 +204,37 @@ body {
 }
 
 .sync-summary-value {
+  flex: 1;
+  min-width: 0;
   text-align: right;
   font-size: 0.88rem;
   color: var(--text-primary);
   line-height: 1.4;
   word-break: break-word;
+}
+
+.sync-row-clear-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  background-color: #FEF2F2;
+  color: #DC2626;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sync-row-clear-btn:hover:not(:disabled) {
+  background-color: #FEE2E2;
+  border-color: #FCA5A5;
+}
+
+.sync-row-clear-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .sync-conflict-banner {
@@ -223,14 +248,8 @@ body {
 }
 
 .sync-modal-actions .btn.hidden,
-.sync-modal-actions .text-btn.hidden,
-.sync-modal-actions .danger-btn.hidden {
+.sync-modal-actions .text-btn.hidden {
   display: none;
-}
-
-.sync-clear-btn {
-  width: 100%;
-  flex: 1 1 100%;
 }
 
 @media (max-width: 640px) {
