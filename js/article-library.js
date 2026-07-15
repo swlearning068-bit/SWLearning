@@ -94,30 +94,100 @@ function extractArticleVocabTerms(vocab) {
 }
 
 /**
- * 列表標題
+ * 文章主標題（英文優先：title_en／original_title）
+ * @param {Object} item
+ * @param {{truncate?: number}} [opts]
+ * @returns {string}
+ */
+function getArticleTitleEn(item, opts = {}) {
+  const truncate = Number(opts.truncate) || 0;
+  if (!item) return '(Untitled)';
+
+  let title = '';
+  if (
+    item.type === 'practice' ||
+    (typeof isInteractivePracticeArticle === 'function' &&
+      isInteractivePracticeArticle(item))
+  ) {
+    title = String(item.title_en || item.title || item.title_zh || '(Untitled)');
+  } else if (item.type === 'story' || item.type === 'case_note') {
+    if (item.title) {
+      title = String(item.title);
+    } else {
+      const text = String(
+        item.type === 'case_note'
+          ? item.article_en || item.case_note_en || ''
+          : item.story_en || ''
+      )
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!text) {
+        title =
+          item.type === 'case_note' ? '(Untitled case note)' : '(Untitled story)';
+      } else {
+        title = text;
+      }
+    }
+  } else {
+    title = String(
+      item.original_title || item.title_en || item.title || '(Untitled)'
+    );
+  }
+
+  if (truncate > 0 && title.length > truncate) {
+    return `${title.slice(0, truncate)}…`;
+  }
+  return title;
+}
+
+/**
+ * 文章副標題（中文 title_zh，有且與英文不同才回傳）
+ * @param {Object} item
+ * @returns {string}
+ */
+function getArticleTitleZh(item) {
+  if (!item) return '';
+  const zh = String(item.title_zh || '').trim();
+  if (!zh) return '';
+  const en = getArticleTitleEn(item);
+  if (zh === en) return '';
+  return zh;
+}
+
+/**
+ * 列表標題（英文主標，可截斷）
  * @param {Object} item
  * @returns {string}
  */
 function getArticleListTitle(item) {
-  if (!item) return '（無標題）';
-  if (item.type === 'practice') {
-    return String(item.title_zh || item.title_en || item.title || '（無標題演練）');
+  return getArticleTitleEn(item, { truncate: 42 });
+}
+
+/**
+ * 在詳情 pack 掛上英文主標列，並在其後附加中文副標（有才顯示）
+ * @param {HTMLElement} pack
+ * @param {HTMLElement} titleRow
+ * @param {Object} item
+ * @param {string|(() => string)} [speakTextOrGetter]
+ */
+function appendLibraryArticleTitleBlock(pack, titleRow, item, speakTextOrGetter) {
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'literature-title library-title-en';
+  titleEl.textContent = getArticleTitleEn(item);
+  titleRow.appendChild(titleEl);
+
+  if (speakTextOrGetter != null) {
+    appendLibrarySpeakControls(titleRow, speakTextOrGetter);
   }
-  if (item.type === 'story' || item.type === 'case_note') {
-    if (item.title) return String(item.title);
-    const text = String(
-      item.type === 'case_note'
-        ? item.article_en || item.case_note_en || ''
-        : item.story_en || ''
-    )
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!text) {
-      return item.type === 'case_note' ? '（無標題臨床挑戰）' : '（無標題故事）';
-    }
-    return text.length > 42 ? `${text.slice(0, 42)}…` : text;
+  pack.appendChild(titleRow);
+
+  const titleZh = getArticleTitleZh(item);
+  if (titleZh) {
+    const zhEl = document.createElement('p');
+    zhEl.className = 'library-title-zh practice-title-zh';
+    zhEl.textContent = titleZh;
+    pack.appendChild(zhEl);
   }
-  return item.original_title || '（無標題）';
 }
 
 /**
@@ -341,10 +411,23 @@ function renderArticlesList(filterType = 'all') {
     badge.textContent = badgeMeta.label;
     topRow.appendChild(badge);
 
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'library-item-title-wrap';
+
     const titleSpan = document.createElement('span');
     titleSpan.className = 'library-item-title';
-    titleSpan.textContent = getArticleListTitle(item);
-    topRow.appendChild(titleSpan);
+    titleSpan.textContent = getArticleTitleEn(item, { truncate: 42 });
+    titleWrap.appendChild(titleSpan);
+
+    const titleZh = getArticleTitleZh(item);
+    if (titleZh) {
+      const zhSpan = document.createElement('span');
+      zhSpan.className = 'library-item-title-zh';
+      zhSpan.textContent =
+        titleZh.length > 36 ? `${titleZh.slice(0, 36)}…` : titleZh;
+      titleWrap.appendChild(zhSpan);
+    }
+    topRow.appendChild(titleWrap);
 
     const subjectSpan = document.createElement('div');
     subjectSpan.className = 'library-item-subject';
@@ -582,13 +665,9 @@ function renderLiteratureArticleDetail(item, detailEl) {
   const titleRow = document.createElement('div');
   titleRow.className = 'tts-title-row';
 
-  const titleEl = document.createElement('h3');
-  titleEl.className = 'literature-title';
-  titleEl.textContent = item.original_title || '（無標題）';
-  titleRow.appendChild(titleEl);
-
-  appendLibrarySpeakControls(titleRow, () => getLibraryArticleSpeakText(item));
-  pack.appendChild(titleRow);
+  appendLibraryArticleTitleBlock(pack, titleRow, item, () =>
+    getLibraryArticleSpeakText(item)
+  );
 
   const metaEl = document.createElement('p');
   metaEl.className = 'library-detail-meta';
@@ -689,13 +768,9 @@ function renderStoryArticleDetail(item, detailEl) {
   const titleRow = document.createElement('div');
   titleRow.className = 'tts-title-row';
 
-  const titleEl = document.createElement('h3');
-  titleEl.className = 'literature-title';
-  titleEl.textContent = getArticleListTitle(item);
-  titleRow.appendChild(titleEl);
-
-  appendLibrarySpeakControls(titleRow, () => getLibraryArticleSpeakText(item));
-  pack.appendChild(titleRow);
+  appendLibraryArticleTitleBlock(pack, titleRow, item, () =>
+    getLibraryArticleSpeakText(item)
+  );
 
   const metaEl = document.createElement('p');
   metaEl.className = 'library-detail-meta';
@@ -828,13 +903,7 @@ function renderCaseNoteArticleDetail(item, detailEl) {
   const titleRow = document.createElement('div');
   titleRow.className = 'tts-title-row';
 
-  const titleEl = document.createElement('h3');
-  titleEl.className = 'literature-title';
-  titleEl.textContent = getArticleListTitle(item);
-  titleRow.appendChild(titleEl);
-
-  appendLibrarySpeakControls(titleRow, () => articleEn);
-  pack.appendChild(titleRow);
+  appendLibraryArticleTitleBlock(pack, titleRow, item, () => articleEn);
 
   const metaEl = document.createElement('p');
   metaEl.className = 'library-detail-meta';
@@ -1194,7 +1263,7 @@ function buildArticleChallengeContext(item) {
     const story = String(item.story_en || '').trim();
     if (!story) return '';
     const theme = String(item.theme || '').trim();
-    const title = getArticleListTitle(item);
+    const title = getArticleTitleEn(item);
     const parts = [`Type: Social Work Story`];
     if (title) parts.push(`Title: ${title}`);
     if (theme) parts.push(`Theme: ${theme}`);
@@ -1507,6 +1576,9 @@ window.loadSavedArticles = loadSavedArticles;
 window.renderArticlesList = renderArticlesList;
 window.refreshArticleLibraryView = refreshArticleLibraryView;
 window.initArticleLibraryModule = initArticleLibraryModule;
+window.getArticleTitleEn = getArticleTitleEn;
+window.getArticleTitleZh = getArticleTitleZh;
+window.getArticleListTitle = getArticleListTitle;
 
 // 相容舊呼叫名稱（若有殘留引用）
 window.refreshLibraryView = refreshArticleLibraryView;

@@ -637,7 +637,7 @@ function renderPracticeArticle(article, targetRoot, options) {
 
   const titleEn = document.createElement('h3');
   titleEn.className = 'practice-title-en literature-title';
-  titleEn.textContent = article.title_en || '';
+  titleEn.textContent = article.title_en || article.title || '';
   titleRow.appendChild(titleEn);
 
   if (typeof createArticleSpeakControls === 'function') {
@@ -647,10 +647,11 @@ function renderPracticeArticle(article, targetRoot, options) {
   }
   pack.appendChild(titleRow);
 
-  if (article.title_zh) {
+  const titleZhText = String(article.title_zh || '').trim();
+  if (titleZhText && titleZhText !== String(article.title_en || '').trim()) {
     const titleZh = document.createElement('p');
     titleZh.className = 'practice-title-zh';
-    titleZh.textContent = article.title_zh;
+    titleZh.textContent = titleZhText;
     pack.appendChild(titleZh);
   }
 

@@ -3851,6 +3851,33 @@ body {
   color: #111827;
 }
 
+#article-library-section .library-item-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+#article-library-section .library-item-title-zh {
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #6B7280;
+}
+
+#article-library-section .library-item.is-active .library-item-title-zh,
+#article-library-section .article-library-item.is-active .library-item-title-zh {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+#article-library-section .library-title-zh {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #6B7280;
+}
+
 #article-library-section .library-item-subject {
   margin-top: 8px;
   font-size: 0.8rem;
