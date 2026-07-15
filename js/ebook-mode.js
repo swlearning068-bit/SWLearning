@@ -3,9 +3,10 @@
  *
  * 職責：
  * 1. 全螢幕純淨閱讀（略過單字表、測驗、寫作）
- * 2. 中文翻譯預設收合（details 點擊展開）
- * 3. TTS 朗讀、字級 A-/A+、淺色／護眼／深色主題
- * 4. 上一篇／下一篇與目錄導覽
+ * 2. 行內藍字生字高亮（vocabulary）＋懸浮中文 tooltip
+ * 3. 整段中文翻譯預設收合（details）
+ * 4. TTS 朗讀、字級 A-/A+、淺色／護眼／深色主題
+ * 5. 上一篇／下一篇與目錄導覽
  */
 
 /** @type {Array<Object>} */
@@ -115,13 +116,102 @@ function getEbookTypeLabel(item) {
 }
 
 /**
- * 建立中英段落（英文直出；中文預設收合藍字翻譯）
+ * 彙整文章可用生字（相容 vocabulary／keywords／key_vocabulary／highlight_terms）
+ * @param {Object} item
+ * @returns {Array<{term: string, zh: string}>}
+ */
+function getEbookVocabularyList(item) {
+  const map = new Map();
+
+  const addList = (list) => {
+    (Array.isArray(list) ? list : []).forEach((v) => {
+      if (!v || typeof v !== 'object') return;
+      const term = String(v.term || v.word || '').trim();
+      const zh = String(v.zh || '').trim();
+      if (!term || !zh) return;
+      const key = term.toLowerCase();
+      if (!map.has(key)) map.set(key, { term, zh });
+    });
+  };
+
+  if (!item) return [];
+  addList(item.vocabulary);
+  addList(item.keywords);
+  addList(item.key_vocabulary);
+  addList(item.vocab);
+  (Array.isArray(item.content_chunks) ? item.content_chunks : []).forEach((chunk) => {
+    addList(chunk && chunk.highlight_terms);
+  });
+
+  return Array.from(map.values());
+}
+
+/**
+ * 將英文段落中的重點單字替換為藍字高亮標籤（含 data-translation）
+ * @param {string} text
+ * @param {Array<{term?: string, word?: string, zh?: string}>} vocabList
+ * @returns {string} 已跳脫並含高亮 span 的 HTML
+ */
+function highlightVocabularyInText(text, vocabList) {
+  const raw = String(text || '');
+  if (!raw) return '';
+
+  const cleaned = (Array.isArray(vocabList) ? vocabList : [])
+    .map((item) => {
+      const term = String(item?.term || item?.word || '').trim();
+      const zh = String(item?.zh || '').trim();
+      if (!term || !zh) return null;
+      return { term, zh };
+    })
+    .filter(Boolean);
+
+  if (cleaned.length === 0) {
+    return ebookEscapeHtml(raw);
+  }
+
+  // 長詞優先，避免短詞先吃掉片語
+  const sortedVocab = [...cleaned].sort((a, b) => b.term.length - a.term.length);
+
+  let html = ebookEscapeHtml(raw);
+  const placeholders = [];
+
+  const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  sortedVocab.forEach((vocab) => {
+    const escapedTerm = escapeRegExp(ebookEscapeHtml(vocab.term));
+    const isPhrase = /\s/.test(vocab.term);
+    const pattern = isPhrase
+      ? escapedTerm.replace(/\\\s+/g, '\\s+').replace(/\s+/g, '\\s+')
+      : escapedTerm;
+    const termRegex = isPhrase
+      ? new RegExp(`(${pattern})`, 'gi')
+      : new RegExp(`\\b(${pattern})\\b`, 'gi');
+
+    html = html.replace(termRegex, (match) => {
+      if (match.includes('\uE000')) return match;
+      const index = placeholders.length;
+      const safeZh = ebookEscapeHtml(vocab.zh);
+      placeholders.push(
+        `<span class="vocab-highlight" data-translation="${safeZh}" tabindex="0" role="term" aria-label="${ebookEscapeHtml(match)}：${safeZh}">${match}</span>`
+      );
+      return `\uE000${index}\uE001`;
+    });
+  });
+
+  return html.replace(/\uE000(\d+)\uE001/g, (_, indexStr) => {
+    return placeholders[Number(indexStr)] || '';
+  });
+}
+
+/**
+ * 建立中英段落（英文含行內藍字高亮；整段中文預設收合）
  * @param {string} [heading]
  * @param {string} enText
  * @param {string} [zhText]
+ * @param {Array<{term: string, zh: string}>} [vocabList]
  * @returns {string}
  */
-function buildEbookParagraphHtml(heading, enText, zhText) {
+function buildEbookParagraphHtml(heading, enText, zhText, vocabList) {
   const en = String(enText || '').trim();
   const zh = String(zhText || '').trim();
   if (!en && !zh) return '';
@@ -131,12 +221,13 @@ function buildEbookParagraphHtml(heading, enText, zhText) {
     html += `<h3 class="ebook-section-heading">${ebookEscapeHtml(heading)}</h3>`;
   }
   if (en) {
-    html += `<p class="ebook-en-text">${ebookEscapeHtml(en).replace(/\n/g, '<br>')}</p>`;
+    const highlightedEnText = highlightVocabularyInText(en, vocabList);
+    html += `<p class="ebook-en-text">${highlightedEnText.replace(/\n/g, '<br>')}</p>`;
   }
   if (zh) {
     html +=
       `<details class="ebook-translation-toggle">` +
-      `<summary>👁️ 顯示中文翻譯</summary>` +
+      `<summary>👁️ 展開中文翻譯</summary>` +
       `<div class="ebook-translation-content">${ebookEscapeHtml(zh).replace(/\n/g, '<br>')}</div>` +
       `</details>`;
   }
@@ -156,6 +247,7 @@ function buildEbookContentHtml(item) {
   const title = getEbookTitle(item);
   const typeLabel = getEbookTypeLabel(item);
   const subject = String(item.subjectName || '').trim();
+  const vocabList = getEbookVocabularyList(item);
 
   let body = '';
   const chunks = Array.isArray(item.content_chunks) ? item.content_chunks : [];
@@ -163,36 +255,41 @@ function buildEbookContentHtml(item) {
   if (chunks.length > 0) {
     chunks.forEach((chunk, i) => {
       if (!chunk || typeof chunk !== 'object') return;
-      // 刻意略過 inline_quiz、highlight_terms、writing_tasks
+      // 刻意略過 inline_quiz、writing_tasks；生字僅用於行內高亮
       body += buildEbookParagraphHtml(
         chunks.length > 1 ? `第 ${i + 1} 段` : '',
         chunk.paragraph_en,
-        chunk.paragraph_zh
+        chunk.paragraph_zh,
+        vocabList
       );
     });
   } else if (item.type === 'story') {
-    body += buildEbookParagraphHtml('', item.story_en, item.story_zh);
+    body += buildEbookParagraphHtml('', item.story_en, item.story_zh, vocabList);
   } else if (item.type === 'case_note') {
     body += buildEbookParagraphHtml(
       '',
       item.article_en || item.case_note_en,
-      item.article_zh || item.case_note_zh
+      item.article_zh || item.case_note_zh,
+      vocabList
     );
   } else {
     body += buildEbookParagraphHtml(
       '學術摘要',
       item.simplified_article || item.simplified_en || item.article_en,
-      item.article_zh
+      item.article_zh,
+      vocabList
     );
     body += buildEbookParagraphHtml(
       '情境案例',
       item.case_scenario_en,
-      item.case_scenario_zh
+      item.case_scenario_zh,
+      vocabList
     );
     body += buildEbookParagraphHtml(
       '實踐應用',
       item.practical_application_en,
-      item.practical_application_zh
+      item.practical_application_zh,
+      vocabList
     );
   }
 
@@ -224,7 +321,7 @@ function bindEbookTranslationToggles(container) {
     const summary = details.querySelector('summary');
     if (!summary) return;
     details.addEventListener('toggle', () => {
-      summary.textContent = details.open ? '🙈 隱藏中文翻譯' : '👁️ 顯示中文翻譯';
+      summary.textContent = details.open ? '🙈 隱藏中文翻譯' : '👁️ 展開中文翻譯';
     });
   });
 }

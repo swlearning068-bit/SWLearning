@@ -5315,10 +5315,12 @@ body.ebook-reader-open {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 12px clamp(12px, 3vw, 40px);
   flex-shrink: 0;
   position: relative;
   z-index: 10002;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ebook-header-left,
@@ -5382,19 +5384,41 @@ body.ebook-reader-open {
   overflow: hidden;
   position: relative;
   min-height: 0;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 clamp(8px, 2vw, 32px);
+  box-sizing: border-box;
+  gap: clamp(4px, 1vw, 16px);
 }
 
 #ebook-text-container {
-  max-width: 750px;
+  max-width: min(820px, 100%);
   width: 100%;
   height: 100%;
-  padding: 40px 20px 60px;
+  padding: 40px clamp(16px, 3vw, 48px) 60px;
   font-size: var(--ebook-font-size, 1.2rem);
   line-height: 1.8;
   overflow-y: auto;
   box-sizing: border-box;
-  transition: font-size 0.2s ease;
+  transition: font-size 0.2s ease, box-shadow 0.25s ease, background-color 0.25s ease;
   color: inherit;
+}
+
+.ebook-nav-btn {
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  color: #BDC3C7;
+  cursor: pointer;
+  padding: 0 12px;
+  height: auto;
+  min-width: 48px;
+  align-self: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+  border-radius: 999px;
+  line-height: 1;
 }
 
 /* 防呆：即使誤傳測驗／單字／表單也不顯示 */
@@ -5458,7 +5482,56 @@ body.ebook-reader-open {
   white-space: pre-wrap;
 }
 
-/* 翻譯收合區塊（藍字翻譯） */
+/* 藍字單字高亮（帶虛線底線） */
+#ebook-text-container .vocab-highlight {
+  color: #2980b9;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+  position: relative;
+  font-weight: 500;
+}
+
+#ebook-reader-overlay.theme-dark #ebook-text-container .vocab-highlight {
+  color: #6CB6FF;
+}
+
+/* 懸浮提示 (Tooltip) */
+#ebook-text-container .vocab-highlight:hover::after,
+#ebook-text-container .vocab-highlight:focus::after {
+  content: attr(data-translation);
+  position: absolute;
+  bottom: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333333;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 10005;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+/* Tooltip 小箭頭 */
+#ebook-text-container .vocab-highlight:hover::before,
+#ebook-text-container .vocab-highlight:focus::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #333333 transparent transparent transparent;
+  z-index: 10005;
+  pointer-events: none;
+}
+
+/* 翻譯收合區塊（整段中文） */
 .ebook-translation-toggle {
   margin-top: 10px;
   margin-bottom: 20px;
@@ -5490,17 +5563,17 @@ body.ebook-reader-open {
 
 .ebook-translation-content {
   margin-top: 8px;
-  color: #2980b9;
+  color: inherit;
+  opacity: 0.85;
   padding-left: 10px;
-  border-left: 3px solid #2980b9;
+  border-left: 3px solid rgba(41, 128, 185, 0.45);
   font-size: 0.92em;
   line-height: 1.75;
   white-space: pre-wrap;
 }
 
 #ebook-reader-overlay.theme-dark .ebook-translation-content {
-  color: #6CB6FF;
-  border-left-color: #6CB6FF;
+  border-left-color: rgba(108, 182, 255, 0.5);
 }
 
 .ebook-empty {
@@ -5509,27 +5582,20 @@ body.ebook-reader-open {
   margin-top: 40px;
 }
 
-.ebook-nav-btn {
-  background: transparent;
-  border: none;
-  font-size: 2rem;
-  color: #BDC3C7;
-  cursor: pointer;
-  padding: 0 20px;
-  height: auto;
-  align-self: stretch;
-  flex-shrink: 0;
-  transition: color 0.15s ease;
-}
-
 .ebook-nav-btn:hover:not(:disabled) {
   color: inherit;
   opacity: 0.85;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+#ebook-reader-overlay.theme-dark .ebook-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .ebook-nav-btn:disabled {
   color: transparent;
   cursor: default;
+  background: transparent;
 }
 
 /* 側邊欄目錄 */
@@ -5644,9 +5710,16 @@ body.ebook-reader-open {
     font-size: 0.82rem;
   }
 
+  .ebook-content-wrapper {
+    max-width: none;
+    padding: 0 4px;
+    gap: 0;
+  }
+
   .ebook-nav-btn {
-    padding: 0 8px;
+    padding: 0 6px;
     font-size: 1.5rem;
+    min-width: 36px;
   }
 
   #ebook-text-container {
@@ -5655,6 +5728,85 @@ body.ebook-reader-open {
 
   #ebook-sidebar {
     width: min(300px, 85vw);
+  }
+}
+
+/* ----- 寬屏優化：置中書頁感、加大閱讀欄與翻頁鈕 ----- */
+@media (min-width: 1024px) {
+  .ebook-header {
+    padding-left: max(24px, calc((100vw - 1200px) / 2 + 24px));
+    padding-right: max(24px, calc((100vw - 1200px) / 2 + 24px));
+  }
+
+  .ebook-content-wrapper {
+    max-width: 1280px;
+    padding: 12px 40px 20px;
+    gap: 20px;
+  }
+
+  #ebook-text-container {
+    max-width: 860px;
+    padding: 48px 56px 72px;
+    border-radius: 8px;
+  }
+
+  #ebook-reader-overlay.theme-light #ebook-text-container,
+  #ebook-reader-overlay.theme-sepia #ebook-text-container {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.06);
+  }
+
+  #ebook-reader-overlay.theme-light #ebook-text-container {
+    background-color: #FFFFFF;
+  }
+
+  #ebook-reader-overlay.theme-sepia #ebook-text-container {
+    background-color: #FFFBF0;
+  }
+
+  #ebook-reader-overlay.theme-dark #ebook-text-container {
+    background-color: #242424;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  .ebook-nav-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+  }
+
+  .ebook-nav-btn:hover:not(:disabled) {
+    opacity: 1;
+  }
+
+  .ebook-title {
+    font-size: 1.55em;
+  }
+}
+
+@media (min-width: 1440px) {
+  .ebook-content-wrapper {
+    max-width: 1400px;
+    padding: 20px 56px 28px;
+    gap: 28px;
+  }
+
+  #ebook-text-container {
+    max-width: 920px;
+    padding: 56px 72px 88px;
+  }
+
+  .ebook-nav-btn {
+    width: 64px;
+    height: 64px;
+    font-size: 2rem;
+  }
+
+  #ebook-sidebar {
+    width: 340px;
   }
 }
 
