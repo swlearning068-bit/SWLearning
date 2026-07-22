@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=56">
+  <link rel="stylesheet" href="css/style.css?v=57">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -106,6 +106,19 @@
         data-tab="reward"
       >
         🏆 學習目標
+      </button>
+      <!-- Phase 13：任務模式（棋盤關卡） -->
+      <button
+        id="nav-quest"
+        class="tab-btn nav-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="quest-section"
+        data-tab="quest"
+        data-target="quest-section"
+      >
+        🗺️ 任務模式
       </button>
     </nav>
 
@@ -790,7 +803,99 @@
 
     </section><!-- /#reward-section -->
 
+    <!-- ==================== Phase 13：任務模式（棋盤關卡） ==================== -->
+    <section
+      id="quest-section"
+      class="quest-section main-section hidden"
+      role="tabpanel"
+      aria-labelledby="nav-quest"
+    >
+      <div class="quest-header">
+        <h2 class="section-title">🏆 社工專業英文歷險</h2>
+        <p class="section-desc">完成各科目關卡，解鎖高階臨床實務挑戰！</p>
+        <p id="quest-status-hint" class="quest-status-hint" aria-live="polite"></p>
+        <div class="quest-header-actions">
+          <button id="btn-quest-regen" class="btn btn-secondary" type="button">
+            🔄 依目前科目重新分配關卡
+          </button>
+        </div>
+      </div>
+      <div id="quest-map-container" class="quest-map-path" aria-label="任務關卡地圖">
+        <!-- 之字形關卡節點將由 JS 動態生成 -->
+      </div>
+    </section><!-- /#quest-section -->
+
   </main>
+
+  <!-- ==================== Phase 13：任務挑戰專屬視圖 ==================== -->
+  <div
+    id="quest-challenge-overlay"
+    class="quest-challenge-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="quest-challenge-title"
+    aria-hidden="true"
+  >
+    <div class="quest-challenge-shell">
+      <header class="quest-challenge-header">
+        <div class="quest-challenge-heading">
+          <p id="quest-challenge-meta" class="quest-challenge-meta"></p>
+          <h2 id="quest-challenge-title" class="quest-challenge-title">任務挑戰</h2>
+        </div>
+        <button id="btn-quest-challenge-close" class="btn btn-secondary" type="button">
+          ← 返回地圖
+        </button>
+      </header>
+
+      <div class="quest-challenge-body">
+        <div class="quest-challenge-steps" aria-label="挑戰進度">
+          <span class="quest-step" data-quest-step="reading">① 段落閱讀</span>
+          <span class="quest-step-arrow" aria-hidden="true">→</span>
+          <span class="quest-step" data-quest-step="quiz">② 即時測驗</span>
+          <span class="quest-step-arrow" aria-hidden="true">→</span>
+          <span class="quest-step" data-quest-step="writing">③ 漸進寫作</span>
+        </div>
+
+        <div class="quest-challenge-actions">
+          <button id="btn-quest-generate" class="btn btn-primary" type="button">
+            🚀 開始本關挑戰（生成文章）
+          </button>
+          <button id="btn-quest-complete" class="btn btn-primary hidden" type="button" disabled>
+            🏅 完成本關卡
+          </button>
+        </div>
+
+        <div id="quest-challenge-loading" class="skeleton-card hidden" aria-live="polite">
+          <div class="skeleton-line skeleton-line--short"></div>
+          <div class="skeleton-line skeleton-line--long"></div>
+          <div class="skeleton-line skeleton-line--medium"></div>
+          <p class="loading-text">正在為本關生成任務文章與測驗…</p>
+        </div>
+
+        <div id="quest-challenge-error" class="error-card hidden" role="alert"></div>
+        <div id="quest-challenge-root" class="quest-challenge-root" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Phase 13：關卡通關慶祝 ==================== -->
+  <div
+    id="quest-clear-modal"
+    class="modal-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="quest-clear-title"
+  >
+    <div class="modal-box quest-clear-box">
+      <h2 id="quest-clear-title" class="modal-title">🎉 恭喜通關！</h2>
+      <p id="quest-clear-text" class="quest-clear-text"></p>
+      <div class="modal-actions">
+        <button id="btn-close-quest-clear" class="btn btn-primary" type="button">
+          繼續冒險
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== 雲端儲存庫 Modal ==================== -->
   <div
@@ -1117,8 +1222,9 @@
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="js/reward.js?v=5"></script>
-  <script src="js/app.js?v=21"></script>
+  <script src="js/reward.js?v=6"></script>
+  <script src="js/quest-mode.js?v=1"></script>
+  <script src="js/app.js?v=22"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=16"></script>
 </body>

@@ -732,6 +732,11 @@ function handleRewardSetupSubmit(event) {
   saveRewardState();
   refreshRewardView();
   rewardToast(`目標已設定！為了「${goal}」，開始收集寶石吧 💎`);
+
+  // Phase 13：啟動學習目標時自動分配任務關卡
+  if (typeof window.onLearningGoalStarted === 'function') {
+    window.onLearningGoalStarted();
+  }
 }
 
 /**
@@ -780,6 +785,7 @@ function debugResetRewardProgress() {
   // 現行合併狀態鍵
   localStorage.removeItem(STORAGE_KEY_REWARD);
   localStorage.removeItem(STORAGE_KEY_COMPLETED_CHALLENGES);
+  localStorage.removeItem('sw_quest_levels');
 
   // 相容任務規格中的舊／拆分鍵名
   localStorage.removeItem('sw_reward_goal');

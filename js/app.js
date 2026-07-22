@@ -3,7 +3,7 @@
  *
  * 職責：
  * 1. 管理設定 Modal 與 API Key
- * 2. Tab 切換（寫作 / 閱讀 / 詞彙庫 / 生字複習 / 測驗 / 文章庫 / 學習目標）
+ * 2. Tab 切換（寫作 / 閱讀 / 詞彙庫 / 生字複習 / 測驗 / 文章庫 / 學習目標 / 任務模式）
  * 3. 載入 14 個社工科目並支援動態切換（localStorage）
  * 4. 初始化各功能模組
  * 5. 動態確保 flashcard.css 已載入
@@ -344,7 +344,7 @@ function ensureFlashcardStyles() {
 /**
  * 切換到指定 Tab，顯示對應 section、隱藏其餘
  * 生字複習（learn）掛在專業詞彙庫底下，進入時高亮「專業詞彙庫」Tab
- * @param {'practice'|'vocab'|'learn'|'quiz'|'articles'|'reward'} tabName
+ * @param {'practice'|'vocab'|'learn'|'quiz'|'articles'|'reward'|'quest'} tabName
  */
 function switchTab(tabName) {
   // 相容舊呼叫
@@ -360,7 +360,8 @@ function switchTab(tabName) {
     learn:    $('learn-section'),
     quiz:     $('quiz-section'),
     articles: $('article-library-section'),
-    reward:   $('reward-section')
+    reward:   $('reward-section'),
+    quest:    $('quest-section')
   };
 
   const tabs = {
@@ -368,7 +369,8 @@ function switchTab(tabName) {
     vocab:    $('tab-vocab'),
     quiz:     $('tab-quiz'),
     articles: $('nav-article-library'),
-    reward:   $('nav-reward')
+    reward:   $('nav-reward'),
+    quest:    $('nav-quest')
   };
 
   Object.keys(sections).forEach((name) => {
@@ -407,6 +409,10 @@ function switchTab(tabName) {
 
   if (tabName === 'reward' && typeof refreshRewardView === 'function') {
     refreshRewardView();
+  }
+
+  if (tabName === 'quest' && typeof refreshQuestView === 'function') {
+    refreshQuestView();
   }
 }
 
@@ -499,6 +505,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 11. 初始化遊戲化獎勵／印花模組（定義於 reward.js）
   if (typeof initRewardModule === 'function') {
     initRewardModule();
+  }
+
+  // 12. Phase 13：任務模式棋盤關卡
+  if (typeof initQuestModeModule === 'function') {
+    initQuestModeModule();
   }
 
 });

@@ -5885,3 +5885,354 @@ body.ebook-reader-open > main.main-content {
   }
 }
 
+/* ============================================================
+   Phase 13：任務模式 — 之字形棋盤關卡
+   ============================================================ */
+
+.quest-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.quest-header {
+  text-align: center;
+  padding: 8px 4px 4px;
+}
+
+.quest-status-hint {
+  margin: 8px 0 0;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.quest-header-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* S 型路徑容器 */
+.quest-map-path {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 16px 48px;
+  width: 100%;
+}
+
+.quest-map-path::before {
+  content: '';
+  position: absolute;
+  top: 40px;
+  bottom: 40px;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    #86efac 0%,
+    #93c5fd 45%,
+    #fcd34d 100%
+  );
+  border-radius: 999px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.quest-map-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.quest-map-row--left {
+  justify-content: flex-start;
+  padding-left: 4%;
+}
+
+.quest-map-row--center {
+  justify-content: center;
+}
+
+.quest-map-row--right {
+  justify-content: flex-end;
+  padding-right: 4%;
+}
+
+.quest-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(240px, 78vw);
+  border: none;
+  background: transparent;
+  font-family: var(--font-base);
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 0;
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.quest-node:focus-visible {
+  outline: none;
+}
+
+.quest-node:focus-visible .quest-node-btn {
+  box-shadow: var(--focus-ring), 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
+.quest-node:not(.node-locked):hover {
+  transform: translateY(-3px);
+}
+
+.quest-node-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.45rem;
+  font-weight: 700;
+  border: 3px solid transparent;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-fast);
+}
+
+.quest-node-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.quest-node-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+/* 已完成 */
+.quest-node.node-completed .quest-node-btn {
+  background: linear-gradient(145deg, #22c55e, #15803d);
+  color: #fff;
+  border-color: #86efac;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.28);
+}
+
+.quest-node.node-completed .quest-node-label {
+  color: #166534;
+}
+
+/* 目前可挑戰 */
+.quest-node.node-active .quest-node-btn {
+  background: linear-gradient(145deg, #38bdf8, #2563eb);
+  color: #fff;
+  border-color: #bfdbfe;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45);
+  animation: quest-node-pulse 1.8s ease-in-out infinite;
+}
+
+.quest-node.node-active .quest-node-label {
+  color: #1d4ed8;
+}
+
+/* 鎖定 */
+.quest-node.node-locked {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.quest-node.node-locked:hover {
+  transform: none;
+}
+
+.quest-node.node-locked .quest-node-btn {
+  background: linear-gradient(145deg, #e5e7eb, #9ca3af);
+  color: #4b5563;
+  border-color: #d1d5db;
+  box-shadow: var(--shadow-sm);
+}
+
+.quest-node.node-locked .quest-node-label {
+  color: #6b7280;
+}
+
+@keyframes quest-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28), 0 0 0 0 rgba(37, 99, 235, 0.35);
+  }
+  50% {
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.35), 0 0 0 12px rgba(37, 99, 235, 0);
+  }
+}
+
+/* —— 任務挑戰全螢幕視圖 —— */
+.quest-challenge-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px;
+}
+
+.quest-challenge-shell {
+  width: min(960px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--bg-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.quest-challenge-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.quest-challenge-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.quest-challenge-title {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.quest-challenge-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quest-challenge-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.quest-step {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.quest-step.is-done {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.quest-step.is-current {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.quest-step-arrow {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.quest-challenge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quest-challenge-root {
+  min-height: 120px;
+}
+
+.quest-clear-box {
+  text-align: center;
+  max-width: 420px;
+}
+
+.quest-clear-text {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.55;
+  margin: 8px 0 4px;
+}
+
+@media (max-width: 640px) {
+  .quest-map-path {
+    gap: 22px;
+    padding: 20px 8px 36px;
+  }
+
+  .quest-map-path::before {
+    left: 36px;
+    transform: none;
+  }
+
+  .quest-map-row--left,
+  .quest-map-row--center,
+  .quest-map-row--right {
+    justify-content: flex-start;
+    padding-left: 8px;
+    padding-right: 0;
+  }
+
+  .quest-node {
+    width: calc(100% - 16px);
+    flex-direction: row;
+    text-align: left;
+    gap: 12px;
+  }
+
+  .quest-node-btn {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+  }
+
+  .quest-challenge-overlay {
+    padding: 0;
+  }
+
+  .quest-challenge-shell {
+    border-radius: 0;
+    max-height: 100%;
+  }
+}
+
