@@ -1837,7 +1837,9 @@ async function generateL0VocabQuizAPI(subjectName, subjectId, wishText) {
   "questions": [
     {
       "type": "en_to_zh",
-      "prompt": "題幹（英文單字／短句或中文）",
+      "term_en": "英文單字或極短片語",
+      "translation_zh": "繁體中文意思",
+      "prompt": "題幹（顯示給學生看的文字）",
       "options": ["選項A", "選項B", "選項C", "選項D"],
       "correctIndex": 0,
       "hint_zh": "一句溫柔提示（繁中）"
@@ -1847,14 +1849,18 @@ async function generateL0VocabQuizAPI(subjectName, subjectId, wishText) {
 rules:
 - questions 必須剛好 5 題
 - type 只能是 en_to_zh 或 zh_to_en（兩者都要出現）
-- correctIndex 為 0–3 整數
+- term_en / translation_zh 必填，供收藏生字用
+- en_to_zh：prompt 應為 term_en，正確選項應為 translation_zh
+- zh_to_en：prompt 應為 translation_zh，正確選項應為 term_en
+- correctIndex 為 0–3 整數（可任意位置；前端會再洗牌）
 - options 必須剛好 4 個字串
 - 全部文字用語適合香港／台灣繁體中文學習者`;
 
   const userContent =
     `科目：「${safeSubject}」。` +
     (wish ? `學習者願望／目標：「${wish}」。` : '') +
-    `請生成 5 題與該科目相關、極低門檻的單字或極短句測驗（英選中與中選英混合）。`;
+    `請生成 5 題與該科目相關、極低門檻的單字或極短句測驗（英選中與中選英混合）。` +
+    `請務必把正確答案放在 options 的隨機位置（不要總是第一個）。`;
 
   const result = await requestDeepSeekJSON(
     systemPrompt,
@@ -1884,12 +1890,30 @@ rules:
       while (four.length < 4) four.push(`（選項 ${four.length + 1}）`);
       if (correctIndex >= four.length) correctIndex = 0;
 
+      const correctText = four[correctIndex];
+      let term_en = String(q.term_en || '').trim();
+      let translation_zh = String(q.translation_zh || '').trim();
+      if (!term_en || !translation_zh) {
+        if (type === 'en_to_zh') {
+          term_en = term_en || prompt;
+          translation_zh = translation_zh || correctText;
+        } else {
+          translation_zh = translation_zh || prompt;
+          term_en = term_en || correctText;
+        }
+      }
+
+      // 前端強制洗牌，避免模型總是把正確答案放第一個
+      const shuffled = shuffleL0QuizOptions(four, correctIndex);
+
       return {
         id: index + 1,
         type,
         prompt,
-        options: four,
-        correctIndex,
+        options: shuffled.options,
+        correctIndex: shuffled.correctIndex,
+        term_en,
+        translation_zh,
         hint_zh:
           typeof q.hint_zh === 'string' && q.hint_zh.trim()
             ? q.hint_zh.trim()
@@ -1914,6 +1938,30 @@ rules:
   }
 
   return questions;
+}
+
+/**
+ * 洗牌 L0 選項並回傳新的 correctIndex
+ * @param {string[]} options
+ * @param {number} correctIndex
+ * @returns {{options: string[], correctIndex: number}}
+ */
+function shuffleL0QuizOptions(options, correctIndex) {
+  const items = options.map((text, i) => ({
+    text,
+    isCorrect: i === correctIndex
+  }));
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = items[i];
+    items[i] = items[j];
+    items[j] = tmp;
+  }
+  const nextCorrect = items.findIndex((item) => item.isCorrect);
+  return {
+    options: items.map((item) => item.text),
+    correctIndex: nextCorrect >= 0 ? nextCorrect : 0
+  };
 }
 
 /**

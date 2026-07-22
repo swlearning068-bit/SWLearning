@@ -1030,24 +1030,21 @@ function syncQuestStepIndicators() {
 
   const completeBtn = quest$('btn-quest-complete');
   if (completeBtn) {
-    const ready = isL0
-      ? questProgress.quiz
-      : questProgress.reading &&
+    // L0：通關鈕改放在題目最下方，頂部隱藏
+    if (isL0) {
+      completeBtn.classList.add('hidden');
+      completeBtn.disabled = true;
+    } else {
+      const ready =
+        questProgress.reading &&
         questProgress.quiz &&
         questProgress.writing;
-    const hasL0Task = Boolean(
-      quest$('quest-challenge-root')?.querySelector('.l0-vocab-task')
-    );
-    completeBtn.classList.toggle(
-      'hidden',
-      isL0 ? !hasL0Task : !questProgress.reading
-    );
-    completeBtn.disabled = !ready;
-    completeBtn.textContent = ready
-      ? '🏅 完成本關卡'
-      : isL0
-        ? '🏅 答對全部題目後可通關'
+      completeBtn.classList.toggle('hidden', !questProgress.reading);
+      completeBtn.disabled = !ready;
+      completeBtn.textContent = ready
+        ? '🏅 完成本關卡'
         : '🏅 完成閱讀／測驗／寫作後可通關';
+    }
   }
 }
 
@@ -1363,7 +1360,10 @@ async function handleQuestL0Start() {
         markQuestProgress('quiz');
         markQuestProgress('writing');
         syncQuestStepIndicators();
-        questToast('🎉 全對！可以通關了');
+        questToast('🎉 全對！可收藏生字後通關');
+      },
+      onComplete: () => {
+        completeActiveQuestLevel();
       },
       onError: (message) => {
         showQuestError(message);

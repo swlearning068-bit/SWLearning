@@ -6525,6 +6525,86 @@ body.ebook-reader-open > main.main-content {
   color: var(--text-secondary);
 }
 
+.l0-vocab-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  padding-bottom: 8px;
+}
+
+.l0-vocab-collect {
+  padding: 14px 16px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+.l0-vocab-collect-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.l0-vocab-collect-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.l0-vocab-collect-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.l0-vocab-collect-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.l0-vocab-collect-en {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.l0-vocab-collect-zh {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.l0-vocab-collect-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.l0-vocab-collect-empty {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.l0-vocab-complete-btn {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1.05rem;
+}
+
+.l0-vocab-complete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .quest-map-path {
     gap: 22px;

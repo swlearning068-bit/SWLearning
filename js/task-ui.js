@@ -1069,7 +1069,7 @@ function escapeL0Html(text) {
 
 /**
  * 渲染 L0 純單字／短句測驗 UI
- * 答錯可立即重試；全對觸發 onAllCorrect
+ * 答錯可立即重試；全對後可收藏生字，並在題目最下方通關
  *
  * @param {HTMLElement} mountEl
  * @param {{
@@ -1077,6 +1077,7 @@ function escapeL0Html(text) {
  *   subjectName?: string,
  *   wishText?: string,
  *   onAllCorrect?: () => void,
+ *   onComplete?: () => void,
  *   onError?: (message: string) => void
  * }} [options]
  * @returns {Promise<void>}
@@ -1104,6 +1105,40 @@ async function renderL0VocabTask(mountEl, options) {
     throw err;
   }
 
+  // 再洗一次，雙重保險
+  questions = questions.map((q) => {
+    const items = (q.options || []).map((text, i) => ({
+      text,
+      isCorrect: i === q.correctIndex
+    }));
+    for (let i = items.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = items[i];
+      items[i] = items[j];
+      items[j] = tmp;
+    }
+    const nextCorrect = items.findIndex((item) => item.isCorrect);
+    let term_en = String(q.term_en || '').trim();
+    let translation_zh = String(q.translation_zh || '').trim();
+    if (!term_en || !translation_zh) {
+      const correctText = items[nextCorrect >= 0 ? nextCorrect : 0]?.text || '';
+      if (q.type === 'en_to_zh') {
+        term_en = term_en || q.prompt;
+        translation_zh = translation_zh || correctText;
+      } else {
+        translation_zh = translation_zh || q.prompt;
+        term_en = term_en || correctText;
+      }
+    }
+    return {
+      ...q,
+      options: items.map((item) => item.text),
+      correctIndex: nextCorrect >= 0 ? nextCorrect : 0,
+      term_en,
+      translation_zh
+    };
+  });
+
   mountEl.innerHTML = '';
 
   const wrap = document.createElement('div');
@@ -1118,17 +1153,111 @@ async function renderL0VocabTask(mountEl, options) {
     `<p class="l0-vocab-progress" aria-live="polite"></p>` +
     `</header>` +
     `<div class="l0-vocab-list"></div>` +
-    `<div class="l0-vocab-pass hidden" role="status">` +
+    `<div class="l0-vocab-footer hidden">` +
+    `<div class="l0-vocab-pass" role="status">` +
     `<p class="l0-vocab-pass-title">🎉 過關！全部答對了</p>` +
-    `<p class="l0-vocab-pass-sub">點下方「完成本關卡」繼續冒險吧</p>` +
+    `<p class="l0-vocab-pass-sub">可以收藏本關生字，再點下方完成本關卡</p>` +
+    `</div>` +
+    `<div class="l0-vocab-collect">` +
+    `<h4 class="l0-vocab-collect-title">📚 收藏本關生字</h4>` +
+    `<ul class="l0-vocab-collect-list"></ul>` +
+    `</div>` +
+    `<button type="button" class="btn btn-primary l0-vocab-complete-btn" disabled>` +
+    `🏅 完成本關卡` +
+    `</button>` +
     `</div>`;
 
   const listEl = wrap.querySelector('.l0-vocab-list');
   const progressEl = wrap.querySelector('.l0-vocab-progress');
-  const passEl = wrap.querySelector('.l0-vocab-pass');
+  const footerEl = wrap.querySelector('.l0-vocab-footer');
+  const collectList = wrap.querySelector('.l0-vocab-collect-list');
+  const completeBtn = wrap.querySelector('.l0-vocab-complete-btn');
 
   /** @type {boolean[]} */
   const answered = questions.map(() => false);
+  let collectBuilt = false;
+
+  function buildCollectList() {
+    if (!collectList || collectBuilt) return;
+    collectBuilt = true;
+    collectList.innerHTML = '';
+
+    const seen = new Set();
+    questions.forEach((q) => {
+      const word = String(q.term_en || '').trim();
+      const zh = String(q.translation_zh || '').trim();
+      if (!word || !zh) return;
+      const key = word.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      const li = document.createElement('li');
+      li.className = 'l0-vocab-collect-item';
+
+      const info = document.createElement('div');
+      info.className = 'l0-vocab-collect-info';
+      info.innerHTML =
+        `<span class="l0-vocab-collect-en">${escapeL0Html(word)}</span>` +
+        `<span class="l0-vocab-collect-zh">${escapeL0Html(zh)}</span>`;
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn btn-secondary l0-vocab-collect-btn';
+      addBtn.textContent = '⭐ 加入學習';
+
+      if (typeof window.isTermInLearning === 'function') {
+        const slug = word
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_|_$/g, '');
+        const probeId = `lit_${slug}`;
+        const already =
+          window.isTermInLearning(probeId) ||
+          (Array.isArray(window.allTerms) &&
+            window.allTerms.some(
+              (t) => t?.term && t.term.toLowerCase() === key && window.isTermInLearning(t.id)
+            ));
+        if (already) {
+          addBtn.disabled = true;
+          addBtn.textContent = '已在學習清單';
+        }
+      }
+
+      addBtn.addEventListener('click', () => {
+        if (typeof window.addCustomTermToLearning !== 'function') {
+          if (typeof window.showToast === 'function') {
+            window.showToast('❌ 生字庫模組尚未載入');
+          }
+          return;
+        }
+        const result = window.addCustomTermToLearning({
+          word,
+          zh,
+          pos: 'n.'
+        });
+        if (result?.ok || result?.already) {
+          addBtn.disabled = true;
+          addBtn.textContent = result.already ? '已在學習清單' : '✅ 已加入';
+          if (typeof window.showToast === 'function') {
+            window.showToast(
+              result.already ? `「${word}」已在學習清單` : `⭐ 已收藏「${word}」`
+            );
+          }
+        } else if (typeof window.showToast === 'function') {
+          window.showToast(`❌ ${result?.message || '無法加入'}`);
+        }
+      });
+
+      li.appendChild(info);
+      li.appendChild(addBtn);
+      collectList.appendChild(li);
+    });
+
+    if (!collectList.children.length) {
+      collectList.innerHTML =
+        '<li class="l0-vocab-collect-empty">本關無可收藏單字</li>';
+    }
+  }
 
   function updateProgress() {
     const done = answered.filter(Boolean).length;
@@ -1136,10 +1265,24 @@ async function renderL0VocabTask(mountEl, options) {
       progressEl.textContent = `進度 ${done} / ${questions.length}`;
     }
     if (done >= questions.length) {
-      passEl?.classList.remove('hidden');
+      footerEl?.classList.remove('hidden');
+      buildCollectList();
+      if (completeBtn) {
+        completeBtn.disabled = false;
+        completeBtn.textContent = '🏅 完成本關卡';
+      }
       options?.onAllCorrect?.();
+      // 捲到底部通關區，方便操作
+      footerEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
+
+  completeBtn?.addEventListener('click', () => {
+    if (completeBtn.disabled) return;
+    if (typeof options?.onComplete === 'function') {
+      options.onComplete();
+    }
+  });
 
   questions.forEach((q, qIndex) => {
     const card = document.createElement('div');
