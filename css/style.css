@@ -6193,6 +6193,338 @@ body.ebook-reader-open > main.main-content {
   margin: 8px 0 4px;
 }
 
+/* —— Phase 13.1：章節區隔 —— */
+.quest-chapter-divider {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 4px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 55%, #fffbeb 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.quest-chapter-badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.quest-chapter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quest-chapter-name {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.quest-chapter-band {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.quest-chapter-wish {
+  font-size: 0.85rem;
+  color: #b45309;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.quest-chapter-wish--empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 寶箱節點 */
+.quest-node--chest .quest-node-btn {
+  background: linear-gradient(145deg, #fbbf24, #f59e0b);
+  color: #78350f;
+  border-color: #fde68a;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.3);
+}
+
+.quest-node--chest.node-active .quest-node-btn {
+  background: linear-gradient(145deg, #fcd34d, #ea580c);
+  color: #fff;
+  border-color: #fed7aa;
+}
+
+.quest-chest-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 220px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #78350f;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 5;
+  white-space: normal;
+}
+
+.quest-node--chest:hover .quest-chest-tooltip,
+.quest-node--chest:focus-visible .quest-chest-tooltip {
+  opacity: 1;
+}
+
+.quest-node--chapter-start.node-active .quest-node-btn {
+  outline: 2px dashed #93c5fd;
+  outline-offset: 4px;
+}
+
+.level-btn.is-quest-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* —— 願望 Modal —— */
+.wish-setting-box {
+  max-width: 440px;
+  width: 100%;
+}
+
+.wish-setting-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+  text-align: left;
+}
+
+.wish-field-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+
+.wish-subject-select,
+.wish-text-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-family: var(--font-base);
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.wish-subject-select:focus,
+.wish-text-input:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: #93c5fd;
+}
+
+.wish-setting-hint {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* —— L0 單字訓練 —— */
+.l0-vocab-task {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.l0-vocab-header {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #eff6ff, #ecfdf5);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+}
+
+.l0-vocab-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.l0-vocab-desc,
+.l0-vocab-wish,
+.l0-vocab-progress {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.l0-vocab-wish {
+  color: #b45309;
+  font-weight: 500;
+}
+
+.l0-vocab-progress {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.l0-vocab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.l0-vocab-card {
+  padding: 14px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.l0-vocab-card.is-done {
+  border-color: #86efac;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.15);
+}
+
+.l0-vocab-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.l0-vocab-qnum {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.l0-vocab-qtype {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: #f3f4f6;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.l0-vocab-prompt {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.l0-vocab-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.l0-vocab-option {
+  padding: 12px 10px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--font-base);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  text-align: left;
+}
+
+.l0-vocab-option:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.l0-vocab-option:disabled {
+  cursor: default;
+}
+
+.l0-vocab-option.is-correct {
+  border-color: #22c55e;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 600;
+}
+
+.l0-vocab-option.is-wrong-flash {
+  border-color: #f87171;
+  background: #fef2f2;
+  animation: l0-shake 0.4s ease;
+}
+
+@keyframes l0-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.l0-vocab-feedback {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.l0-vocab-feedback.is-correct {
+  color: #166534;
+}
+
+.l0-vocab-feedback.is-wrong {
+  color: #b45309;
+}
+
+.l0-vocab-pass {
+  text-align: center;
+  padding: 18px 16px;
+  background: linear-gradient(135deg, #dcfce7, #dbeafe);
+  border: 1px solid #86efac;
+  border-radius: 14px;
+}
+
+.l0-vocab-pass-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.l0-vocab-pass-sub {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
 @media (max-width: 640px) {
   .quest-map-path {
     gap: 22px;
@@ -6224,6 +6556,21 @@ body.ebook-reader-open > main.main-content {
     height: 56px;
     flex-shrink: 0;
     font-size: 1.2rem;
+  }
+
+  .quest-chest-tooltip {
+    left: 0;
+    transform: none;
+    max-width: min(240px, 70vw);
+  }
+
+  .quest-chapter-divider {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .l0-vocab-options {
+    grid-template-columns: 1fr;
   }
 
   .quest-challenge-overlay {

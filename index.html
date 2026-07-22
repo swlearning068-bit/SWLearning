@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=57">
+  <link rel="stylesheet" href="css/style.css?v=58">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -812,11 +812,13 @@
     >
       <div class="quest-header">
         <h2 class="section-title">🏆 社工專業英文歷險</h2>
-        <p class="section-desc">完成各科目關卡，解鎖高階臨床實務挑戰！</p>
+        <p class="section-desc">
+          100 關平緩進階（單字 → 短文 → 長文 → 臨床表單）。每 10 關為一個願望循環：設定目標、衝關、點亮寶箱！
+        </p>
         <p id="quest-status-hint" class="quest-status-hint" aria-live="polite"></p>
         <div class="quest-header-actions">
           <button id="btn-quest-regen" class="btn btn-secondary" type="button">
-            🔄 依目前科目重新分配關卡
+            🔄 依目前科目重新分配 100 關
           </button>
         </div>
       </div>
@@ -892,6 +894,47 @@
       <div class="modal-actions">
         <button id="btn-close-quest-clear" class="btn btn-primary" type="button">
           繼續冒險
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Phase 13.1：願望目標設定 ==================== -->
+  <div
+    id="wish-setting-modal"
+    class="modal-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="wish-setting-title"
+    aria-hidden="true"
+  >
+    <div class="modal-box wish-setting-box">
+      <h2 id="wish-setting-title" class="modal-title">✨ 設定學習願望</h2>
+      <p id="wish-setting-heading" class="modal-desc">
+        請為接下來的 10 關設定你的學習目標與願望！
+      </p>
+      <div class="wish-setting-form">
+        <label class="wish-field-label" for="wish-subject-select">重點科目</label>
+        <select id="wish-subject-select" class="wish-subject-select" aria-label="重點科目">
+          <!-- 由 quest-mode.js 動態填入 -->
+        </select>
+        <label class="wish-field-label" for="wish-text-input">過關願望</label>
+        <input
+          id="wish-text-input"
+          class="wish-text-input"
+          type="text"
+          maxlength="80"
+          placeholder="例如：希望實習順利"
+          autocomplete="off"
+        />
+        <p class="wish-setting-hint">完成這 10 關後，寶箱會點亮你的願望喔 🎁</p>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-wish-save" class="btn btn-primary" type="button">
+          設定願望並出發
+        </button>
+        <button id="btn-wish-cancel" class="btn btn-secondary" type="button">
+          取消
         </button>
       </div>
     </div>
@@ -1210,8 +1253,8 @@
   </div>
 
   <script src="js/utils.js?v=4"></script>
-  <script src="js/deepseek.js?v=32"></script>
-  <script src="js/task-ui.js?v=3"></script>
+  <script src="js/deepseek.js?v=33"></script>
+  <script src="js/task-ui.js?v=4"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
@@ -1222,8 +1265,8 @@
   <script src="js/quiz.js?v=8"></script>
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="js/reward.js?v=6"></script>
-  <script src="js/quest-mode.js?v=2"></script>
+  <script src="js/reward.js?v=7"></script>
+  <script src="js/quest-mode.js?v=3"></script>
   <script src="js/app.js?v=22"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=16"></script>

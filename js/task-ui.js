@@ -1051,9 +1051,156 @@ function buildL3WritingPanel(article) {
   return wrap;
 }
 
+/* ============================================================
+   Phase 13.1：L0 極簡單字訓練（無需閱讀文章）
+   ============================================================ */
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function escapeL0Html(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * 渲染 L0 純單字／短句測驗 UI
+ * 答錯可立即重試；全對觸發 onAllCorrect
+ *
+ * @param {HTMLElement} mountEl
+ * @param {{
+ *   subjectId?: string,
+ *   subjectName?: string,
+ *   wishText?: string,
+ *   onAllCorrect?: () => void,
+ *   onError?: (message: string) => void
+ * }} [options]
+ * @returns {Promise<void>}
+ */
+async function renderL0VocabTask(mountEl, options) {
+  if (!mountEl) return;
+
+  const subjectName = options?.subjectName || '通用社工實務';
+  const subjectId = options?.subjectId || null;
+  const wishText = options?.wishText || '';
+
+  const apiFn = window.generateL0VocabQuizAPI;
+  if (typeof apiFn !== 'function') {
+    const msg = 'L0 題目 API 尚未載入，請強制重新整理頁面。';
+    options?.onError?.(msg);
+    throw new Error(msg);
+  }
+
+  let questions;
+  try {
+    questions = await apiFn(subjectName, subjectId, wishText);
+  } catch (err) {
+    const msg = err?.message || '無法產生單字題目';
+    options?.onError?.(msg);
+    throw err;
+  }
+
+  mountEl.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'l0-vocab-task';
+  wrap.innerHTML =
+    `<header class="l0-vocab-header">` +
+    `<h3 class="l0-vocab-title">🔤 單字配對訓練</h3>` +
+    `<p class="l0-vocab-desc">與「${escapeL0Html(subjectName)}」相關的 5 題極簡練習。答錯可立刻再試，沒有壓力！</p>` +
+    (wishText
+      ? `<p class="l0-vocab-wish">✨ 為了願望：${escapeL0Html(wishText)}</p>`
+      : '') +
+    `<p class="l0-vocab-progress" aria-live="polite"></p>` +
+    `</header>` +
+    `<div class="l0-vocab-list"></div>` +
+    `<div class="l0-vocab-pass hidden" role="status">` +
+    `<p class="l0-vocab-pass-title">🎉 過關！全部答對了</p>` +
+    `<p class="l0-vocab-pass-sub">點下方「完成本關卡」繼續冒險吧</p>` +
+    `</div>`;
+
+  const listEl = wrap.querySelector('.l0-vocab-list');
+  const progressEl = wrap.querySelector('.l0-vocab-progress');
+  const passEl = wrap.querySelector('.l0-vocab-pass');
+
+  /** @type {boolean[]} */
+  const answered = questions.map(() => false);
+
+  function updateProgress() {
+    const done = answered.filter(Boolean).length;
+    if (progressEl) {
+      progressEl.textContent = `進度 ${done} / ${questions.length}`;
+    }
+    if (done >= questions.length) {
+      passEl?.classList.remove('hidden');
+      options?.onAllCorrect?.();
+    }
+  }
+
+  questions.forEach((q, qIndex) => {
+    const card = document.createElement('div');
+    card.className = 'l0-vocab-card';
+    card.dataset.qIndex = String(qIndex);
+
+    const typeLabel = q.type === 'zh_to_en' ? '中文 → 英文' : '英文 → 中文';
+    card.innerHTML =
+      `<div class="l0-vocab-card-top">` +
+      `<span class="l0-vocab-qnum">第 ${qIndex + 1} 題</span>` +
+      `<span class="l0-vocab-qtype">${escapeL0Html(typeLabel)}</span>` +
+      `</div>` +
+      `<p class="l0-vocab-prompt">${escapeL0Html(q.prompt)}</p>` +
+      `<div class="l0-vocab-options" role="group" aria-label="第 ${qIndex + 1} 題選項"></div>` +
+      `<p class="l0-vocab-feedback hidden" aria-live="polite"></p>`;
+
+    const optionsWrap = card.querySelector('.l0-vocab-options');
+    const feedback = card.querySelector('.l0-vocab-feedback');
+
+    q.options.forEach((opt, optIndex) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'l0-vocab-option';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        if (answered[qIndex]) return;
+
+        const correct = optIndex === q.correctIndex;
+        feedback.classList.remove('hidden', 'is-correct', 'is-wrong');
+
+        if (correct) {
+          answered[qIndex] = true;
+          feedback.classList.add('is-correct');
+          feedback.textContent = '✅ 正確！太棒了';
+          card.classList.add('is-done');
+          optionsWrap.querySelectorAll('.l0-vocab-option').forEach((b, i) => {
+            b.disabled = true;
+            if (i === q.correctIndex) b.classList.add('is-correct');
+          });
+          updateProgress();
+        } else {
+          feedback.classList.add('is-wrong');
+          feedback.textContent = `再試一次～ ${q.hint_zh || '你可以的！'}`;
+          btn.classList.add('is-wrong-flash');
+          setTimeout(() => btn.classList.remove('is-wrong-flash'), 450);
+        }
+      });
+      optionsWrap.appendChild(btn);
+    });
+
+    listEl.appendChild(card);
+  });
+
+  updateProgress();
+  mountEl.appendChild(wrap);
+}
+
 // 對外 API
 window.buildSubjectFieldPlaceholders = buildSubjectFieldPlaceholders;
 window.renderProgressiveWritingBlock = renderProgressiveWritingBlock;
+window.renderL0VocabTask = renderL0VocabTask;
 window.buildFallbackGuidance = buildFallbackGuidance;
 window.buildStoredTaskInstruction = buildStoredTaskInstruction;
 window.setTaskInstruction = setTaskInstruction;

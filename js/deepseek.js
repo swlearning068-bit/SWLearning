@@ -1809,6 +1809,114 @@ terms 必須剛好 3 筆；pos 可用 n. / v. / adj. / adv. 等簡短標記。`;
 }
 
 /**
+ * Phase 13.1：L0 極簡單字／短句測驗（5 題，英選中／中選英）
+ *
+ * @param {string} subjectName
+ * @param {string} [subjectId]
+ * @param {string} [wishText]
+ * @returns {Promise<Array<{
+ *   id: number,
+ *   type: 'en_to_zh'|'zh_to_en',
+ *   prompt: string,
+ *   options: string[],
+ *   correctIndex: number,
+ *   hint_zh?: string
+ * }>>}
+ */
+async function generateL0VocabQuizAPI(subjectName, subjectId, wishText) {
+  const safeSubject = String(subjectName || '').trim() || '通用社工實務';
+  const wish = String(wishText || '').trim();
+
+  const systemPrompt = `你是香港社工系的溫柔英文助教，專門為初學者設計「零挫折」單字測驗。
+請產出剛好 5 題極簡單字或極短句選擇題，難度必須非常低（日常社工場域常見詞，避免生僻術語）。
+題型須混合：英文選中文（en_to_zh）、中文選英文（zh_to_en）。
+每題 4 個選項，只有一個正確；干擾項也要合理但明顯不同。
+
+必須回傳純 JSON：
+{
+  "questions": [
+    {
+      "type": "en_to_zh",
+      "prompt": "題幹（英文單字／短句或中文）",
+      "options": ["選項A", "選項B", "選項C", "選項D"],
+      "correctIndex": 0,
+      "hint_zh": "一句溫柔提示（繁中）"
+    }
+  ]
+}
+rules:
+- questions 必須剛好 5 題
+- type 只能是 en_to_zh 或 zh_to_en（兩者都要出現）
+- correctIndex 為 0–3 整數
+- options 必須剛好 4 個字串
+- 全部文字用語適合香港／台灣繁體中文學習者`;
+
+  const userContent =
+    `科目：「${safeSubject}」。` +
+    (wish ? `學習者願望／目標：「${wish}」。` : '') +
+    `請生成 5 題與該科目相關、極低門檻的單字或極短句測驗（英選中與中選英混合）。`;
+
+  const result = await requestDeepSeekJSON(
+    systemPrompt,
+    userContent,
+    1400,
+    'standard',
+    { subjectId: subjectId || null, temperature: 0.6 }
+  );
+
+  const raw = Array.isArray(result.questions) ? result.questions : [];
+  const questions = raw
+    .map((q, index) => {
+      if (!q || typeof q !== 'object') return null;
+      const type =
+        q.type === 'zh_to_en' || q.type === 'en_to_zh' ? q.type : null;
+      const prompt = String(q.prompt || '').trim();
+      const options = Array.isArray(q.options)
+        ? q.options.map((o) => String(o || '').trim()).filter(Boolean)
+        : [];
+      let correctIndex = Number(q.correctIndex);
+      if (!type || !prompt || options.length < 4) return null;
+      if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+        correctIndex = 0;
+      }
+      // 正規化為剛好 4 選項
+      const four = options.slice(0, 4);
+      while (four.length < 4) four.push(`（選項 ${four.length + 1}）`);
+      if (correctIndex >= four.length) correctIndex = 0;
+
+      return {
+        id: index + 1,
+        type,
+        prompt,
+        options: four,
+        correctIndex,
+        hint_zh:
+          typeof q.hint_zh === 'string' && q.hint_zh.trim()
+            ? q.hint_zh.trim()
+            : '再想一想，你可以的！'
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (questions.length < 5) {
+    throw new Error('AI 回傳的 L0 題目不足 5 題，請再試一次。');
+  }
+
+  // 確保兩種題型都有
+  const hasEn = questions.some((q) => q.type === 'en_to_zh');
+  const hasZh = questions.some((q) => q.type === 'zh_to_en');
+  if (!hasEn || !hasZh) {
+    // 輕量修正：交替標記（不改答案內容）
+    questions.forEach((q, i) => {
+      q.type = i % 2 === 0 ? 'en_to_zh' : 'zh_to_en';
+    });
+  }
+
+  return questions;
+}
+
+/**
  * 文章庫 AI 深度挑戰：依文本（文獻或故事）生成 MCQ + 情境反思測驗
  */
 const ARTICLE_CHALLENGE_SYSTEM_PROMPT = `你是一位嚴格的香港社會工作系教授。請根據我提供的文本（可能是學術文獻或實務故事），設計一份英文測驗卷。
@@ -2372,6 +2480,7 @@ window.generateCaseNoteReading = generateCaseNoteReading;
 window.getL3SupervisionFeedbackAPI = getL3SupervisionFeedbackAPI;
 window.generateWritingPromptsAPI = generateWritingPromptsAPI;
 window.generateNewVocabAPI = generateNewVocabAPI;
+window.generateL0VocabQuizAPI = generateL0VocabQuizAPI;
 window.generateLiteratureTagsAPI = generateLiteratureTagsAPI;
 window.generateArticleChallengeAPI = generateArticleChallengeAPI;
 window.generateCelebrationLetterAPI = generateCelebrationLetterAPI;
