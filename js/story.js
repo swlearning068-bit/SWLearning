@@ -231,25 +231,29 @@ function resetPracticeDisplay() {
 }
 
 /**
- * 同步收藏按鈕
+ * 同步收藏按鈕狀態
+ * @param {HTMLButtonElement|null} [btn]
+ * @param {Object|null} [article]
  */
-function syncPracticeSaveButton() {
-  const btn = practice$('btn-save-practice-article');
-  if (!btn) return;
+function syncPracticeSaveButton(btn, article) {
+  const targetBtn = btn || practice$('btn-save-practice-article');
+  if (!targetBtn) return;
 
-  if (!currentPracticeArticle || !isInteractivePracticeArticle(currentPracticeArticle)) {
-    btn.disabled = true;
-    btn.textContent = '⭐ 收藏文章';
-    btn.classList.remove('is-saved');
+  const art = article || currentPracticeArticle;
+  if (!art || !isInteractivePracticeArticle(art)) {
+    targetBtn.disabled = true;
+    targetBtn.textContent = '⭐ 收藏文章';
+    targetBtn.classList.remove('is-saved');
     return;
   }
 
   const subjectName =
-    typeof window.getCurrentSubjectName === 'function'
+    String(art.subjectName || '').trim() ||
+    (typeof window.getCurrentSubjectName === 'function'
       ? window.getCurrentSubjectName()
-      : '社會工作';
-  const title = String(currentPracticeArticle.title_en || '');
-  const track = currentPracticeArticle.track || 'story';
+      : '社會工作');
+  const title = String(art.title_en || '');
+  const track = art.track || 'story';
 
   const already =
     typeof getSavedArticles === 'function'
@@ -264,21 +268,24 @@ function syncPracticeSaveButton() {
       : false;
 
   if (already) {
-    btn.textContent = '✅ 已收藏至文章庫';
-    btn.disabled = true;
-    btn.classList.add('is-saved');
+    targetBtn.textContent = '✅ 已收藏至文章庫';
+    targetBtn.disabled = true;
+    targetBtn.classList.add('is-saved');
   } else {
-    btn.textContent = '⭐ 收藏文章';
-    btn.disabled = false;
-    btn.classList.remove('is-saved');
+    targetBtn.textContent = '⭐ 收藏文章';
+    targetBtn.disabled = false;
+    targetBtn.classList.remove('is-saved');
   }
 }
 
 /**
- * 收藏目前互動文章（整包 JSON）
+ * 收藏指定互動文章（整包 JSON）
+ * @param {Object|null} [article]
+ * @param {HTMLButtonElement|null} [btn]
  */
-function handleSavePracticeArticle() {
-  if (!currentPracticeArticle || !isInteractivePracticeArticle(currentPracticeArticle)) {
+function savePracticeArticlePayload(article, btn) {
+  const art = article || currentPracticeArticle;
+  if (!art || !isInteractivePracticeArticle(art)) {
     alert('目前沒有可收藏的文章，請先生成一篇。');
     return;
   }
@@ -289,20 +296,22 @@ function handleSavePracticeArticle() {
   }
 
   const subjectName =
-    typeof window.getCurrentSubjectName === 'function'
+    String(art.subjectName || '').trim() ||
+    (typeof window.getCurrentSubjectName === 'function'
       ? window.getCurrentSubjectName()
-      : '社會工作';
+      : '社會工作');
   const subjectId =
-    typeof resolveCurrentSubject === 'function'
+    String(art.subjectId || '').trim() ||
+    (typeof resolveCurrentSubject === 'function'
       ? resolveCurrentSubject().id
-      : '';
+      : '');
 
   const payload = {
-    ...currentPracticeArticle,
-    id: currentPracticeArticle.id || Date.now(),
+    ...art,
+    id: art.id || Date.now(),
     type: 'practice',
-    track: currentPracticeArticle.track || 'story',
-    subjectId: subjectId || currentPracticeArticle.subjectId || '',
+    track: art.track || 'story',
+    subjectId: subjectId || '',
     subjectName: subjectName || '社會工作',
     timestamp: Date.now(),
     savedAt: new Date().toISOString()
@@ -314,11 +323,24 @@ function handleSavePracticeArticle() {
     return;
   }
 
-  currentPracticeArticle = payload;
-  syncPracticeSaveButton();
+  if (art === currentPracticeArticle || !article) {
+    currentPracticeArticle = payload;
+  }
+  syncPracticeSaveButton(btn || null, payload);
+  // 同步主畫面按鈕（若存在）
+  if (btn && btn.id !== 'btn-save-practice-article') {
+    syncPracticeSaveButton(practice$('btn-save-practice-article'), payload);
+  }
   if (typeof showToast === 'function') {
     showToast(result.already ? '✅ 此文章已在文章庫中' : '✅ 已收藏至文章庫');
   }
+}
+
+/**
+ * 收藏目前互動文章（主畫面按鈕）
+ */
+function handleSavePracticeArticle() {
+  savePracticeArticlePayload(currentPracticeArticle, practice$('btn-save-practice-article'));
 }
 
 /**
@@ -589,14 +611,16 @@ function renderPracticeVocabulary(vocabulary) {
  * 渲染完整互動文章（主畫面或文章庫共用）
  * @param {Object} article
  * @param {HTMLElement} [targetRoot]
- * @param {{skipScroll?: boolean}} [options]
+ * @param {{skipScroll?: boolean, showSave?: boolean}} [options]
  */
 function renderPracticeArticle(article, targetRoot, options) {
   const root = targetRoot || practice$('practice-article-root');
   const placeholder = practice$('practice-placeholder');
   if (!root || !article || !isInteractivePracticeArticle(article)) return;
 
-  if (!targetRoot) {
+  const allowSave = !targetRoot || Boolean(options?.showSave);
+
+  if (!targetRoot || allowSave) {
     currentPracticeArticle = article;
   }
 
@@ -655,18 +679,23 @@ function renderPracticeArticle(article, targetRoot, options) {
     pack.appendChild(titleZh);
   }
 
-  // 主畫面：收藏按鈕放在標題下方（小尺寸）
-  if (!targetRoot) {
+  // 主畫面／任務關卡：顯示收藏按鈕（文章庫重看則不重複顯示）
+  if (allowSave) {
     const saveWrap = document.createElement('div');
     saveWrap.className = 'save-story-wrap practice-save-wrap';
     const saveBtn = document.createElement('button');
     saveBtn.type = 'button';
-    saveBtn.id = 'btn-save-practice-article';
+    if (!targetRoot) {
+      saveBtn.id = 'btn-save-practice-article';
+    }
     saveBtn.className = 'save-story-btn btn btn-primary practice-save-btn';
     saveBtn.textContent = '⭐ 收藏文章';
-    saveBtn.addEventListener('click', handleSavePracticeArticle);
+    saveBtn.addEventListener('click', () => {
+      savePracticeArticlePayload(article, saveBtn);
+    });
     saveWrap.appendChild(saveBtn);
     pack.appendChild(saveWrap);
+    syncPracticeSaveButton(saveBtn, article);
   }
 
   // 合併全域 vocabulary + 各段 highlight_terms

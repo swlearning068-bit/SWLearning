@@ -687,7 +687,7 @@ async function handleQuestGenerateArticle() {
     hideQuestEl(loading);
 
     if (typeof renderPracticeArticle === 'function' && root) {
-      renderPracticeArticle(article, root, { skipScroll: true });
+      renderPracticeArticle(article, root, { skipScroll: true, showSave: true });
       markQuestProgress('reading');
       bindQuestChallengeProgress(root);
       if (genBtn) {
