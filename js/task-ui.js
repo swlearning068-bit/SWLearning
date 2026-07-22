@@ -1076,6 +1076,9 @@ function escapeL0Html(text) {
  *   subjectId?: string,
  *   subjectName?: string,
  *   wishText?: string,
+ *   levelId?: number,
+ *   levelTitle?: string,
+ *   chapterId?: number,
  *   onAllCorrect?: () => void,
  *   onComplete?: () => void,
  *   onError?: (message: string) => void
@@ -1088,6 +1091,9 @@ async function renderL0VocabTask(mountEl, options) {
   const subjectName = options?.subjectName || '通用社工實務';
   const subjectId = options?.subjectId || null;
   const wishText = options?.wishText || '';
+  const levelId = Number(options?.levelId) || 0;
+  const levelTitle = String(options?.levelTitle || '').trim();
+  const chapterId = Number(options?.chapterId) || 0;
 
   const apiFn = window.generateL0VocabQuizAPI;
   if (typeof apiFn !== 'function') {
@@ -1098,12 +1104,20 @@ async function renderL0VocabTask(mountEl, options) {
 
   let questions;
   try {
-    questions = await apiFn(subjectName, subjectId, wishText);
+    questions = await apiFn(subjectName, subjectId, wishText, {
+      levelId,
+      levelTitle,
+      chapterId,
+      avoidTerms: loadRecentL0Terms()
+    });
   } catch (err) {
     const msg = err?.message || '無法產生單字題目';
     options?.onError?.(msg);
     throw err;
   }
+
+  // 記錄本關詞彙，供後續關卡避重複
+  rememberL0Terms(questions.map((q) => q.term_en).filter(Boolean));
 
   // 再洗一次，雙重保險
   questions = questions.map((q) => {
@@ -1141,12 +1155,19 @@ async function renderL0VocabTask(mountEl, options) {
 
   mountEl.innerHTML = '';
 
+  const themeLabel = levelTitle
+    ? `Lv ${levelId || ''}「${levelTitle}」`.replace(/\s+/g, ' ').trim()
+    : subjectName;
+
   const wrap = document.createElement('div');
   wrap.className = 'l0-vocab-task';
   wrap.innerHTML =
     `<header class="l0-vocab-header">` +
     `<h3 class="l0-vocab-title">🔤 單字配對訓練</h3>` +
-    `<p class="l0-vocab-desc">與「${escapeL0Html(subjectName)}」相關的 5 題極簡練習。答錯可立刻再試，沒有壓力！</p>` +
+    `<p class="l0-vocab-theme">本關主題：${escapeL0Html(themeLabel)}</p>` +
+    `<p class="l0-vocab-desc">題目緊扣本關主題「${escapeL0Html(
+      levelTitle || subjectName
+    )}」。答錯可立刻再試，沒有壓力！</p>` +
     (wishText
       ? `<p class="l0-vocab-wish">✨ 為了願望：${escapeL0Html(wishText)}</p>`
       : '') +
@@ -1211,13 +1232,7 @@ async function renderL0VocabTask(mountEl, options) {
           .replace(/[^a-z0-9]+/g, '_')
           .replace(/^_|_$/g, '');
         const probeId = `lit_${slug}`;
-        const already =
-          window.isTermInLearning(probeId) ||
-          (Array.isArray(window.allTerms) &&
-            window.allTerms.some(
-              (t) => t?.term && t.term.toLowerCase() === key && window.isTermInLearning(t.id)
-            ));
-        if (already) {
+        if (window.isTermInLearning(probeId)) {
           addBtn.disabled = true;
           addBtn.textContent = '已在學習清單';
         }
@@ -1272,7 +1287,6 @@ async function renderL0VocabTask(mountEl, options) {
         completeBtn.textContent = '🏅 完成本關卡';
       }
       options?.onAllCorrect?.();
-      // 捲到底部通關區，方便操作
       footerEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
@@ -1338,6 +1352,53 @@ async function renderL0VocabTask(mountEl, options) {
 
   updateProgress();
   mountEl.appendChild(wrap);
+}
+
+/** localStorage：近期 L0 已出過的英文詞（跨關避重複） */
+const STORAGE_KEY_L0_RECENT_TERMS = 'sw_quest_l0_recent_terms';
+
+/**
+ * @returns {string[]}
+ */
+function loadRecentL0Terms() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_L0_RECENT_TERMS);
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((t) => String(t || '').trim()).filter(Boolean).slice(-40);
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * @param {string[]} terms
+ */
+function rememberL0Terms(terms) {
+  try {
+    const prev = loadRecentL0Terms();
+    const next = prev.concat(
+      (terms || []).map((t) => String(t || '').trim()).filter(Boolean)
+    );
+    const deduped = [];
+    const seen = new Set();
+    // 保留最新，去重
+    for (let i = next.length - 1; i >= 0; i -= 1) {
+      const key = next[i].toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.unshift(next[i]);
+    }
+    localStorage.setItem(
+      STORAGE_KEY_L0_RECENT_TERMS,
+      JSON.stringify(deduped.slice(-40))
+    );
+    if (typeof window.__swNotifyDataChanged === 'function') {
+      window.__swNotifyDataChanged(STORAGE_KEY_L0_RECENT_TERMS);
+    }
+  } catch (_) {
+    // ignore
+  }
 }
 
 // 對外 API

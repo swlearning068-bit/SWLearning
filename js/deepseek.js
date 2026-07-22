@@ -1810,27 +1810,61 @@ terms 必須剛好 3 筆；pos 可用 n. / v. / adj. / adv. 等簡短標記。`;
 
 /**
  * Phase 13.1：L0 極簡單字／短句測驗（5 題，英選中／中選英）
+ * 必須依關卡主題（levelTitle）出題，避免各關重複同一套題。
  *
  * @param {string} subjectName
  * @param {string} [subjectId]
  * @param {string} [wishText]
+ * @param {{
+ *   levelId?: number,
+ *   levelTitle?: string,
+ *   chapterId?: number,
+ *   avoidTerms?: string[]
+ * }} [questContext]
  * @returns {Promise<Array<{
  *   id: number,
  *   type: 'en_to_zh'|'zh_to_en',
  *   prompt: string,
  *   options: string[],
  *   correctIndex: number,
+ *   term_en?: string,
+ *   translation_zh?: string,
  *   hint_zh?: string
  * }>>}
  */
-async function generateL0VocabQuizAPI(subjectName, subjectId, wishText) {
+async function generateL0VocabQuizAPI(
+  subjectName,
+  subjectId,
+  wishText,
+  questContext
+) {
   const safeSubject = String(subjectName || '').trim() || '通用社工實務';
   const wish = String(wishText || '').trim();
+  const ctx =
+    questContext && typeof questContext === 'object' ? questContext : {};
+  const levelTitle = String(ctx.levelTitle || '').trim();
+  const levelId = Number(ctx.levelId) || 0;
+  const chapterId = Number(ctx.chapterId) || 0;
+  const avoidTerms = Array.isArray(ctx.avoidTerms)
+    ? ctx.avoidTerms
+        .map((t) => String(t || '').trim())
+        .filter(Boolean)
+        .slice(0, 40)
+    : [];
+
+  const themeLine = levelTitle
+    ? `本關主題「${levelTitle}」` +
+      (levelId ? `（Lv ${levelId}` + (chapterId ? `／第 ${chapterId} 章` : '') + '）' : '')
+    : `科目「${safeSubject}」入門詞彙`;
 
   const systemPrompt = `你是香港社工系的溫柔英文助教，專門為初學者設計「零挫折」單字測驗。
 請產出剛好 5 題極簡單字或極短句選擇題，難度必須非常低（日常社工場域常見詞，避免生僻術語）。
 題型須混合：英文選中文（en_to_zh）、中文選英文（zh_to_en）。
 每題 4 個選項，只有一個正確；干擾項也要合理但明顯不同。
+
+【最重要】五題必須緊扣指定「本關主題」，詞彙／短句要能反映該主題情境；
+不可改成其他無關主題，也不可每關都用同一組常見家庭／社工通用詞（如 family / home / help）。
+同一科目下不同關卡必須使用明顯不同的詞彙組。
 
 必須回傳純 JSON：
 {
@@ -1857,17 +1891,22 @@ rules:
 - 全部文字用語適合香港／台灣繁體中文學習者`;
 
   const userContent =
-    `科目：「${safeSubject}」。` +
-    (wish ? `學習者願望／目標：「${wish}」。` : '') +
-    `請生成 5 題與該科目相關、極低門檻的單字或極短句測驗（英選中與中選英混合）。` +
-    `請務必把正確答案放在 options 的隨機位置（不要總是第一個）。`;
+    `科目：「${safeSubject}」。\n` +
+    `【本關主題｜必須緊扣】${themeLine}。\n` +
+    (wish ? `學習者願望／目標：「${wish}」（僅作動機，不可取代本關主題）。\n` : '') +
+    (avoidTerms.length
+      ? `請避免重複使用以下近期已出現的英文詞（或其同義近義）：${avoidTerms.join(', ')}。\n`
+      : '') +
+    `請生成 5 題與「${levelTitle || safeSubject}」主題直接相關、極低門檻的單字或極短句測驗（英選中與中選英混合）。\n` +
+    `正確答案請放在 options 的隨機位置（不要總是第一個）。\n` +
+    `變化種子：Lv${levelId || 'x'}-${levelTitle || safeSubject}-${Date.now() % 100000}（確保與其他關卡題目不同）。`;
 
   const result = await requestDeepSeekJSON(
     systemPrompt,
     userContent,
-    1400,
+    1600,
     'standard',
-    { subjectId: subjectId || null, temperature: 0.6 }
+    { subjectId: subjectId || null, temperature: 0.85 }
   );
 
   const raw = Array.isArray(result.questions) ? result.questions : [];
@@ -2447,20 +2486,40 @@ function buildVocabDensityInstruction(opts) {
 
 /**
  * Phase 11.8：生成互動社工小故事（段落測驗 + 寫作題）
+ * @param {{
+ *   theme?: string,
+ *   levelId?: number,
+ *   levelTitle?: string,
+ *   chapterId?: number
+ * }} [options] - 任務關卡可傳入本關主題，避免各關內容雷同
  * @returns {Promise<Object>}
  */
-async function generateInteractiveStoryAPI() {
+async function generateInteractiveStoryAPI(options) {
+  const opts = options && typeof options === 'object' ? options : {};
   const subject = resolveCurrentSubject();
   const themes = getL1StoryThemes(subject.id);
-  const theme = themes[Math.floor(Math.random() * themes.length)];
+  const levelTitle = String(opts.levelTitle || opts.theme || '').trim();
+  const levelId = Number(opts.levelId) || 0;
+  const chapterId = Number(opts.chapterId) || 0;
+  const theme =
+    levelTitle ||
+    themes[Math.floor(Math.random() * Math.max(themes.length, 1))] ||
+    subject.name;
   const taskType =
     normalizeSubjectId(subject.id) === 'ethics_and_values' ? 'ethics' : 'story';
   const densityOpts = resolveVocabCountByDensity();
 
   const userContent =
     `請為科目「${subject.name}」生成一篇互動社工小故事教材。` +
-    `\n主題方向：${theme}` +
+    `\n【本關主題｜必須緊扣】${theme}` +
+    (levelId
+      ? `（任務關卡 Lv ${levelId}` +
+        (chapterId ? `／第 ${chapterId} 章` : '') +
+        '）'
+      : '') +
+    `\n故事情節、段落內容、inline_quiz 與 writing_tasks 都必須圍繞此主題，不可換成其他無關主題。` +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
+    `\n變化種子：story-Lv${levelId || 'x'}-${theme}-${Date.now() % 100000}` +
     buildVocabDensityInstruction(densityOpts);
 
   const result = await requestDeepSeekJSON(
@@ -2468,7 +2527,7 @@ async function generateInteractiveStoryAPI() {
     userContent,
     densityOpts.density >= 80 ? 10000 : 8192,
     taskType,
-    { subjectId: subject.id }
+    { subjectId: subject.id, temperature: levelTitle ? 0.8 : 0.7 }
   );
 
   return normalizeInteractivePracticeArticle(result, 'story');
@@ -2476,11 +2535,21 @@ async function generateInteractiveStoryAPI() {
 
 /**
  * Phase 11.8：生成互動模擬學術文獻（段落測驗 + 寫作題）
+ * @param {{
+ *   theme?: string,
+ *   levelId?: number,
+ *   levelTitle?: string,
+ *   chapterId?: number
+ * }} [options]
  * @returns {Promise<Object>}
  */
-async function generateInteractiveLiteratureAPI() {
+async function generateInteractiveLiteratureAPI(options) {
+  const opts = options && typeof options === 'object' ? options : {};
   const subject = resolveCurrentSubject();
   const knowledge = getSubjectKnowledge(subject.id);
+  const levelTitle = String(opts.levelTitle || opts.theme || '').trim();
+  const levelId = Number(opts.levelId) || 0;
+  const chapterId = Number(opts.chapterId) || 0;
   const theoryHint = knowledge
     ? [
         knowledge.theory_core,
@@ -2493,11 +2562,20 @@ async function generateInteractiveLiteratureAPI() {
     : '';
 
   const densityOpts = resolveVocabCountByDensity();
+  const focusTheme = levelTitle || theoryHint || subject.name;
 
   const userContent =
     `請為科目「${subject.name}」生成一篇互動模擬學術文獻教材。` +
-    (theoryHint ? `\n理論焦點：${theoryHint}` : '') +
+    `\n【本關主題／焦點｜必須緊扣】${focusTheme}` +
+    (levelId
+      ? `（任務關卡 Lv ${levelId}` +
+        (chapterId ? `／第 ${chapterId} 章` : '') +
+        '）'
+      : '') +
+    (theoryHint && levelTitle ? `\n理論參考：${theoryHint}` : '') +
+    `\n文獻內容、inline_quiz 與 writing_tasks 都必須圍繞上述主題，不可與其他關卡雷同。` +
     `\n必須輸出 3–4 個 content_chunks（每段含 inline_quiz），以及 writing_tasks。` +
+    `\n變化種子：lit-Lv${levelId || 'x'}-${focusTheme}-${Date.now() % 100000}` +
     buildVocabDensityInstruction(densityOpts) +
     `\n文體須像教學用模擬論文／理論短文，並在適處加學術免責意識（不必另開欄位）。`;
 
@@ -2506,7 +2584,7 @@ async function generateInteractiveLiteratureAPI() {
     userContent,
     densityOpts.density >= 80 ? 10000 : 8192,
     'literature',
-    { subjectId: subject.id }
+    { subjectId: subject.id, temperature: levelTitle ? 0.8 : 0.7 }
   );
 
   return normalizeInteractivePracticeArticle(result, 'literature');

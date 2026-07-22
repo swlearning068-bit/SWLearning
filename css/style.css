@@ -6374,6 +6374,14 @@ body.ebook-reader-open > main.main-content {
   line-height: 1.45;
 }
 
+.l0-vocab-theme {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  line-height: 1.4;
+}
+
 .l0-vocab-wish {
   color: #b45309;
   font-weight: 500;

@@ -1276,7 +1276,12 @@ async function handleQuestGenerateArticle() {
   if (root) root.innerHTML = '';
 
   try {
-    const data = await apiFn();
+    const data = await apiFn({
+      levelId: level.id,
+      levelTitle: level.title,
+      chapterId: level.chapter,
+      theme: level.title
+    });
     const article = {
       ...data,
       id: `quest-${level.id}-${Date.now()}`,
@@ -1284,7 +1289,8 @@ async function handleQuestGenerateArticle() {
       type: 'quest',
       subjectId: level.subject,
       subjectName: getSubjectDisplayName(level.subject),
-      questLevelId: level.id
+      questLevelId: level.id,
+      questLevelTitle: level.title
     };
 
     questChallengeArticle = article;
@@ -1355,6 +1361,9 @@ async function handleQuestL0Start() {
       subjectId: level.subject,
       subjectName: getSubjectDisplayName(level.subject),
       wishText: wish?.wishText || '',
+      levelId: level.id,
+      levelTitle: level.title,
+      chapterId: level.chapter,
       onAllCorrect: () => {
         markQuestProgress('reading');
         markQuestProgress('quiz');
@@ -1508,6 +1517,11 @@ function bindQuestEvents() {
       '重新分配會重置 100 關進度（願望會保留），確定要以目前科目重新產生地圖嗎？'
     );
     if (!ok) return;
+    try {
+      localStorage.removeItem('sw_quest_l0_recent_terms');
+    } catch (_) {
+      // ignore
+    }
     generateQuestLevels(getQuestCurrentSubject()?.id);
     renderQuestMap();
   });
