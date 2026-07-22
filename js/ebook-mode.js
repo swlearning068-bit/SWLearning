@@ -833,6 +833,25 @@ function bindEbookModeEvents() {
         setEbookTocOpen(false);
       }
     });
+
+    // 目錄內觸控滾動不要被全螢幕層攔截
+    const sidebar = document.getElementById('ebook-sidebar');
+    if (sidebar) {
+      sidebar.addEventListener(
+        'touchstart',
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: true }
+      );
+      sidebar.addEventListener(
+        'touchmove',
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: true }
+      );
+    }
   }
 
   document.addEventListener('keydown', (event) => {
