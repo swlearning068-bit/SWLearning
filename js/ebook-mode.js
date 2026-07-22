@@ -572,14 +572,25 @@ function renderEbookContent() {
 }
 
 /**
- * 依實際工具列高度對齊目錄側邊欄，避免遮住按鈕或露出空隙
+ * 依工具列高度 + 可視視窗（避開 iOS Safari 底欄）計算目錄可滾動高度
  */
 function syncEbookSidebarOffset() {
   const overlay = document.getElementById('ebook-reader-overlay');
   const header = overlay && overlay.querySelector('.ebook-header');
   if (!overlay || !header) return;
-  const height = Math.ceil(header.getBoundingClientRect().height) || 56;
-  overlay.style.setProperty('--ebook-header-height', `${height}px`);
+
+  const headerH = Math.ceil(header.getBoundingClientRect().height) || 56;
+  const vv = window.visualViewport;
+  const viewH =
+    vv && Number.isFinite(vv.height) && vv.height > 0
+      ? vv.height
+      : window.innerHeight || document.documentElement.clientHeight || 600;
+
+  // 預留底部空間，避免最後幾項被 Safari 工具列擋住
+  const sidebarH = Math.max(180, Math.floor(viewH - headerH - 16));
+
+  overlay.style.setProperty('--ebook-header-height', `${headerH}px`);
+  overlay.style.setProperty('--ebook-sidebar-height', `${sidebarH}px`);
 }
 
 /**
@@ -597,10 +608,12 @@ function setEbookTocOpen(force) {
 
   if (ebookTocOpen) {
     syncEbookSidebarOffset();
-    const list = document.getElementById('ebook-toc-list');
-    const active = list && list.querySelector('.ebook-toc-item.is-active');
-    if (active && typeof active.scrollIntoView === 'function') {
-      active.scrollIntoView({ block: 'nearest' });
+    const scrollEl = document.getElementById('ebook-sidebar-scroll');
+    const active =
+      scrollEl && scrollEl.querySelector('.ebook-toc-item.is-active');
+    if (scrollEl && active) {
+      const top = active.offsetTop - 12;
+      scrollEl.scrollTop = Math.max(0, top);
     }
   }
 }
@@ -611,6 +624,10 @@ function setEbookTocOpen(force) {
  */
 function requestEbookFullscreen(overlay) {
   if (!overlay) return;
+  // iOS Safari 對 div 全螢幕支援差，且易干擾 visualViewport／觸控捲動
+  const ua = String(navigator.userAgent || '');
+  if (/iPhone|iPad|iPod/i.test(ua)) return;
+
   const req =
     overlay.requestFullscreen ||
     overlay.webkitRequestFullscreen ||
@@ -779,6 +796,16 @@ function bindEbookModeEvents() {
     { passive: true }
   );
 
+  if (window.visualViewport) {
+    const onVvChange = () => {
+      const overlayEl = document.getElementById('ebook-reader-overlay');
+      if (!overlayEl || overlayEl.classList.contains('ebook-hidden')) return;
+      syncEbookSidebarOffset();
+    };
+    window.visualViewport.addEventListener('resize', onVvChange, { passive: true });
+    window.visualViewport.addEventListener('scroll', onVvChange, { passive: true });
+  }
+
   const readBtn = document.getElementById('btn-ebook-read');
   if (readBtn) {
     readBtn.addEventListener('click', () => toggleEbookSpeech());
@@ -833,25 +860,6 @@ function bindEbookModeEvents() {
         setEbookTocOpen(false);
       }
     });
-
-    // 目錄內觸控滾動不要被全螢幕層攔截
-    const sidebar = document.getElementById('ebook-sidebar');
-    if (sidebar) {
-      sidebar.addEventListener(
-        'touchstart',
-        (event) => {
-          event.stopPropagation();
-        },
-        { passive: true }
-      );
-      sidebar.addEventListener(
-        'touchmove',
-        (event) => {
-          event.stopPropagation();
-        },
-        { passive: true }
-      );
-    }
   }
 
   document.addEventListener('keydown', (event) => {

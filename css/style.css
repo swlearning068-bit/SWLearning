@@ -5667,34 +5667,29 @@ body.ebook-reader-open > main.main-content {
   background: transparent;
 }
 
-/* 側邊欄目錄 */
+/* 側邊欄目錄（iOS：外層定位／勿用 transform；內層專責滾動） */
 #ebook-sidebar {
   position: absolute;
   top: var(--ebook-header-height, 56px);
   left: 0;
-  bottom: 0;
   width: min(340px, 92vw);
-  height: auto;
-  max-height: none;
+  height: var(--ebook-sidebar-height, calc(100dvh - var(--ebook-header-height, 56px)));
+  max-height: var(--ebook-sidebar-height, calc(100dvh - var(--ebook-header-height, 56px)));
   background: #fff;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.12);
-  transform: translate3d(-105%, 0, 0);
-  transition: transform 0.3s ease, background-color 0.25s ease;
+  transition: left 0.28s ease, background-color 0.25s ease;
   z-index: 10060;
   display: flex;
   flex-direction: column;
-  /* iOS：有 transform 的元素本身當滾動容器較穩定 */
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+  overflow: hidden;
   padding: 0;
   box-sizing: border-box;
   color: #1F2937;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: #9CA3AF rgba(0, 0, 0, 0.06);
+}
+
+#ebook-sidebar.ebook-sidebar-hidden {
+  left: calc(-1 * min(340px, 92vw) - 24px);
+  pointer-events: none;
 }
 
 #ebook-reader-overlay.theme-sepia #ebook-sidebar {
@@ -5708,19 +5703,8 @@ body.ebook-reader-open > main.main-content {
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.45);
 }
 
-#ebook-sidebar:not(.ebook-sidebar-hidden) {
-  transform: translate3d(0, 0, 0);
-}
-
-#ebook-sidebar.ebook-sidebar-hidden {
-  pointer-events: none;
-}
-
 #ebook-sidebar h3 {
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: 0 0 auto;
   margin: 0;
   padding: 16px 16px 12px;
   font-size: 1.05rem;
@@ -5733,54 +5717,61 @@ body.ebook-reader-open > main.main-content {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-#ebook-toc-list {
-  list-style: none;
-  margin: 0;
-  padding: 10px 10px max(28px, env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 0 auto;
+.ebook-sidebar-scroll {
+  flex: 1 1 0;
   min-height: 0;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   touch-action: pan-y;
+  padding: 10px 10px max(32px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #9CA3AF rgba(0, 0, 0, 0.06);
 }
 
-#ebook-sidebar::-webkit-scrollbar {
+.ebook-sidebar-scroll::-webkit-scrollbar {
   width: 8px;
 }
 
-#ebook-sidebar::-webkit-scrollbar-track {
+.ebook-sidebar-scroll::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 99px;
   margin: 4px 0;
 }
 
-#ebook-sidebar::-webkit-scrollbar-thumb {
+.ebook-sidebar-scroll::-webkit-scrollbar-thumb {
   background-color: #9CA3AF;
   border-radius: 99px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
-#ebook-sidebar::-webkit-scrollbar-thumb:hover {
+.ebook-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background-color: #6B7280;
 }
 
-#ebook-reader-overlay.theme-dark #ebook-sidebar {
+#ebook-reader-overlay.theme-dark .ebook-sidebar-scroll {
   scrollbar-color: #6B7280 rgba(255, 255, 255, 0.06);
 }
 
-#ebook-reader-overlay.theme-dark #ebook-sidebar::-webkit-scrollbar-track {
+#ebook-reader-overlay.theme-dark .ebook-sidebar-scroll::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.06);
 }
 
-#ebook-reader-overlay.theme-dark #ebook-sidebar::-webkit-scrollbar-thumb {
+#ebook-reader-overlay.theme-dark .ebook-sidebar-scroll::-webkit-scrollbar-thumb {
   background-color: #6B7280;
 }
 
-#ebook-reader-overlay.theme-dark #ebook-sidebar::-webkit-scrollbar-thumb:hover {
-  background-color: #9CA3AF;
+#ebook-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .ebook-toc-btn {
