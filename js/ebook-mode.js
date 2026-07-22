@@ -572,6 +572,17 @@ function renderEbookContent() {
 }
 
 /**
+ * 依實際工具列高度對齊目錄側邊欄，避免遮住按鈕或露出空隙
+ */
+function syncEbookSidebarOffset() {
+  const overlay = document.getElementById('ebook-reader-overlay');
+  const header = overlay && overlay.querySelector('.ebook-header');
+  if (!overlay || !header) return;
+  const height = Math.ceil(header.getBoundingClientRect().height) || 56;
+  overlay.style.setProperty('--ebook-header-height', `${height}px`);
+}
+
+/**
  * @param {boolean} [force]
  */
 function setEbookTocOpen(force) {
@@ -583,6 +594,15 @@ function setEbookTocOpen(force) {
   sidebar.classList.toggle('ebook-sidebar-hidden', !ebookTocOpen);
   sidebar.setAttribute('aria-hidden', ebookTocOpen ? 'false' : 'true');
   if (tocBtn) tocBtn.setAttribute('aria-expanded', ebookTocOpen ? 'true' : 'false');
+
+  if (ebookTocOpen) {
+    syncEbookSidebarOffset();
+    const list = document.getElementById('ebook-toc-list');
+    const active = list && list.querySelector('.ebook-toc-item.is-active');
+    if (active && typeof active.scrollIntoView === 'function') {
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  }
 }
 
 /**
@@ -674,6 +694,7 @@ function openEbookReader(startIndex) {
 
   setEbookTocOpen(false);
   renderEbookContent();
+  syncEbookSidebarOffset();
   requestEbookFullscreen(overlay);
 }
 
@@ -747,6 +768,16 @@ function bindEbookModeEvents() {
   if (tocBtn) {
     tocBtn.addEventListener('click', () => setEbookTocOpen());
   }
+
+  window.addEventListener(
+    'resize',
+    () => {
+      const overlayEl = document.getElementById('ebook-reader-overlay');
+      if (!overlayEl || overlayEl.classList.contains('ebook-hidden')) return;
+      syncEbookSidebarOffset();
+    },
+    { passive: true }
+  );
 
   const readBtn = document.getElementById('btn-ebook-read');
   if (readBtn) {
