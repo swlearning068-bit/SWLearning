@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=69">
+  <link rel="stylesheet" href="css/style.css?v=70">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -887,6 +887,34 @@
     </div>
   </div>
 
+  <!-- ==================== Phase 13.5：小夥伴進化慶祝 ==================== -->
+  <div
+    id="mascot-evolution-modal"
+    class="modal-overlay mascot-evolution-overlay hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="mascot-evolution-title"
+    aria-hidden="true"
+  >
+    <div class="modal-box mascot-evolution-box">
+      <h2 id="mascot-evolution-title" class="modal-title mascot-evolution-heading">
+        ✨ 恭喜！你的小夥伴進化了！✨
+      </h2>
+      <div
+        id="mascot-evolution-preview"
+        class="mascot-evolution-preview"
+        aria-hidden="true"
+      ></div>
+      <p id="mascot-evolution-name" class="mascot-evolution-name"></p>
+      <p id="mascot-evolution-desc" class="mascot-evolution-desc"></p>
+      <div class="modal-actions">
+        <button id="btn-close-mascot-evolution" class="btn btn-primary" type="button">
+          太棒了！繼續冒險
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== Phase 13：關卡通關慶祝 ==================== -->
   <div
     id="quest-clear-modal"
@@ -1291,8 +1319,8 @@
   <script src="js/reward.js?v=8"></script>
   <script src="js/user-profile.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
-  <script src="js/mascot.js?v=5"></script>
-  <script src="js/quest-mode.js?v=8"></script>
+  <script src="js/mascot.js?v=6"></script>
+  <script src="js/quest-mode.js?v=9"></script>
   <script src="js/app.js?v=23"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=17"></script>

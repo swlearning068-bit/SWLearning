@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate stage-based cute-dog Lottie JSON (baby/teen/adult/master × 4 states)."""
+"""Generate distinct multi-form dog Lottie JSON for Phase 13.5.
+
+Forms:
+  baby   — 奶瓶狗 BB
+  rookie — 掛工作證的熱血犬
+  pro    — 戴眼鏡拿筆記本的專業犬
+  master — 披風督導犬
+"""
 
 from __future__ import annotations
 
@@ -7,10 +14,9 @@ import json
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent
-W = H = 200
+W = H = 220
 FR = 30
 
-# 目前階段調色（由 set_stage 寫入）
 BODY = EAR = EAR_INNER = SNOUT = NOSE = EYE = CHEEK = OUTLINE = SPOT = (0, 0, 0)
 WHITE = (255, 255, 255)
 STAGE = "baby"
@@ -19,19 +25,19 @@ HEAD_SCALE = 100
 
 STAGES = {
     "baby": {
-        "body": (255, 200, 150),
-        "ear": (245, 160, 110),
-        "ear_inner": (255, 220, 195),
-        "snout": (255, 238, 220),
-        "nose": (80, 55, 50),
+        "body": (255, 205, 155),
+        "ear": (250, 165, 115),
+        "ear_inner": (255, 225, 200),
+        "snout": (255, 240, 225),
+        "nose": (85, 55, 50),
         "eye": (50, 42, 42),
-        "cheek": (255, 160, 150),
+        "cheek": (255, 165, 155),
         "outline": (100, 70, 55),
-        "spot": (250, 180, 120),
-        "eye_boost": 118,
-        "head_scale": 92,
+        "spot": (250, 185, 125),
+        "eye_boost": 122,
+        "head_scale": 90,
     },
-    "teen": {
+    "rookie": {
         "body": (255, 186, 120),
         "ear": (232, 140, 80),
         "ear_inner": (255, 210, 180),
@@ -41,32 +47,32 @@ STAGES = {
         "cheek": (255, 150, 140),
         "outline": (90, 60, 50),
         "spot": (240, 160, 95),
-        "eye_boost": 100,
+        "eye_boost": 104,
         "head_scale": 100,
     },
-    "adult": {
-        "body": (245, 175, 115),
-        "ear": (210, 125, 75),
-        "ear_inner": (250, 205, 175),
+    "pro": {
+        "body": (240, 170, 115),
+        "ear": (205, 120, 75),
+        "ear_inner": (248, 200, 170),
         "snout": (255, 228, 205),
         "nose": (55, 40, 38),
         "eye": (35, 32, 32),
-        "cheek": (240, 140, 130),
+        "cheek": (235, 135, 125),
         "outline": (75, 50, 42),
-        "spot": (220, 145, 90),
+        "spot": (215, 140, 90),
         "eye_boost": 96,
         "head_scale": 104,
     },
     "master": {
-        "body": (235, 165, 105),
-        "ear": (195, 115, 70),
-        "ear_inner": (245, 198, 168),
+        "body": (230, 160, 105),
+        "ear": (190, 110, 70),
+        "ear_inner": (242, 195, 165),
         "snout": (255, 224, 200),
         "nose": (45, 35, 32),
-        "eye": (30, 28, 28),
-        "cheek": (230, 130, 120),
-        "outline": (65, 45, 38),
-        "spot": (205, 135, 85),
+        "eye": (28, 26, 26),
+        "cheek": (225, 125, 115),
+        "outline": (60, 42, 36),
+        "spot": (200, 130, 85),
         "eye_boost": 94,
         "head_scale": 108,
     },
@@ -97,7 +103,14 @@ def color(rgb, a=1.0):
 
 
 def solid(rgb, a=1.0):
-    return {"ty": "fl", "c": color(rgb, a), "o": {"a": 0, "k": 100}, "r": 1, "bm": 0, "nm": "Fill"}
+    return {
+        "ty": "fl",
+        "c": color(rgb, a),
+        "o": {"a": 0, "k": 100},
+        "r": 1,
+        "bm": 0,
+        "nm": "Fill",
+    }
 
 
 def stroke(rgb, width=3):
@@ -123,7 +136,7 @@ def ellipse(sx, sy):
     }
 
 
-def rect(sx, sy, r=12):
+def rect(sx, sy, r=8):
     return {
         "ty": "rc",
         "p": {"a": 0, "k": [0, 0]},
@@ -201,25 +214,23 @@ def shape_group(name, items, px=0, py=0, sx=100, sy=100, r=0, **anim):
 
 
 def layer(name, shapes, ip=0, op=90, ind=1, **root_tr):
-    # 套用階段縮放
     base_s = root_tr.get("animated_s")
     if base_s is None:
         s = HEAD_SCALE
         base_s = {"a": 0, "k": [s, s, 100]}
-    ks = {
-        "o": root_tr.get("animated_o") or {"a": 0, "k": 100},
-        "r": root_tr.get("animated_r") or {"a": 0, "k": 0},
-        "p": root_tr.get("animated_pos") or {"a": 0, "k": [W / 2, H / 2, 0]},
-        "a": {"a": 0, "k": [0, 0, 0]},
-        "s": base_s,
-    }
     return {
         "ddd": 0,
         "ind": ind,
         "ty": 4,
         "nm": name,
         "sr": 1,
-        "ks": ks,
+        "ks": {
+            "o": root_tr.get("animated_o") or {"a": 0, "k": 100},
+            "r": root_tr.get("animated_r") or {"a": 0, "k": 0},
+            "p": root_tr.get("animated_pos") or {"a": 0, "k": [W / 2, H / 2, 0]},
+            "a": {"a": 0, "k": [0, 0, 0]},
+            "s": base_s,
+        },
         "ao": 0,
         "shapes": shapes,
         "ip": ip,
@@ -230,93 +241,73 @@ def layer(name, shapes, ip=0, op=90, ind=1, **root_tr):
 
 
 def scale_kf(pairs_2d):
-    """pairs_2d: [(t, [sx,sy]), ...] → 3D scale keyframes with HEAD_SCALE baked in."""
     factor = HEAD_SCALE / 100
-    mapped = []
-    for t, xy in pairs_2d:
-        mapped.append((t, [xy[0] * factor, xy[1] * factor, 100]))
-    return kf(mapped)
+    return kf([(t, [xy[0] * factor, xy[1] * factor, 100]) for t, xy in pairs_2d])
 
 
 def dog_shapes(mouth_style="smile", brow_tilt=0, eye_scale=100):
-    """Lottie：陣列越前面越上層。回傳：臉部細節 → 頭 → 耳朵。"""
+    """陣列越前面越上層。"""
     eye_scale = int(eye_scale * EYE_BOOST / 100)
     back = []
 
-    back.append(
+    back += [
         shape_group(
             "ear-l",
             [ellipse(42, 58), solid(EAR), stroke(OUTLINE, 2.5)],
             px=-50,
             py=-46,
             r=-26,
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "ear-l-in",
             [ellipse(20, 30), solid(EAR_INNER)],
             px=-50,
             py=-42,
             r=-26,
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "ear-r",
             [ellipse(42, 58), solid(EAR), stroke(OUTLINE, 2.5)],
             px=50,
             py=-46,
             r=26,
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "ear-r-in",
             [ellipse(20, 30), solid(EAR_INNER)],
             px=50,
             py=-42,
             r=26,
-        )
-    )
-
-    back.append(
+        ),
         shape_group(
             "head",
             [ellipse(122, 112), solid(BODY), stroke(OUTLINE, 3)],
             px=0,
             py=-2,
-        )
-    )
-    back.append(shape_group("spot", [ellipse(30, 24), solid(SPOT)], px=36, py=-26))
-
-    back.append(
+        ),
+        shape_group("spot", [ellipse(30, 24), solid(SPOT)], px=36, py=-26),
         shape_group(
             "cheek-l",
             [ellipse(18, 12), solid(CHEEK)],
             px=-42,
             py=16,
             animated_o={"a": 0, "k": 55},
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "cheek-r",
             [ellipse(18, 12), solid(CHEEK)],
             px=42,
             py=16,
             animated_o={"a": 0, "k": 55},
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "snout",
             [ellipse(52, 36), solid(SNOUT), stroke(OUTLINE, 2)],
             px=0,
             py=24,
-        )
-    )
-    back.append(shape_group("nose", [ellipse(18, 14), solid(NOSE)], px=0, py=16))
+        ),
+        shape_group("nose", [ellipse(18, 14), solid(NOSE)], px=0, py=16),
+    ]
 
     if mouth_style == "smile":
         back.append(
@@ -343,11 +334,9 @@ def dog_shapes(mouth_style="smile", brow_tilt=0, eye_scale=100):
             )
         )
     else:
-        back.append(
-            shape_group("mouth", [rect(20, 5, 4), solid(NOSE)], px=0, py=36)
-        )
+        back.append(shape_group("mouth", [rect(20, 5, 4), solid(NOSE)], px=0, py=36))
 
-    back.append(
+    back += [
         shape_group(
             "eye-l-w",
             [ellipse(26, 28), solid(WHITE), stroke(OUTLINE, 2)],
@@ -355,9 +344,7 @@ def dog_shapes(mouth_style="smile", brow_tilt=0, eye_scale=100):
             py=-12,
             sx=eye_scale,
             sy=eye_scale,
-        )
-    )
-    back.append(
+        ),
         shape_group(
             "eye-r-w",
             [ellipse(26, 28), solid(WHITE), stroke(OUTLINE, 2)],
@@ -365,140 +352,257 @@ def dog_shapes(mouth_style="smile", brow_tilt=0, eye_scale=100):
             py=-12,
             sx=eye_scale,
             sy=eye_scale,
-        )
-    )
-    back.append(shape_group("pupil-l", [ellipse(12, 14), solid(EYE)], px=-24, py=-10))
-    back.append(shape_group("pupil-r", [ellipse(12, 14), solid(EYE)], px=28, py=-10))
-    back.append(shape_group("shine-l", [ellipse(5, 5), solid(WHITE)], px=-28, py=-14))
-    back.append(shape_group("shine-r", [ellipse(5, 5), solid(WHITE)], px=24, py=-14))
+        ),
+        shape_group("pupil-l", [ellipse(12, 14), solid(EYE)], px=-24, py=-10),
+        shape_group("pupil-r", [ellipse(12, 14), solid(EYE)], px=28, py=-10),
+        shape_group("shine-l", [ellipse(5, 5), solid(WHITE)], px=-28, py=-14),
+        shape_group("shine-r", [ellipse(5, 5), solid(WHITE)], px=24, py=-14),
+    ]
 
-    if brow_tilt != 0:
-        back.append(
+    if brow_tilt:
+        back += [
             shape_group(
                 "brow-l",
                 [rect(18, 5, 3), solid(OUTLINE)],
                 px=-26,
                 py=-32,
                 r=-brow_tilt,
-            )
-        )
-        back.append(
+            ),
             shape_group(
                 "brow-r",
                 [rect(18, 5, 3), solid(OUTLINE)],
                 px=26,
                 py=-32,
                 r=brow_tilt,
-            )
-        )
+            ),
+        ]
 
     return list(reversed(back))
 
 
-def stage_accessories():
-    """各進化階段辨識配件（放在最上層）。"""
-    acc = []
+def form_props():
+    """各形態招牌道具（最上層）。"""
+    props = []
+
     if STAGE == "baby":
-        # 幼年期不加頭頂配件，靠大眼睛與配色辨識
-        pass
-    elif STAGE == "teen":
-        # 小圍巾
-        acc.append(
+        # 奶瓶（右側）
+        props += [
             shape_group(
-                "scarf",
-                [ellipse(70, 18), solid((56, 132, 220)), stroke(OUTLINE, 1.5)],
-                px=0,
-                py=52,
-            )
-        )
-    elif STAGE == "adult":
-        # 眼鏡
-        acc.append(
+                "bottle-body",
+                [rect(28, 48, 10), solid((255, 255, 255)), stroke(OUTLINE, 2)],
+                px=62,
+                py=28,
+                r=12,
+            ),
             shape_group(
-                "glass-l",
-                [ellipse(30, 28), solid(WHITE, 0.15), stroke((40, 40, 40), 3)],
-                px=-26,
-                py=-12,
-            )
-        )
-        acc.append(
+                "bottle-milk",
+                [rect(22, 28, 6), solid((255, 230, 180))],
+                px=62,
+                py=34,
+                r=12,
+            ),
             shape_group(
-                "glass-r",
-                [ellipse(30, 28), solid(WHITE, 0.15), stroke((40, 40, 40), 3)],
-                px=26,
-                py=-12,
-            )
-        )
-        acc.append(
-            shape_group("bridge", [rect(14, 3, 2), solid((40, 40, 40))], px=0, py=-12)
-        )
-        # 領帶尖
-        acc.append(
+                "bottle-ring",
+                [ellipse(30, 10), solid((120, 190, 255)), stroke(OUTLINE, 1.5)],
+                px=62,
+                py=6,
+            ),
             shape_group(
-                "tie",
-                [ellipse(14, 22), solid((40, 80, 160)), stroke(OUTLINE, 1)],
+                "bottle-nipple",
+                [ellipse(14, 16), solid((255, 180, 190)), stroke(OUTLINE, 1.5)],
+                px=62,
+                py=-8,
+            ),
+            # 圍兜
+            shape_group(
+                "bib",
+                [ellipse(70, 28), solid((255, 240, 245)), stroke((240, 160, 180), 2)],
                 px=0,
                 py=58,
-            )
-        )
-    else:  # master
-        acc.append(
+            ),
+            shape_group(
+                "bib-dot",
+                [ellipse(10, 10), solid((255, 140, 160))],
+                px=0,
+                py=58,
+            ),
+        ]
+
+    elif STAGE == "rookie":
+        # 熱血頭帶
+        props += [
+            shape_group(
+                "headband",
+                [rect(100, 14, 6), solid((220, 50, 50)), stroke(OUTLINE, 1.5)],
+                px=0,
+                py=-48,
+            ),
+            shape_group(
+                "headband-tail",
+                [rect(18, 28, 4), solid((220, 50, 50)), stroke(OUTLINE, 1)],
+                px=52,
+                py=-40,
+                r=25,
+            ),
+            # 工作證掛繩
+            shape_group(
+                "lanyard",
+                [rect(6, 40, 3), solid((40, 90, 180))],
+                px=0,
+                py=48,
+            ),
+            # 工作證
+            shape_group(
+                "badge-card",
+                [rect(36, 44, 4), solid((255, 255, 255)), stroke((40, 90, 180), 2.5)],
+                px=0,
+                py=78,
+            ),
+            shape_group(
+                "badge-photo",
+                [ellipse(16, 16), solid((255, 200, 150)), stroke(OUTLINE, 1)],
+                px=0,
+                py=70,
+            ),
+            shape_group(
+                "badge-bar",
+                [rect(24, 6, 2), solid((40, 90, 180))],
+                px=0,
+                py=88,
+            ),
+        ]
+
+    elif STAGE == "pro":
+        # 眼鏡
+        props += [
             shape_group(
                 "glass-l",
-                [ellipse(30, 28), solid(WHITE, 0.12), stroke((30, 30, 30), 3)],
+                [ellipse(32, 30), solid(WHITE, 0.18), stroke((35, 35, 40), 3.5)],
                 px=-26,
                 py=-12,
-            )
-        )
-        acc.append(
+            ),
             shape_group(
                 "glass-r",
-                [ellipse(30, 28), solid(WHITE, 0.12), stroke((30, 30, 30), 3)],
+                [ellipse(32, 30), solid(WHITE, 0.18), stroke((35, 35, 40), 3.5)],
                 px=26,
                 py=-12,
-            )
-        )
-        acc.append(
-            shape_group("bridge", [rect(14, 3, 2), solid((30, 30, 30))], px=0, py=-12)
-        )
-        # 星星徽章
-        acc.append(
+            ),
             shape_group(
-                "badge",
-                [ellipse(18, 18), solid((255, 200, 60)), stroke((180, 130, 20), 2)],
-                px=48,
+                "bridge",
+                [rect(16, 3.5, 2), solid((35, 35, 40))],
+                px=0,
+                py=-12,
+            ),
+            # 筆記本（左側）
+            shape_group(
+                "notebook",
+                [rect(40, 52, 4), solid((70, 140, 110)), stroke(OUTLINE, 2)],
+                px=-64,
+                py=30,
+                r=-18,
+            ),
+            shape_group(
+                "notebook-page",
+                [rect(30, 40, 2), solid((250, 250, 245))],
+                px=-64,
+                py=30,
+                r=-18,
+            ),
+            shape_group(
+                "notebook-line1",
+                [rect(22, 2, 1), solid((180, 180, 180))],
+                px=-64,
+                py=22,
+                r=-18,
+            ),
+            shape_group(
+                "notebook-line2",
+                [rect(22, 2, 1), solid((180, 180, 180))],
+                px=-64,
+                py=30,
+                r=-18,
+            ),
+            shape_group(
+                "notebook-line3",
+                [rect(18, 2, 1), solid((180, 180, 180))],
+                px=-64,
+                py=38,
+                r=-18,
+            ),
+            # 筆
+            shape_group(
+                "pen",
+                [rect(5, 36, 2), solid((40, 40, 50)), stroke(OUTLINE, 1)],
+                px=-48,
+                py=18,
+                r=-30,
+            ),
+            shape_group(
+                "pen-tip",
+                [ellipse(6, 6), solid((200, 160, 40))],
+                px=-40,
+                py=34,
+            ),
+        ]
+
+    else:  # master
+        # 披風（底層感：放在臉前仍清楚可見兩翼）
+        props += [
+            shape_group(
+                "cape-l",
+                [ellipse(48, 70), solid((90, 50, 160)), stroke((60, 30, 110), 2)],
+                px=-55,
                 py=40,
-            )
-        )
-        acc.append(
-            shape_group("badge-core", [ellipse(8, 8), solid((255, 240, 160))], px=48, py=40)
-        )
-        # 小禮帽
-        acc.append(
+                r=20,
+            ),
             shape_group(
-                "hat-brim",
-                [ellipse(56, 12), solid((45, 45, 55)), stroke(OUTLINE, 1.5)],
-                px=0,
-                py=-62,
-            )
-        )
-        acc.append(
+                "cape-r",
+                [ellipse(48, 70), solid((90, 50, 160)), stroke((60, 30, 110), 2)],
+                px=55,
+                py=40,
+                r=-20,
+            ),
             shape_group(
-                "hat-top",
-                [rect(34, 22, 6), solid((45, 45, 55)), stroke(OUTLINE, 1.5)],
+                "cape-collar",
+                [ellipse(70, 18), solid((120, 70, 190)), stroke((60, 30, 110), 2)],
                 px=0,
-                py=-74,
-            )
-        )
-        acc.append(
+                py=48,
+            ),
+            # 眼鏡
             shape_group(
-                "hat-band",
-                [rect(34, 6, 2), solid((200, 160, 50))],
+                "glass-l",
+                [ellipse(30, 28), solid(WHITE, 0.12), stroke((25, 25, 30), 3)],
+                px=-26,
+                py=-12,
+            ),
+            shape_group(
+                "glass-r",
+                [ellipse(30, 28), solid(WHITE, 0.12), stroke((25, 25, 30), 3)],
+                px=26,
+                py=-12,
+            ),
+            shape_group(
+                "bridge",
+                [rect(14, 3, 2), solid((25, 25, 30))],
                 px=0,
-                py=-66,
-            )
-        )
-    return acc
+                py=-12,
+            ),
+            # 星星徽章
+            shape_group(
+                "star-badge",
+                [ellipse(22, 22), solid((255, 205, 60)), stroke((180, 130, 20), 2.5)],
+                px=50,
+                py=42,
+            ),
+            shape_group(
+                "star-core",
+                [ellipse(10, 10), solid((255, 245, 180))],
+                px=50,
+                py=42,
+            ),
+        ]
+
+    return props
 
 
 def make_doc(name, op, layers):
@@ -531,21 +635,20 @@ def build_idle():
     blink_o = kf([(0, 0), (50, 0), (53, 100), (56, 0), (90, 0)])
     lids = [
         shape_group(
-            "lid-l",
-            [ellipse(28, 16), solid(BODY)],
-            px=-26,
-            py=-12,
-            animated_o=blink_o,
+            "lid-l", [ellipse(28, 16), solid(BODY)], px=-26, py=-12, animated_o=blink_o
         ),
         shape_group(
-            "lid-r",
-            [ellipse(28, 16), solid(BODY)],
-            px=26,
-            py=-12,
-            animated_o=blink_o,
+            "lid-r", [ellipse(28, 16), solid(BODY)], px=26, py=-12, animated_o=blink_o
         ),
     ]
-    shapes = stage_accessories() + lids + shapes
+    # props 最上；披風需在臉下 → master 披風拆兩段處理
+    if STAGE == "master":
+        # 披風在後：放 shapes 尾端（下層）；徽章眼鏡在前
+        cape = form_props()[:3]
+        front = form_props()[3:]
+        shapes = front + lids + shapes + list(reversed(cape))
+    else:
+        shapes = form_props() + lids + shapes
     return make_doc(
         f"mascot-{STAGE}-idle",
         op,
@@ -587,7 +690,12 @@ def build_success():
             animated_s=kf([(0, [50, 50]), (18, [130, 130]), (45, [50, 50])]),
         ),
     ]
-    shapes = sparks + stage_accessories() + shapes
+    if STAGE == "master":
+        cape = form_props()[:3]
+        front = form_props()[3:]
+        shapes = sparks + front + shapes + list(reversed(cape))
+    else:
+        shapes = sparks + form_props() + shapes
     return make_doc(
         f"mascot-{STAGE}-success",
         op,
@@ -639,7 +747,12 @@ def build_thinking():
                 animated_o=o_anim,
             )
         )
-    shapes = dots + stage_accessories() + shapes
+    if STAGE == "master":
+        cape = form_props()[:3]
+        front = form_props()[3:]
+        shapes = dots + front + shapes + list(reversed(cape))
+    else:
+        shapes = dots + form_props() + shapes
     return make_doc(
         f"mascot-{STAGE}-thinking",
         op,
@@ -673,7 +786,12 @@ def build_error():
         animated_o=sweat,
         animated_pos=kf([(0, [58, -20]), (20, [62, -5]), (36, [64, 5])]),
     )
-    shapes = [sweat_drop] + stage_accessories() + shapes
+    if STAGE == "master":
+        cape = form_props()[:3]
+        front = form_props()[3:]
+        shapes = [sweat_drop] + front + shapes + list(reversed(cape))
+    else:
+        shapes = [sweat_drop] + form_props() + shapes
     return make_doc(
         f"mascot-{STAGE}-error",
         op,
@@ -697,6 +815,13 @@ def main():
         "thinking": build_thinking,
         "error": build_error,
     }
+
+    # 清除舊 teen/adult 檔名
+    for old in OUT.glob("mascot-teen-*.json"):
+        old.unlink()
+    for old in OUT.glob("mascot-adult-*.json"):
+        old.unlink()
+
     for stage in STAGES:
         set_stage(stage)
         for state, builder in builders.items():
@@ -706,18 +831,16 @@ def main():
             path.write_text(json.dumps(doc, separators=(",", ":")), encoding="utf-8")
             print(f"wrote {name} ({path.stat().st_size} bytes)")
 
-    # 相容舊路徑：無前綴 = baby
+    # legacy 無前綴 = baby
     set_stage("baby")
     for state, builder in builders.items():
         doc = builder()
-        # 改名為舊格式
         doc["nm"] = f"mascot-{state}"
-        path = OUT / f"mascot-{state}.json"
-        path.write_text(json.dumps(doc, separators=(",", ":")), encoding="utf-8")
+        (OUT / f"mascot-{state}.json").write_text(
+            json.dumps(doc, separators=(",", ":")), encoding="utf-8"
+        )
         print(f"wrote legacy mascot-{state}.json")
 
-    for p in list(OUT.glob("_probe_*.json")) + list(OUT.glob("_p2_*.json")):
-        p.unlink()
     print("done")
 
 

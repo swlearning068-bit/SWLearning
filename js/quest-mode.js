@@ -1554,9 +1554,6 @@ function completeActiveQuestLevel() {
   const wish = getWishForChapter(clearedLevel.chapter);
   const isChapterClear = clearedLevel.isChest;
 
-  // Phase 13.4：通關後、重繪前檢查進化（避免被地圖重繪搶先同步）
-  const evo = syncMascotEvolution({ announce: false });
-
   closeQuestChallenge();
   renderQuestMap();
   showQuestClearModal(clearedTitle, next, {
@@ -1565,11 +1562,9 @@ function completeActiveQuestLevel() {
     chapterId: clearedLevel.chapter
   });
 
-  if (evo && evo.evolved) {
-    setTimeout(() => {
-      mascotCall('triggerEvolution', evo.stageName);
-    }, 700);
-  } else {
+  // Phase 13.5：跨進化門檻時開全螢幕慶祝；關閉後才更新右下角形態
+  const evo = syncMascotEvolution({ announce: true });
+  if (!(evo && evo.evolved)) {
     mascotCall(
       'triggerSuccess',
       isChapterClear
@@ -1673,6 +1668,11 @@ function bindQuestEvents() {
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const evoModal = document.getElementById('mascot-evolution-modal');
+    if (evoModal && !evoModal.classList.contains('hidden')) {
+      mascotCall('closeEvolutionModal');
+      return;
+    }
     const wishModal = quest$('wish-setting-modal');
     if (wishModal && !wishModal.classList.contains('hidden')) {
       closeWishSettingModal();
