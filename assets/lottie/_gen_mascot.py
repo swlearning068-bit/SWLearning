@@ -399,18 +399,8 @@ def stage_accessories():
     """各進化階段辨識配件（放在最上層）。"""
     acc = []
     if STAGE == "baby":
-        # 小蝴蝶結
-        acc.append(
-            shape_group(
-                "bow",
-                [ellipse(22, 14), solid((255, 120, 140)), stroke(OUTLINE, 1.5)],
-                px=0,
-                py=-58,
-            )
-        )
-        acc.append(
-            shape_group("bow-knot", [ellipse(8, 8), solid((230, 80, 110))], px=0, py=-58)
-        )
+        # 幼年期不加頭頂配件，靠大眼睛與配色辨識
+        pass
     elif STAGE == "teen":
         # 小圍巾
         acc.append(

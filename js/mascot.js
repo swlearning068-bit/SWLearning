@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  const LOTTIE_VER = '4';
+  const LOTTIE_VER = '5';
   const STORAGE_KEY_STAGE = 'sw_mascot_stage';
 
   /** @type {Array<{id: string, name: string, min: number}>} */
