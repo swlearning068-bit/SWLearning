@@ -5031,25 +5031,28 @@ body {
   }
 }
 
-/* ---------- AI 模式懸浮標籤（右下角輔助提示） ---------- */
+/* ---------- AI 模式懸浮標籤（頭像左側，避開 Lottie 小夥伴） ---------- */
 .ai-indicator {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: rgba(255, 255, 255, 0.85);
+  /* 與 120px Lottie 頭像同高並排，不被上方對話氣泡遮住 */
+  bottom: 48px;
+  right: 140px;
+  left: auto;
+  max-width: min(280px, calc(100vw - 160px));
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   padding: 8px 16px;
   border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-primary);
-  z-index: 9999;
+  z-index: 10050;
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -5079,11 +5082,13 @@ body {
 
 @media (max-width: 640px) {
   .ai-indicator {
-    bottom: 16px;
-    right: 16px;
-    left: 16px;
-    justify-content: center;
+    bottom: 36px;
+    right: 108px;
+    left: auto;
+    max-width: calc(100vw - 120px);
+    justify-content: flex-start;
     font-size: 0.8rem;
+    padding: 7px 12px;
   }
 }
 
@@ -6213,7 +6218,8 @@ body.ebook-reader-open > main.main-content {
 .quest-challenge-overlay {
   position: fixed;
   inset: 0;
-  z-index: 240;
+  /* 高於學習小夥伴，避免右下角擋到底部操作鈕 */
+  z-index: 10100;
   background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: stretch;
@@ -6261,7 +6267,7 @@ body.ebook-reader-open > main.main-content {
 }
 
 .quest-challenge-body {
-  padding: 16px;
+  padding: 16px 16px 120px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -6669,7 +6675,8 @@ body.ebook-reader-open > main.main-content {
   flex-direction: column;
   gap: 14px;
   margin-top: 4px;
-  padding-bottom: 8px;
+  padding-bottom: 28px;
+  scroll-margin-bottom: 24px;
 }
 
 .l0-vocab-collect {
@@ -6737,6 +6744,7 @@ body.ebook-reader-open > main.main-content {
   width: 100%;
   padding: 14px 16px;
   font-size: 1.05rem;
+  scroll-margin-bottom: 32px;
 }
 
 .l0-vocab-complete-btn:disabled {
@@ -6803,12 +6811,12 @@ body.ebook-reader-open > main.main-content {
 }
 
 /* ============================================================
-   Phase 13.3：學習小夥伴（Mascot）＋動態對話框
+   Phase 13.3+：Lottie 學習小夥伴＋動態對話框
    ============================================================ */
 .mascot-floating {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 12px;
+  right: 12px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -6817,7 +6825,7 @@ body.ebook-reader-open > main.main-content {
 }
 
 .mascot-floating .speech-bubble,
-.mascot-floating .mascot-avatar {
+.mascot-floating .mascot-lottie-avatar {
   pointer-events: auto;
 }
 
@@ -6826,7 +6834,7 @@ body.ebook-reader-open > main.main-content {
   border: 2px solid #2563eb;
   border-radius: 15px;
   padding: 12px 18px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   box-shadow: var(--shadow-md);
   max-width: 250px;
   font-size: 0.95rem;
@@ -6844,7 +6852,7 @@ body.ebook-reader-open > main.main-content {
   content: '';
   position: absolute;
   bottom: -10px;
-  right: 28px;
+  right: 40px;
   width: 0;
   height: 0;
   border-left: 10px solid transparent;
@@ -6856,7 +6864,7 @@ body.ebook-reader-open > main.main-content {
   content: '';
   position: absolute;
   bottom: -7px;
-  right: 30px;
+  right: 42px;
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
@@ -6865,39 +6873,43 @@ body.ebook-reader-open > main.main-content {
   z-index: 1;
 }
 
-.mascot-avatar {
-  font-size: 3.5rem;
-  line-height: 1;
-  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.18));
-  transition: transform 0.2s ease;
+.mascot-lottie-avatar {
+  width: 120px;
+  height: 120px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  display: inline-flex;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.16));
+  transition: transform 0.2s ease;
+  outline: none;
+}
+
+.mascot-lottie-avatar:hover {
+  transform: scale(1.06);
+}
+
+.mascot-lottie-avatar:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+.mascot-lottie-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mascot-fallback {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #eff6ff 55%, #dbeafe 100%);
-  border: 2px solid #bfdbfe;
+  width: 100%;
+  height: 100%;
+  font-size: 4rem;
+  line-height: 1;
 }
 
-.mascot-avatar:hover {
-  transform: scale(1.1);
-}
-
-.mascot-avatar:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 3px;
-}
-
-.mascot-icon {
-  display: block;
-  transform-origin: center bottom;
-}
-
-/* 動畫狀態 */
 @keyframes mascot-popIn {
   0% {
     opacity: 0;
@@ -6909,97 +6921,54 @@ body.ebook-reader-open > main.main-content {
   }
 }
 
-@keyframes mascot-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes mascot-jump {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  40% {
-    transform: translateY(-18px) scale(1.08);
-  }
-  70% {
-    transform: translateY(-4px) scale(1.02);
-  }
-}
-
-@keyframes mascot-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  20% {
-    transform: translateX(-6px) rotate(-4deg);
-  }
-  40% {
-    transform: translateX(6px) rotate(4deg);
-  }
-  60% {
-    transform: translateX(-4px) rotate(-2deg);
-  }
-  80% {
-    transform: translateX(4px) rotate(2deg);
-  }
-}
-
-.mascot-avatar.state-idle {
-  transform: translateY(0);
-}
-
-.mascot-avatar.state-thinking {
-  animation: mascot-bounce 1s ease-in-out infinite;
-}
-
-.mascot-avatar.state-success {
-  animation: mascot-jump 0.5s ease;
-}
-
-.mascot-avatar.state-error {
-  animation: mascot-shake 0.4s ease;
-}
-
-/* 與 AI 模式標籤錯開，避免右下角重疊 */
-.ai-indicator {
-  bottom: 118px;
-}
-
 @media (max-width: 640px) {
   .mascot-floating {
-    bottom: 12px;
-    right: 12px;
+    bottom: 8px;
+    right: 4px;
   }
 
-  .mascot-avatar {
-    font-size: 2.75rem;
-    width: 58px;
-    height: 58px;
+  .mascot-lottie-avatar {
+    width: 96px;
+    height: 96px;
   }
 
   .speech-bubble {
-    max-width: min(220px, calc(100vw - 96px));
+    max-width: min(220px, calc(100vw - 110px));
     font-size: 0.88rem;
     padding: 10px 14px;
-  }
-
-  .ai-indicator {
-    bottom: 96px;
-    left: auto;
-    right: 12px;
-    max-width: calc(100vw - 90px);
   }
 }
 
 /* 電子書全螢幕時隱藏小夥伴，避免干擾閱讀 */
 body:has(#ebook-reader-overlay:not(.ebook-hidden)) .mascot-floating {
   display: none;
+}
+
+/* 任務挑戰進行中：小夥伴改到上方，避免擋住底部通關鈕 */
+body:has(#quest-challenge-overlay:not(.hidden)) .mascot-floating {
+  top: 70px;
+  bottom: auto;
+  right: 12px;
+  z-index: 10120;
+}
+
+body:has(#quest-challenge-overlay:not(.hidden)) .mascot-lottie-avatar {
+  width: 88px;
+  height: 88px;
+}
+
+body:has(#quest-challenge-overlay:not(.hidden)) .speech-bubble {
+  max-width: 200px;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+}
+
+/* AI 標籤在挑戰中改到左下，避免與上方小夥伴重疊 */
+body:has(#quest-challenge-overlay:not(.hidden)) .ai-indicator {
+  bottom: 20px;
+  right: auto;
+  left: 16px;
+  z-index: 10150;
+  max-width: min(280px, calc(100vw - 32px));
 }
 

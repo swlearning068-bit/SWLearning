@@ -1,17 +1,10 @@
 /**
- * Phase 13.3：學習小夥伴（Mascot）
+ * Phase 13.3+：Lottie 動態學習小夥伴
  * 狀態：idle / thinking / success / error
- * 供 quest-mode.js、task-ui.js、quiz.js 等透過 window.MascotApp 呼叫
+ * 對外 API：setState / triggerSuccess / triggerHint / triggerError / triggerThinking / say
  */
 (function () {
   'use strict';
-
-  const FACES = {
-    idle: '🐶',
-    thinking: '🤔',
-    success: '🎉',
-    error: '🥺'
-  };
 
   const IDLE_MESSAGES = [
     '準備好開始今天的挑戰了嗎？',
@@ -33,14 +26,29 @@
     '別灰心，錯誤是學習的一部分！'
   ];
 
+  const ANIMATIONS = {
+    idle: 'assets/lottie/mascot-idle.json',
+    success: 'assets/lottie/mascot-success.json',
+    thinking: 'assets/lottie/mascot-thinking.json',
+    error: 'assets/lottie/mascot-error.json'
+  };
+
   let idleTimer = null;
   let messageIndex = 0;
+  let currentState = '';
 
   /**
    * @returns {boolean}
    */
   function ready() {
-    return Boolean(MascotApp.avatar && MascotApp.bubble && MascotApp.icon);
+    return Boolean(MascotApp.container && MascotApp.bubble);
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  function hasLottie() {
+    return typeof window.lottie !== 'undefined' && typeof window.lottie.loadAnimation === 'function';
   }
 
   /**
@@ -69,36 +77,112 @@
     return msg;
   }
 
+  /**
+   * @param {HTMLElement} el
+   * @param {string|null|undefined} message
+   */
+  function updateBubble(el, message) {
+    if (message) {
+      el.textContent = message;
+      el.classList.remove('hidden');
+      el.classList.remove('speech-bubble--pop');
+      void el.offsetWidth;
+      el.classList.add('speech-bubble--pop');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
   const MascotApp = {
-    avatar: null,
+    container: null,
     bubble: null,
-    icon: null,
+    currentAnimation: null,
+    animations: ANIMATIONS,
 
-    /**
-     * 綁定 DOM（腳本在 body 尾端時可直接呼叫）
-     */
     init() {
-      this.avatar = document.getElementById('mascot-avatar');
+      this.container = document.getElementById('mascot-lottie-avatar');
       this.bubble = document.getElementById('mascot-speech-bubble');
-      this.icon = document.querySelector('#mascot-avatar .mascot-icon');
-
       if (!ready()) return;
+
+      if (!hasLottie()) {
+        console.warn('[mascot.js] lottie-web 尚未載入，改用靜態後備顯示');
+        this.container.innerHTML =
+          '<span class="mascot-fallback" aria-hidden="true">🐶</span>';
+      }
 
       const onTap = () => {
         this.setState('idle', pickMessage(IDLE_MESSAGES));
         scheduleIdle(4000);
       };
-      this.avatar.addEventListener('click', onTap);
-      this.avatar.addEventListener('keydown', (event) => {
+      this.container.addEventListener('click', onTap);
+      this.container.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           onTap();
         }
       });
 
-      // 歡迎詞
       this.setState('idle', IDLE_MESSAGES[0]);
       scheduleIdle(5000);
+    },
+
+    /**
+     * @param {'idle'|'thinking'|'success'|'error'} state
+     */
+    loadAnimation(state) {
+      if (!ready()) return;
+
+      const next = ANIMATIONS[state] ? state : 'idle';
+      this.container.dataset.state = next;
+
+      if (!hasLottie()) {
+        const faces = {
+          idle: '🐶',
+          thinking: '🤔',
+          success: '🎉',
+          error: '🥺'
+        };
+        this.container.innerHTML =
+          `<span class="mascot-fallback" aria-hidden="true">${faces[next] || faces.idle}</span>`;
+        currentState = next;
+        return;
+      }
+
+      // 同一狀態且動畫仍在：不必重載（避免點擊閒聊時閃爍）
+      if (next === currentState && this.currentAnimation) {
+        try {
+          this.currentAnimation.goToAndPlay(0, true);
+        } catch (_) {
+          // ignore
+        }
+        return;
+      }
+
+      if (this.currentAnimation) {
+        try {
+          this.currentAnimation.destroy();
+        } catch (_) {
+          // ignore
+        }
+        this.currentAnimation = null;
+      }
+
+      this.container.innerHTML = '';
+      this.currentAnimation = window.lottie.loadAnimation({
+        container: this.container,
+        renderer: 'svg',
+        loop: next === 'idle' || next === 'thinking',
+        autoplay: true,
+        path: ANIMATIONS[next] || ANIMATIONS.idle
+      });
+
+      this.currentAnimation.addEventListener('data_failed', () => {
+        console.warn('[mascot.js] 動畫載入失敗：', ANIMATIONS[next]);
+        this.container.innerHTML =
+          '<span class="mascot-fallback" aria-hidden="true">🐶</span>';
+      });
+
+      currentState = next;
     },
 
     /**
@@ -108,28 +192,17 @@
     setState(state, message) {
       if (!ready()) return;
 
-      const next = FACES[state] ? state : 'idle';
+      const next = ANIMATIONS[state] ? state : 'idle';
       if (idleTimer && next !== 'idle') {
         clearTimeout(idleTimer);
         idleTimer = null;
       }
 
-      this.avatar.className = `mascot-avatar state-${next}`;
-      this.icon.textContent = FACES[next] || FACES.idle;
-
-      if (message) {
-        this.bubble.textContent = message;
-        this.bubble.classList.remove('hidden');
-        this.bubble.classList.remove('speech-bubble--pop');
-        void this.bubble.offsetWidth;
-        this.bubble.classList.add('speech-bubble--pop');
-      } else {
-        this.bubble.classList.add('hidden');
-      }
+      this.loadAnimation(next);
+      updateBubble(this.bubble, message);
     },
 
     /**
-     * 答對／通關鼓勵
      * @param {string} [message]
      */
     triggerSuccess(message) {
@@ -138,18 +211,13 @@
     },
 
     /**
-     * 思考中／提示
      * @param {string} hintText
      */
     triggerHint(hintText) {
-      this.setState(
-        'thinking',
-        hintText || '讓我想想……'
-      );
+      this.setState('thinking', hintText || '讓我想想……');
     },
 
     /**
-     * 答錯溫和回饋
      * @param {string} [message]
      */
     triggerError(message) {
@@ -158,7 +226,6 @@
     },
 
     /**
-     * 載入／生成中
      * @param {string} [message]
      */
     triggerThinking(message) {
@@ -166,7 +233,6 @@
     },
 
     /**
-     * 歡迎／待機台詞
      * @param {string} [message]
      */
     say(message) {

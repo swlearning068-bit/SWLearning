@@ -1295,7 +1295,10 @@ async function renderL0VocabTask(mountEl, options) {
         completeBtn.textContent = '🏅 完成本關卡';
       }
       options?.onAllCorrect?.();
-      footerEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // 等收藏清單展開後，捲到通關鈕（避免停在 footer 頂端看不到按鈕）
+      requestAnimationFrame(() => {
+        completeBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
   }
 

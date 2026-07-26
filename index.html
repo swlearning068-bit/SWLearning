@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=65">
+  <link rel="stylesheet" href="css/style.css?v=68">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -1171,20 +1171,18 @@
     </div>
   </div>
 
-  <!-- ==================== Phase 13.3：學習小夥伴 ==================== -->
+  <!-- ==================== Phase 13.3：Lottie 學習小夥伴 ==================== -->
   <div id="mascot-container" class="mascot-floating" aria-live="polite">
-    <div id="mascot-speech-bubble" class="speech-bubble">
-      準備好開始今天的挑戰了嗎？
-    </div>
+    <div id="mascot-speech-bubble" class="speech-bubble hidden"></div>
+    <!-- Lottie 動畫渲染容器 -->
     <div
-      id="mascot-avatar"
-      class="mascot-avatar state-idle"
+      id="mascot-lottie-avatar"
+      class="mascot-lottie-avatar"
       role="button"
       tabindex="0"
       aria-label="學習小夥伴，點擊可聽鼓勵"
-    >
-      <span class="mascot-icon" aria-hidden="true">🐶</span>
-    </div>
+      data-state="idle"
+    ></div>
   </div>
 
   <!-- Toast 浮動提示（切換科目等操作的短暫視覺回饋） -->
@@ -1279,7 +1277,7 @@
 
   <script src="js/utils.js?v=4"></script>
   <script src="js/deepseek.js?v=35"></script>
-  <script src="js/task-ui.js?v=7"></script>
+  <script src="js/task-ui.js?v=8"></script>
   <script src="js/vocab-library.js?v=9"></script>
   <script src="js/vocab-learn.js?v=4"></script>
   <script src="js/literature.js?v=11"></script>
@@ -1292,7 +1290,8 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=8"></script>
   <script src="js/user-profile.js?v=1"></script>
-  <script src="js/mascot.js?v=1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  <script src="js/mascot.js?v=2"></script>
   <script src="js/quest-mode.js?v=7"></script>
   <script src="js/app.js?v=23"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
