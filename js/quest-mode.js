@@ -957,6 +957,7 @@ function escapeQuestHtml(text) {
 
 function refreshQuestView() {
   renderQuestMap();
+  syncMascotEvolution({ announce: false });
 }
 
 /* ============================================================
@@ -1179,18 +1180,28 @@ function focusQuestWritingLevel(root, tier) {
  * @param {Object} level
  */
 /**
- * 安全呼叫學習小夥伴（Phase 13.3）
- * @param {'say'|'triggerSuccess'|'triggerHint'|'triggerError'|'triggerThinking'|'setState'} method
+ * 安全呼叫學習小夥伴（Phase 13.3 / 13.4）
+ * @param {string} method
  * @param {...*} args
  */
 function mascotCall(method, ...args) {
   const app = window.MascotApp;
   if (!app || typeof app[method] !== 'function') return;
   try {
-    app[method](...args);
+    return app[method](...args);
   } catch (_) {
-    // ignore
+    return undefined;
   }
+}
+
+/**
+ * 同步小夥伴進化階段（Phase 13.4）
+ * @param {{announce?: boolean}} [options]
+ * @returns {{stage: string, stageName: string, evolved: boolean}|null}
+ */
+function syncMascotEvolution(options) {
+  const result = mascotCall('syncFromQuestProgress', options || {});
+  return result && typeof result === 'object' ? result : null;
 }
 
 function openQuestChallenge(level) {
@@ -1543,6 +1554,9 @@ function completeActiveQuestLevel() {
   const wish = getWishForChapter(clearedLevel.chapter);
   const isChapterClear = clearedLevel.isChest;
 
+  // Phase 13.4：通關後、重繪前檢查進化（避免被地圖重繪搶先同步）
+  const evo = syncMascotEvolution({ announce: false });
+
   closeQuestChallenge();
   renderQuestMap();
   showQuestClearModal(clearedTitle, next, {
@@ -1551,12 +1565,18 @@ function completeActiveQuestLevel() {
     chapterId: clearedLevel.chapter
   });
 
-  mascotCall(
-    'triggerSuccess',
-    isChapterClear
-      ? '章節願望達成！你太厲害了！'
-      : `「${clearedTitle}」通關！太棒了！`
-  );
+  if (evo && evo.evolved) {
+    setTimeout(() => {
+      mascotCall('triggerEvolution', evo.stageName);
+    }, 700);
+  } else {
+    mascotCall(
+      'triggerSuccess',
+      isChapterClear
+        ? '章節願望達成！你太厲害了！'
+        : `「${clearedTitle}」通關！太棒了！`
+    );
+  }
 
   if (!wasAlreadyDone && typeof window.earnGem === 'function') {
     try {
@@ -1681,6 +1701,7 @@ function initQuestModeModule() {
   }
   bindQuestEvents();
   updateNavCareerTitle();
+  syncMascotEvolution({ announce: false });
 }
 
 window.initQuestModeModule = initQuestModeModule;

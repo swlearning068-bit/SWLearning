@@ -6888,6 +6888,22 @@ body.ebook-reader-open > main.main-content {
   transform: scale(1.06);
 }
 
+.mascot-lottie-avatar.mascot-evolving {
+  animation: mascot-evolve-glow 1.2s ease-in-out 3;
+}
+
+@keyframes mascot-evolve-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.16));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.85));
+    transform: scale(1.12);
+  }
+}
+
 .mascot-lottie-avatar:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 4px;

@@ -1,40 +1,99 @@
 /**
- * Phase 13.3+：Lottie 動態學習小夥伴
+ * Phase 13.3+ / 13.4：Lottie 動態學習小夥伴＋進化育成
  * 狀態：idle / thinking / success / error
- * 對外 API：setState / triggerSuccess / triggerHint / triggerError / triggerThinking / say
+ * 進化：baby → teen → adult → master（依最高解鎖關卡）
  */
 (function () {
   'use strict';
 
-  const IDLE_MESSAGES = [
-    '準備好開始今天的挑戰了嗎？',
-    '慢慢來，我會陪著你～',
-    '記得先看清楚題目再作答喔！',
-    '累了就休息一下，再繼續加油！'
+  const LOTTIE_VER = '4';
+  const STORAGE_KEY_STAGE = 'sw_mascot_stage';
+
+  /** @type {Array<{id: string, name: string, min: number}>} */
+  const EVOLUTION_STAGES = [
+    { id: 'baby', name: '實習生', min: 1 },
+    { id: 'teen', name: '前線社工', min: 21 },
+    { id: 'adult', name: '單位主管', min: 51 },
+    { id: 'master', name: '資深督導', min: 81 }
   ];
 
-  const SUCCESS_MESSAGES = [
-    '太棒了！完全正確！',
-    '漂亮！就是這樣！',
-    '答對了，繼續保持！',
-    '優秀！你越來越上手了！'
-  ];
-
-  const ERROR_MESSAGES = [
-    '沒關係，再試一次！',
-    '差一點～仔細看看提示吧！',
-    '別灰心，錯誤是學習的一部分！'
-  ];
-
-  const LOTTIE_VER = '3';
-  const ANIMATIONS = {
-    idle: `assets/lottie/mascot-idle.json?v=${LOTTIE_VER}`,
-    success: `assets/lottie/mascot-success.json?v=${LOTTIE_VER}`,
-    thinking: `assets/lottie/mascot-thinking.json?v=${LOTTIE_VER}`,
-    error: `assets/lottie/mascot-error.json?v=${LOTTIE_VER}`
+  const MESSAGES_BY_STAGE = {
+    baby: {
+      idle: [
+        '準備好開始今天的挑戰了嗎？',
+        '慢慢來，我會陪著你～',
+        '記得先看清楚題目再作答喔！',
+        '累了就休息一下，再繼續加油！'
+      ],
+      success: [
+        '太棒了！完全正確！',
+        '答對了，繼續保持！',
+        '哇！你超強的！'
+      ],
+      error: [
+        '沒關係，再試一次！',
+        '差一點～仔細看看提示吧！',
+        '別灰心，我們一起加油！'
+      ]
+    },
+    teen: {
+      idle: [
+        '前線實務，一步一步來！',
+        '這關主題很實用，專心應戰吧。',
+        '記得把專業詞彙記起來喔。',
+        '休息夠了就繼續衝關！'
+      ],
+      success: [
+        '漂亮！前線社工就是要這樣！',
+        '判斷正確，繼續保持節奏。',
+        '好身手，下一題也沒問題！'
+      ],
+      error: [
+        '實務上也常遇到這種題，再練一次！',
+        '對照提示調整一下思路。',
+        '沒過關沒關係，重點是學會。'
+      ]
+    },
+    adult: {
+      idle: [
+        '主管視角：先釐清問題再下手。',
+        '這關可以當督導前的暖身。',
+        '注意用詞精準度，會更專業。',
+        '穩定輸出，比一次衝刺更重要。'
+      ],
+      success: [
+        '決策正確，很有主管風範。',
+        '漂亮！重點都抓到了。',
+        '這種穩定度，團隊會很安心。'
+      ],
+      error: [
+        '先停一下，回顧關鍵概念再試。',
+        '錯也是資訊，調整策略即可。',
+        '督導思維：找出卡關點再前進。'
+      ]
+    },
+    master: {
+      idle: [
+        '資深督導模式啟動，穩健推進吧。',
+        '把經驗轉成判斷力，就是專業。',
+        '這關可以當教學案例來拆解。',
+        '保持節奏，我陪你走到第 100 關。'
+      ],
+      success: [
+        '典範級表現，督導會給按讚。',
+        '精準又沉著，太出色了。',
+        '這就是資深社工的手感！'
+      ],
+      error: [
+        '即使資深也會再確認細節，再來。',
+        '把這題變成你的教學筆記。',
+        '深度複盤後，下一題會更穩。'
+      ]
+    }
   };
 
   let idleTimer = null;
+  let evolutionTimer = null;
   let messageIndex = 0;
   let currentState = '';
 
@@ -49,7 +108,10 @@
    * @returns {boolean}
    */
   function hasLottie() {
-    return typeof window.lottie !== 'undefined' && typeof window.lottie.loadAnimation === 'function';
+    return (
+      typeof window.lottie !== 'undefined' &&
+      typeof window.lottie.loadAnimation === 'function'
+    );
   }
 
   /**
@@ -79,6 +141,16 @@
   }
 
   /**
+   * @param {'idle'|'success'|'error'} kind
+   * @returns {string[]}
+   */
+  function stageMessages(kind) {
+    const pack =
+      MESSAGES_BY_STAGE[MascotApp.currentStage] || MESSAGES_BY_STAGE.baby;
+    return pack[kind] || MESSAGES_BY_STAGE.baby[kind];
+  }
+
+  /**
    * @param {HTMLElement} el
    * @param {string|null|undefined} message
    */
@@ -94,11 +166,64 @@
     }
   }
 
+  /**
+   * @param {number} level
+   * @returns {{id: string, name: string, min: number}}
+   */
+  function resolveStage(level) {
+    const n = Math.max(1, Number(level) || 1);
+    let found = EVOLUTION_STAGES[0];
+    for (let i = 0; i < EVOLUTION_STAGES.length; i += 1) {
+      if (n >= EVOLUTION_STAGES[i].min) found = EVOLUTION_STAGES[i];
+    }
+    return found;
+  }
+
+  /**
+   * @param {string} stage
+   * @returns {Record<'idle'|'success'|'thinking'|'error', string>}
+   */
+  function buildAnimationPaths(stage) {
+    const s = stage || 'baby';
+    return {
+      idle: `assets/lottie/mascot-${s}-idle.json?v=${LOTTIE_VER}`,
+      success: `assets/lottie/mascot-${s}-success.json?v=${LOTTIE_VER}`,
+      thinking: `assets/lottie/mascot-${s}-thinking.json?v=${LOTTIE_VER}`,
+      error: `assets/lottie/mascot-${s}-error.json?v=${LOTTIE_VER}`
+    };
+  }
+
+  /**
+   * @param {string} stage
+   */
+  function persistStage(stage) {
+    try {
+      localStorage.setItem(STORAGE_KEY_STAGE, stage);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /**
+   * @returns {string}
+   */
+  function loadPersistedStage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_STAGE);
+      if (raw && EVOLUTION_STAGES.some((s) => s.id === raw)) return raw;
+    } catch (_) {
+      // ignore
+    }
+    return '';
+  }
+
   const MascotApp = {
     container: null,
     bubble: null,
     currentAnimation: null,
-    animations: ANIMATIONS,
+    currentStage: 'baby',
+    stageName: '實習生',
+    animations: buildAnimationPaths('baby'),
 
     init() {
       this.container = document.getElementById('mascot-lottie-avatar');
@@ -111,8 +236,16 @@
           '<span class="mascot-fallback" aria-hidden="true">🐶</span>';
       }
 
+      const persisted = loadPersistedStage();
+      if (persisted) {
+        this.currentStage = persisted;
+        const meta = EVOLUTION_STAGES.find((s) => s.id === persisted);
+        this.stageName = meta ? meta.name : '實習生';
+        this.animations = buildAnimationPaths(persisted);
+      }
+
       const onTap = () => {
-        this.setState('idle', pickMessage(IDLE_MESSAGES));
+        this.setState('idle', pickMessage(stageMessages('idle')));
         scheduleIdle(4000);
       };
       this.container.addEventListener('click', onTap);
@@ -123,8 +256,110 @@
         }
       });
 
-      this.setState('idle', IDLE_MESSAGES[0]);
+      this.container.dataset.stage = this.currentStage;
+      this.setState('idle', pickMessage(stageMessages('idle')));
       scheduleIdle(5000);
+
+      // 延遲同步任務進度（等 quest-mode 初始化）
+      setTimeout(() => {
+        this.syncFromQuestProgress({ announce: false });
+      }, 0);
+    },
+
+    /**
+     * 依最高解鎖關卡更新進化階段與動畫路徑
+     * @param {number} currentLevel
+     * @param {{announce?: boolean}} [options]
+     * @returns {{stage: string, stageName: string, evolved: boolean}}
+     */
+    checkEvolution(currentLevel, options) {
+      const announce = Boolean(options && options.announce);
+      const next = resolveStage(currentLevel);
+      const prevStage = this.currentStage;
+      const evolved = Boolean(prevStage && prevStage !== next.id);
+
+      this.currentStage = next.id;
+      this.stageName = next.name;
+      this.animations = buildAnimationPaths(next.id);
+      persistStage(next.id);
+
+      if (this.container) {
+        this.container.dataset.stage = next.id;
+        this.container.setAttribute(
+          'aria-label',
+          `學習小夥伴（${next.name}），點擊可聽鼓勵`
+        );
+      }
+
+      if (evolved) {
+        // 強制切換外觀
+        currentState = '';
+        if (announce) {
+          this.triggerEvolution(next.name);
+        } else {
+          this.setState('idle');
+        }
+      }
+
+      return {
+        stage: next.id,
+        stageName: next.name,
+        evolved
+      };
+    },
+
+    /**
+     * 從任務模組讀取最高解鎖關卡並同步
+     * @param {{announce?: boolean}} [options]
+     * @returns {{stage: string, stageName: string, evolved: boolean}|null}
+     */
+    syncFromQuestProgress(options) {
+      let level = 1;
+      if (typeof window.getHighestUnlockedLevel === 'function') {
+        try {
+          level = Number(window.getHighestUnlockedLevel()) || 1;
+        } catch (_) {
+          level = 1;
+        }
+      }
+      return this.checkEvolution(level, options);
+    },
+
+    /**
+     * 進化慶祝
+     * @param {string} stageName
+     */
+    triggerEvolution(stageName) {
+      if (evolutionTimer) {
+        clearTimeout(evolutionTimer);
+        evolutionTimer = null;
+      }
+
+      const name = stageName || this.stageName || '新階段';
+      const message = `✨ 太棒了！跟著你一起學習，我也進化成「${name}」了！`;
+
+      this.container?.classList.add('mascot-evolving');
+      this.setState('success', message);
+
+      if (typeof confetti === 'function') {
+        try {
+          confetti({
+            particleCount: 110,
+            spread: 76,
+            origin: { y: 0.8, x: 0.88 },
+            colors: ['#fbbf24', '#34d399', '#60a5fa', '#f472b6']
+          });
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      evolutionTimer = setTimeout(() => {
+        evolutionTimer = null;
+        this.container?.classList.remove('mascot-evolving');
+        this.setState('idle', `我現在是「${name}」，繼續一起加油！`);
+        scheduleIdle(4500);
+      }, 4200);
     },
 
     /**
@@ -133,7 +368,8 @@
     loadAnimation(state) {
       if (!ready()) return;
 
-      const next = ANIMATIONS[state] ? state : 'idle';
+      const paths = this.animations || buildAnimationPaths(this.currentStage);
+      const next = paths[state] ? state : 'idle';
       this.container.dataset.state = next;
 
       if (!hasLottie()) {
@@ -145,12 +381,12 @@
         };
         this.container.innerHTML =
           `<span class="mascot-fallback" aria-hidden="true">${faces[next] || faces.idle}</span>`;
-        currentState = next;
+        currentState = `${this.currentStage}:${next}`;
         return;
       }
 
-      // 同一狀態且動畫仍在：不必重載（避免點擊閒聊時閃爍）
-      if (next === currentState && this.currentAnimation) {
+      const stateKey = `${this.currentStage}:${next}`;
+      if (stateKey === currentState && this.currentAnimation) {
         try {
           this.currentAnimation.goToAndPlay(0, true);
         } catch (_) {
@@ -174,16 +410,16 @@
         renderer: 'svg',
         loop: next === 'idle' || next === 'thinking',
         autoplay: true,
-        path: ANIMATIONS[next] || ANIMATIONS.idle
+        path: paths[next] || paths.idle
       });
 
       this.currentAnimation.addEventListener('data_failed', () => {
-        console.warn('[mascot.js] 動畫載入失敗：', ANIMATIONS[next]);
+        console.warn('[mascot.js] 動畫載入失敗：', paths[next]);
         this.container.innerHTML =
           '<span class="mascot-fallback" aria-hidden="true">🐶</span>';
       });
 
-      currentState = next;
+      currentState = stateKey;
     },
 
     /**
@@ -193,7 +429,7 @@
     setState(state, message) {
       if (!ready()) return;
 
-      const next = ANIMATIONS[state] ? state : 'idle';
+      const next = this.animations[state] ? state : 'idle';
       if (idleTimer && next !== 'idle') {
         clearTimeout(idleTimer);
         idleTimer = null;
@@ -207,7 +443,7 @@
      * @param {string} [message]
      */
     triggerSuccess(message) {
-      this.setState('success', message || pickMessage(SUCCESS_MESSAGES));
+      this.setState('success', message || pickMessage(stageMessages('success')));
       scheduleIdle(3000);
     },
 
@@ -222,7 +458,7 @@
      * @param {string} [message]
      */
     triggerError(message) {
-      this.setState('error', message || pickMessage(ERROR_MESSAGES));
+      this.setState('error', message || pickMessage(stageMessages('error')));
       scheduleIdle(3500);
     },
 
@@ -237,7 +473,7 @@
      * @param {string} [message]
      */
     say(message) {
-      this.setState('idle', message || pickMessage(IDLE_MESSAGES));
+      this.setState('idle', message || pickMessage(stageMessages('idle')));
       scheduleIdle(4500);
     }
   };
