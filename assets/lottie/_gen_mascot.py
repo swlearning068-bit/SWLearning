@@ -153,183 +153,186 @@ SPOT = (240, 160, 95)
 
 
 def dog_shapes(mouth_style="smile", brow_tilt=0, eye_scale=100):
-    """Build static dog face shape groups; mouth_style: smile|flat|frown|open"""
-    groups = []
+    """Build dog face groups.
 
-    # Left ear
-    groups.append(
+    Lottie / After Effects：shapes 陣列「越前面越上層」。
+    因此回傳順序為：臉部細節 → 頭 → 耳朵（耳朵在最底層）。
+    """
+    back = []  # 先收集「由後到前」，最後再 reverse
+
+    # —— 最底：耳朵 ——
+    back.append(
         shape_group(
             "ear-l",
-            [ellipse(38, 52), solid(EAR), stroke(OUTLINE, 2.5)],
-            px=-48,
-            py=-48,
-            r=-28,
+            [ellipse(42, 58), solid(EAR), stroke(OUTLINE, 2.5)],
+            px=-50,
+            py=-46,
+            r=-26,
         )
     )
-    groups.append(
+    back.append(
         shape_group(
             "ear-l-in",
-            [ellipse(18, 28), solid(EAR_INNER)],
-            px=-48,
-            py=-44,
-            r=-28,
+            [ellipse(20, 30), solid(EAR_INNER)],
+            px=-50,
+            py=-42,
+            r=-26,
         )
     )
-    # Right ear
-    groups.append(
+    back.append(
         shape_group(
             "ear-r",
-            [ellipse(38, 52), solid(EAR), stroke(OUTLINE, 2.5)],
-            px=48,
-            py=-48,
-            r=28,
+            [ellipse(42, 58), solid(EAR), stroke(OUTLINE, 2.5)],
+            px=50,
+            py=-46,
+            r=26,
         )
     )
-    groups.append(
+    back.append(
         shape_group(
             "ear-r-in",
-            [ellipse(18, 28), solid(EAR_INNER)],
-            px=48,
-            py=-44,
-            r=28,
+            [ellipse(20, 30), solid(EAR_INNER)],
+            px=50,
+            py=-42,
+            r=26,
         )
     )
 
-    # Head
-    groups.append(
+    # —— 頭與斑點 ——
+    back.append(
         shape_group(
             "head",
-            [ellipse(118, 108), solid(BODY), stroke(OUTLINE, 3)],
+            [ellipse(122, 112), solid(BODY), stroke(OUTLINE, 3)],
             px=0,
-            py=-4,
+            py=-2,
         )
     )
-    # Spot
-    groups.append(
-        shape_group("spot", [ellipse(28, 22), solid(SPOT)], px=34, py=-28)
-    )
+    back.append(shape_group("spot", [ellipse(30, 24), solid(SPOT)], px=36, py=-26))
 
-    # Eyes white
-    groups.append(
+    # —— 臉：臉頰、口鼻、眼睛（越後面越上層，reverse 後會在最前） ——
+    back.append(
         shape_group(
-            "eye-l-w",
-            [ellipse(22, 24), solid(WHITE), stroke(OUTLINE, 1.5)],
-            px=-24,
-            py=-10,
-            sx=eye_scale,
-            sy=eye_scale,
+            "cheek-l",
+            [ellipse(18, 12), solid(CHEEK)],
+            px=-42,
+            py=16,
+            animated_o={"a": 0, "k": 55},
         )
     )
-    groups.append(
+    back.append(
         shape_group(
-            "eye-r-w",
-            [ellipse(22, 24), solid(WHITE), stroke(OUTLINE, 1.5)],
-            px=24,
-            py=-10,
-            sx=eye_scale,
-            sy=eye_scale,
+            "cheek-r",
+            [ellipse(18, 12), solid(CHEEK)],
+            px=42,
+            py=16,
+            animated_o={"a": 0, "k": 55},
         )
     )
-    # Pupils
-    groups.append(
-        shape_group("pupil-l", [ellipse(10, 12), solid(EYE)], px=-22, py=-8)
-    )
-    groups.append(
-        shape_group("pupil-r", [ellipse(10, 12), solid(EYE)], px=26, py=-8)
-    )
-    # Eye shine
-    groups.append(
-        shape_group("shine-l", [ellipse(4, 4), solid(WHITE)], px=-26, py=-12)
-    )
-    groups.append(
-        shape_group("shine-r", [ellipse(4, 4), solid(WHITE)], px=22, py=-12)
-    )
-
-    # Cheeks
-    groups.append(
-        shape_group("cheek-l", [ellipse(16, 10), solid(CHEEK, 0.55)], px=-40, py=14)
-    )
-    groups.append(
-        shape_group("cheek-r", [ellipse(16, 10), solid(CHEEK, 0.55)], px=40, py=14)
-    )
-
-    # Snout
-    groups.append(
+    back.append(
         shape_group(
             "snout",
-            [ellipse(48, 34), solid(SNOUT), stroke(OUTLINE, 2)],
+            [ellipse(52, 36), solid(SNOUT), stroke(OUTLINE, 2)],
             px=0,
-            py=22,
+            py=24,
         )
     )
-    # Nose
-    groups.append(
-        shape_group("nose", [ellipse(16, 12), solid(NOSE)], px=0, py=14)
-    )
+    back.append(shape_group("nose", [ellipse(18, 14), solid(NOSE)], px=0, py=16))
 
-    # Mouth
     if mouth_style == "smile":
-        groups.append(
+        back.append(
             shape_group(
                 "mouth",
-                [ellipse(22, 14), solid(NOSE)],
+                [ellipse(26, 16), solid(NOSE)],
                 px=0,
-                py=32,
-                sy=55,
+                py=34,
+                sy=50,
             )
         )
     elif mouth_style == "open":
-        groups.append(
+        back.append(
             shape_group(
                 "mouth",
-                [ellipse(26, 22), solid((180, 70, 70)), stroke(OUTLINE, 1.5)],
+                [ellipse(28, 24), solid((180, 70, 70)), stroke(OUTLINE, 1.5)],
                 px=0,
-                py=34,
+                py=36,
             )
         )
     elif mouth_style == "frown":
-        groups.append(
+        back.append(
             shape_group(
                 "mouth",
-                [ellipse(20, 12), solid(NOSE)],
+                [ellipse(22, 12), solid(NOSE)],
                 px=0,
-                py=36,
-                sy=40,
+                py=38,
+                sy=45,
                 r=180,
             )
         )
-    else:  # flat
-        groups.append(
+    else:
+        back.append(
             shape_group(
                 "mouth",
-                [rect(18, 4, 4), solid(NOSE)],
+                [rect(20, 5, 4), solid(NOSE)],
                 px=0,
-                py=34,
+                py=36,
             )
         )
 
-    # Brows (for thinking / error)
+    back.append(
+        shape_group(
+            "eye-l-w",
+            [ellipse(26, 28), solid(WHITE), stroke(OUTLINE, 2)],
+            px=-26,
+            py=-12,
+            sx=eye_scale,
+            sy=eye_scale,
+        )
+    )
+    back.append(
+        shape_group(
+            "eye-r-w",
+            [ellipse(26, 28), solid(WHITE), stroke(OUTLINE, 2)],
+            px=26,
+            py=-12,
+            sx=eye_scale,
+            sy=eye_scale,
+        )
+    )
+    back.append(
+        shape_group("pupil-l", [ellipse(12, 14), solid(EYE)], px=-24, py=-10)
+    )
+    back.append(
+        shape_group("pupil-r", [ellipse(12, 14), solid(EYE)], px=28, py=-10)
+    )
+    back.append(
+        shape_group("shine-l", [ellipse(5, 5), solid(WHITE)], px=-28, py=-14)
+    )
+    back.append(
+        shape_group("shine-r", [ellipse(5, 5), solid(WHITE)], px=24, py=-14)
+    )
+
     if brow_tilt != 0:
-        groups.append(
+        back.append(
             shape_group(
                 "brow-l",
-                [rect(16, 4, 3), solid(OUTLINE)],
-                px=-24,
-                py=-28,
+                [rect(18, 5, 3), solid(OUTLINE)],
+                px=-26,
+                py=-32,
                 r=-brow_tilt,
             )
         )
-        groups.append(
+        back.append(
             shape_group(
                 "brow-r",
-                [rect(16, 4, 3), solid(OUTLINE)],
-                px=24,
-                py=-28,
+                [rect(18, 5, 3), solid(OUTLINE)],
+                px=26,
+                py=-32,
                 r=brow_tilt,
             )
         )
 
-    return groups
+    # reverse：臉在陣列前端（最上層），耳朵在後端（最下層）
+    return list(reversed(back))
 
 
 def make_doc(name, op, shapes_or_layers, use_layers=False):
@@ -373,7 +376,7 @@ def build_idle():
     )
 
     shapes = dog_shapes("smile")
-    # Blink overlay: eyelids that cover eyes briefly
+    # 眨眼眼皮必須在陣列最前面（最上層）
     blink_o = kf(
         [
             (0, 0),
@@ -383,24 +386,23 @@ def build_idle():
             (90, 0),
         ]
     )
-    shapes.append(
+    lids = [
         shape_group(
             "lid-l",
-            [ellipse(24, 14), solid(BODY)],
-            px=-24,
-            py=-10,
+            [ellipse(28, 16), solid(BODY)],
+            px=-26,
+            py=-12,
             animated_o=blink_o,
-        )
-    )
-    shapes.append(
+        ),
         shape_group(
             "lid-r",
-            [ellipse(24, 14), solid(BODY)],
-            px=24,
-            py=-10,
+            [ellipse(28, 16), solid(BODY)],
+            px=26,
+            py=-12,
             animated_o=blink_o,
-        )
-    )
+        ),
+    ]
+    shapes = lids + shapes
 
     return make_doc(
         "mascot-idle",
@@ -441,9 +443,9 @@ def build_success():
         ]
     )
     shapes = dog_shapes("open", eye_scale=110)
-    # Sparkles
+    # 星星在最上層
     spark_o = kf([(0, 0), (8, 100), (30, 100), (45, 0)])
-    shapes.append(
+    sparks = [
         shape_group(
             "spark1",
             [ellipse(8, 8), solid((255, 214, 90))],
@@ -451,9 +453,7 @@ def build_success():
             py=-60,
             animated_o=spark_o,
             animated_s=kf([(0, [40, 40]), (15, [120, 120]), (45, [60, 60])]),
-        )
-    )
-    shapes.append(
+        ),
         shape_group(
             "spark2",
             [ellipse(8, 8), solid((255, 214, 90))],
@@ -461,8 +461,9 @@ def build_success():
             py=-50,
             animated_o=spark_o,
             animated_s=kf([(0, [50, 50]), (18, [130, 130]), (45, [50, 50])]),
-        )
-    )
+        ),
+    ]
+    shapes = sparks + shapes
     return make_doc(
         "mascot-success",
         op,
@@ -501,7 +502,8 @@ def build_thinking():
     )
     shapes = dog_shapes("flat", brow_tilt=18)
 
-    # Thought bubbles
+    # 思考氣泡在最上層
+    dots = []
     for i, (x, y, delay) in enumerate([(-62, -70, 0), (-74, -88, 12), (-86, -108, 24)]):
         size = 10 + i * 5
         o_anim = kf(
@@ -514,7 +516,7 @@ def build_thinking():
                 (75, 0),
             ]
         )
-        shapes.append(
+        dots.append(
             shape_group(
                 f"dot{i}",
                 [ellipse(size, size), solid(WHITE), stroke(OUTLINE, 1.5)],
@@ -523,6 +525,7 @@ def build_thinking():
                 animated_o=o_anim,
             )
         )
+    shapes = dots + shapes
 
     return make_doc(
         "mascot-thinking",
@@ -565,24 +568,23 @@ def build_error():
         ]
     )
     shapes = dog_shapes("frown", brow_tilt=-16, eye_scale=90)
-    # Sweat drop
+    # 汗珠在最上層
     sweat = kf([(0, 0), (8, 100), (28, 100), (36, 0)])
-    shapes.append(
-        shape_group(
-            "sweat",
-            [ellipse(8, 12), solid((120, 190, 255))],
-            px=58,
-            py=-20,
-            animated_o=sweat,
-            animated_pos=kf(
-                [
-                    (0, [58, -20]),
-                    (20, [62, -5]),
-                    (36, [64, 5]),
-                ]
-            ),
-        )
+    sweat_drop = shape_group(
+        "sweat",
+        [ellipse(8, 12), solid((120, 190, 255))],
+        px=58,
+        py=-20,
+        animated_o=sweat,
+        animated_pos=kf(
+            [
+                (0, [58, -20]),
+                (20, [62, -5]),
+                (36, [64, 5]),
+            ]
+        ),
     )
+    shapes = [sweat_drop] + shapes
     return make_doc(
         "mascot-error",
         op,

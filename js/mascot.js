@@ -26,11 +26,12 @@
     '別灰心，錯誤是學習的一部分！'
   ];
 
+  const LOTTIE_VER = '3';
   const ANIMATIONS = {
-    idle: 'assets/lottie/mascot-idle.json',
-    success: 'assets/lottie/mascot-success.json',
-    thinking: 'assets/lottie/mascot-thinking.json',
-    error: 'assets/lottie/mascot-error.json'
+    idle: `assets/lottie/mascot-idle.json?v=${LOTTIE_VER}`,
+    success: `assets/lottie/mascot-success.json?v=${LOTTIE_VER}`,
+    thinking: `assets/lottie/mascot-thinking.json?v=${LOTTIE_VER}`,
+    error: `assets/lottie/mascot-error.json?v=${LOTTIE_VER}`
   };
 
   let idleTimer = null;
