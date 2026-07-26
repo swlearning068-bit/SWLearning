@@ -1,11 +1,12 @@
 /**
- * quest-mode.js — Phase 13.1：100 關任務地圖與願望迴圈
+ * quest-mode.js — Phase 13.1／13.2：100 關任務地圖與遊戲化職階
  *
  * 職責：
  * 1. 動態產生 100 關之字形地圖，視覺區隔為 10 章（每章 10 關）
  * 2. 難度：1–20 L0 單字／21–50 L1／51–80 L2／81–100 L3
  * 3. 每章起點設定「願望目標」，第 10 關寶箱顯示願望 tooltip
  * 4. 開啟挑戰：L0 純測驗；L1+ 段落閱讀 → 測驗 → 對應寫作
+ * 5. Phase 13.2：依最高解鎖關卡渲染導覽列職階稱號；通關時更新連勝
  */
 
 /* ============================================================
@@ -26,6 +27,17 @@ const QUEST_CHAPTER_SIZE = 10;
 
 /** 章節總數 */
 const QUEST_CHAPTER_COUNT = QUEST_LEVEL_COUNT / QUEST_CHAPTER_SIZE;
+
+/**
+ * 職涯稱號（依最高解鎖關卡）
+ * @type {Array<{min: number, max: number, label: string}>}
+ */
+const QUEST_CAREER_TITLES = [
+  { min: 1, max: 20, label: '🐣 實習社工' },
+  { min: 21, max: 50, label: '🧑‍💼 前線社工' },
+  { min: 51, max: 80, label: '💼 單位主管' },
+  { min: 81, max: 100, label: '🧙‍♂️ 資深督導' }
+];
 
 /**
  * 章節顯示名稱（依難度帶）
@@ -774,6 +786,49 @@ function appendChapterDivider(container, chapterId) {
 /**
  * 渲染 #quest-map-container
  */
+/**
+ * 最高已解鎖關卡（active 或 completed）；無關卡時視為 1
+ * @returns {number}
+ */
+function getHighestUnlockedLevel() {
+  if (!Array.isArray(questLevels) || !questLevels.length) return 1;
+  let highest = 0;
+  questLevels.forEach((level) => {
+    if (!level || level.status === 'locked') return;
+    const id = Number(level.id) || 0;
+    if (id > highest) highest = id;
+  });
+  return highest > 0 ? highest : 1;
+}
+
+/**
+ * @param {number} [highestUnlocked]
+ * @returns {string}
+ */
+function getCareerTitleLabel(highestUnlocked) {
+  const level = Math.max(
+    1,
+    Math.min(QUEST_LEVEL_COUNT, Number(highestUnlocked) || 1)
+  );
+  const found = QUEST_CAREER_TITLES.find(
+    (tier) => level >= tier.min && level <= tier.max
+  );
+  return found ? found.label : QUEST_CAREER_TITLES[0].label;
+}
+
+/**
+ * 更新導覽列職階稱號
+ */
+function updateNavCareerTitle() {
+  const el = quest$('nav-career-title');
+  if (!el) return;
+  const highest = getHighestUnlockedLevel();
+  const label = getCareerTitleLabel(highest);
+  el.textContent = label;
+  el.setAttribute('aria-label', `當前職階 ${label}`);
+  el.title = `當前職階（最高解鎖 Lv ${highest}）`;
+}
+
 function renderQuestMap() {
   const container = quest$('quest-map-container');
   const hint = quest$('quest-status-hint');
@@ -781,6 +836,7 @@ function renderQuestMap() {
 
   ensureQuestLevels({ silent: true });
   container.innerHTML = '';
+  updateNavCareerTitle();
 
   if (!questLevels.length) {
     container.innerHTML =
@@ -1441,6 +1497,15 @@ function completeActiveQuestLevel() {
   reconcileQuestStatuses();
   saveQuestLevels();
 
+  // Phase 13.2：首次通關才累計每日連勝
+  if (!wasAlreadyDone && typeof window.updateStreak === 'function') {
+    try {
+      window.updateStreak();
+    } catch (_) {
+      // ignore
+    }
+  }
+
   const clearedTitle = activeQuestLevel.title;
   const next = questLevels.find((l) => l.status === 'active');
   const wish = getWishForChapter(clearedLevel.chapter);
@@ -1576,6 +1641,7 @@ function initQuestModeModule() {
     }
   }
   bindQuestEvents();
+  updateNavCareerTitle();
 }
 
 window.initQuestModeModule = initQuestModeModule;
@@ -1586,5 +1652,8 @@ window.ensureQuestLevels = ensureQuestLevels;
 window.onLearningGoalStarted = onLearningGoalStarted;
 window.getQuestLevels = () => questLevels.slice();
 window.getQuestWishes = () => ({ ...questWishes });
+window.getHighestUnlockedLevel = getHighestUnlockedLevel;
+window.getCareerTitleLabel = getCareerTitleLabel;
+window.updateNavCareerTitle = updateNavCareerTitle;
 window.STORAGE_KEY_QUEST = STORAGE_KEY_QUEST;
 window.STORAGE_KEY_QUEST_WISHES = STORAGE_KEY_QUEST_WISHES;

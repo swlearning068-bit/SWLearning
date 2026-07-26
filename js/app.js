@@ -507,7 +507,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     initRewardModule();
   }
 
-  // 12. Phase 13：任務模式棋盤關卡
+  // 12. Phase 13.2：連勝／職階狀態列
+  if (typeof initUserProfileModule === 'function') {
+    initUserProfileModule();
+  }
+
+  // 13. Phase 13：任務模式棋盤關卡
   if (typeof initQuestModeModule === 'function') {
     initQuestModeModule();
   }

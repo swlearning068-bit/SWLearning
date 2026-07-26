@@ -94,6 +94,76 @@ body {
   min-width: 0;
 }
 
+/* ---------- Phase 13.2：連勝火焰＋職階稱號 ---------- */
+.user-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.streak-fire,
+.career-title {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background-color: #F9FAFB;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.streak-fire {
+  color: #C2410C;
+  background-color: #FFF7ED;
+  border-color: #FED7AA;
+}
+
+.career-title {
+  color: #1F2937;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.streak-fire--pulse {
+  animation: streak-fire-pulse 0.55s ease-out;
+}
+
+@keyframes streak-fire-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+  }
+  60% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .career-title {
+    max-width: 7.5rem;
+    font-size: 0.78rem;
+    padding: 4px 8px;
+  }
+
+  .streak-fire {
+    font-size: 0.78rem;
+    padding: 4px 8px;
+  }
+}
+
 .nav-btn {
   min-height: 36px;
   padding: 6px 12px;

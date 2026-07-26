@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=63">
+  <link rel="stylesheet" href="css/style.css?v=64">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -19,6 +19,11 @@
   <header class="top-nav">
     <h1 class="app-title">社工英文學習助手</h1>
     <div class="top-nav-actions">
+      <!-- Phase 13.2：每日連勝＋職階稱號 -->
+      <div class="user-status-bar" aria-label="學習狀態">
+        <span id="nav-streak-counter" class="streak-fire" title="每日連勝">🔥 0</span>
+        <span id="nav-career-title" class="career-title" title="當前職階">🐣 實習社工</span>
+      </div>
       <!-- Firebase 帳號／雲端同步 -->
       <button id="btn-login" class="nav-btn hidden" type="button">登入以同步</button>
       <div id="user-profile" class="user-profile hidden">
@@ -1270,9 +1275,10 @@
   <script src="js/writing.js?v=6"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="js/reward.js?v=8"></script>
-  <script src="js/quest-mode.js?v=5"></script>
-  <script src="js/app.js?v=22"></script>
+  <script src="js/user-profile.js?v=1"></script>
+  <script src="js/quest-mode.js?v=6"></script>
+  <script src="js/app.js?v=23"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
-  <script type="module" src="js/sync.js?v=16"></script>
+  <script type="module" src="js/sync.js?v=17"></script>
 </body>
 </html>

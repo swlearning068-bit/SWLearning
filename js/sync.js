@@ -120,6 +120,7 @@ function isLocalDirty() {
 function shouldSyncKey(key) {
   if (!key || EXCLUDE_KEYS.has(key)) return false;
   return (
+    key === 'userStats' ||
     key.startsWith('sw_') ||
     key.startsWith('swlearning_') ||
     key.startsWith('custom_sw_')

@@ -788,6 +788,7 @@ function debugResetRewardProgress() {
   localStorage.removeItem('sw_quest_levels');
   localStorage.removeItem('sw_quest_wishes');
   localStorage.removeItem('sw_quest_l0_recent_terms');
+  localStorage.removeItem('userStats');
 
   // 相容任務規格中的舊／拆分鍵名
   localStorage.removeItem('sw_reward_goal');
