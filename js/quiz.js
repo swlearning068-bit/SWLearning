@@ -466,6 +466,9 @@ function handleOptionSelect(selectedIndex) {
     quizScore += 1;
     const selectedBtn = buttons[selectedIndex];
     if (selectedBtn) selectedBtn.classList.add('is-correct');
+    if (window.MascotApp?.triggerSuccess) {
+      window.MascotApp.triggerSuccess('太棒了！完全正確！');
+    }
   } else {
     // 答錯：選項變紅，正確答案標綠；連動複習系統
     quizWrongCount += 1;
@@ -474,6 +477,9 @@ function handleOptionSelect(selectedIndex) {
     if (selectedBtn) selectedBtn.classList.add('is-wrong');
     if (correctBtn) correctBtn.classList.add('is-correct');
     resetWrongTermToReview(q.termId);
+    if (window.MascotApp?.triggerError) {
+      window.MascotApp.triggerError('這題已排入明天複習，別灰心！');
+    }
   }
 
   updateQuizStatusBar();

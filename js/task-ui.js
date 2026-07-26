@@ -872,6 +872,9 @@ function buildL1ClozePanel(cloze) {
     if (!user) {
       feedback.textContent = '請先填寫答案。';
       feedback.classList.remove('hidden', 'is-correct', 'is-wrong');
+      if (window.MascotApp?.triggerHint) {
+        window.MascotApp.triggerHint('先把答案填進去，再按檢查喔！');
+      }
       return;
     }
     const ok = user.toLowerCase() === answer.toLowerCase();
@@ -881,6 +884,11 @@ function buildL1ClozePanel(cloze) {
     feedback.textContent = ok
       ? '✅ 正確！'
       : `❌ 再想想。參考答案：${answer}`;
+    if (ok && window.MascotApp?.triggerSuccess) {
+      window.MascotApp.triggerSuccess('太棒了！完全正確！');
+    } else if (!ok && window.MascotApp?.triggerError) {
+      window.MascotApp.triggerError('差一點～對照參考答案再練一次！');
+    }
   });
 
   return box;
@@ -1336,12 +1344,22 @@ async function renderL0VocabTask(mountEl, options) {
             b.disabled = true;
             if (i === q.correctIndex) b.classList.add('is-correct');
           });
+          if (window.MascotApp?.triggerSuccess) {
+            window.MascotApp.triggerSuccess('答對了！繼續下一題～');
+          }
           updateProgress();
         } else {
           feedback.classList.add('is-wrong');
           feedback.textContent = `再試一次～ ${q.hint_zh || '你可以的！'}`;
           btn.classList.add('is-wrong-flash');
           setTimeout(() => btn.classList.remove('is-wrong-flash'), 450);
+          if (window.MascotApp?.triggerError) {
+            window.MascotApp.triggerError(
+              q.hint_zh ? `提示：${q.hint_zh}` : '沒關係，再試一次！'
+            );
+          } else if (window.MascotApp?.triggerHint && q.hint_zh) {
+            window.MascotApp.triggerHint(q.hint_zh);
+          }
         }
       });
       optionsWrap.appendChild(btn);

@@ -489,6 +489,16 @@ function renderPracticeChunk(chunk, index, keywords) {
         ? `<p class="practice-quiz-explanation">${escapePracticeHtml(quiz.explanation)}</p>`
         : '');
 
+    if (ok && window.MascotApp?.triggerSuccess) {
+      window.MascotApp.triggerSuccess('太棒了！完全正確！');
+    } else if (!ok && window.MascotApp?.triggerError) {
+      window.MascotApp.triggerError(
+        quiz.explanation
+          ? '這題有點難，看看說明再繼續～'
+          : '沒關係，對照正確答案再練一次！'
+      );
+    }
+
     optionsWrap.querySelectorAll('input').forEach((input) => {
       input.disabled = true;
     });

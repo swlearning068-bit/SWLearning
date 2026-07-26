@@ -6802,3 +6802,204 @@ body.ebook-reader-open > main.main-content {
   }
 }
 
+/* ============================================================
+   Phase 13.3：學習小夥伴（Mascot）＋動態對話框
+   ============================================================ */
+.mascot-floating {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.mascot-floating .speech-bubble,
+.mascot-floating .mascot-avatar {
+  pointer-events: auto;
+}
+
+.speech-bubble {
+  background: var(--surface-color);
+  border: 2px solid #2563eb;
+  border-radius: 15px;
+  padding: 12px 18px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-md);
+  max-width: 250px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.45;
+  position: relative;
+}
+
+.speech-bubble.speech-bubble--pop {
+  animation: mascot-popIn 0.3s ease-out;
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  right: 28px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid #2563eb;
+}
+
+.speech-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  right: 30px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--surface-color);
+  z-index: 1;
+}
+
+.mascot-avatar {
+  font-size: 3.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.18));
+  transition: transform 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #eff6ff 55%, #dbeafe 100%);
+  border: 2px solid #bfdbfe;
+}
+
+.mascot-avatar:hover {
+  transform: scale(1.1);
+}
+
+.mascot-avatar:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.mascot-icon {
+  display: block;
+  transform-origin: center bottom;
+}
+
+/* 動畫狀態 */
+@keyframes mascot-popIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mascot-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes mascot-jump {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-18px) scale(1.08);
+  }
+  70% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@keyframes mascot-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px) rotate(-4deg);
+  }
+  40% {
+    transform: translateX(6px) rotate(4deg);
+  }
+  60% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  80% {
+    transform: translateX(4px) rotate(2deg);
+  }
+}
+
+.mascot-avatar.state-idle {
+  transform: translateY(0);
+}
+
+.mascot-avatar.state-thinking {
+  animation: mascot-bounce 1s ease-in-out infinite;
+}
+
+.mascot-avatar.state-success {
+  animation: mascot-jump 0.5s ease;
+}
+
+.mascot-avatar.state-error {
+  animation: mascot-shake 0.4s ease;
+}
+
+/* 與 AI 模式標籤錯開，避免右下角重疊 */
+.ai-indicator {
+  bottom: 118px;
+}
+
+@media (max-width: 640px) {
+  .mascot-floating {
+    bottom: 12px;
+    right: 12px;
+  }
+
+  .mascot-avatar {
+    font-size: 2.75rem;
+    width: 58px;
+    height: 58px;
+  }
+
+  .speech-bubble {
+    max-width: min(220px, calc(100vw - 96px));
+    font-size: 0.88rem;
+    padding: 10px 14px;
+  }
+
+  .ai-indicator {
+    bottom: 96px;
+    left: auto;
+    right: 12px;
+    max-width: calc(100vw - 90px);
+  }
+}
+
+/* 電子書全螢幕時隱藏小夥伴，避免干擾閱讀 */
+body:has(#ebook-reader-overlay:not(.ebook-hidden)) .mascot-floating {
+  display: none;
+}
+

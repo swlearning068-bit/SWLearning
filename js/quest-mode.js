@@ -1178,6 +1178,21 @@ function focusQuestWritingLevel(root, tier) {
 /**
  * @param {Object} level
  */
+/**
+ * 安全呼叫學習小夥伴（Phase 13.3）
+ * @param {'say'|'triggerSuccess'|'triggerHint'|'triggerError'|'triggerThinking'|'setState'} method
+ * @param {...*} args
+ */
+function mascotCall(method, ...args) {
+  const app = window.MascotApp;
+  if (!app || typeof app[method] !== 'function') return;
+  try {
+    app[method](...args);
+  } catch (_) {
+    // ignore
+  }
+}
+
 function openQuestChallenge(level) {
   const overlay = quest$('quest-challenge-overlay');
   if (!overlay || !level) return;
@@ -1185,6 +1200,13 @@ function openQuestChallenge(level) {
   activeQuestLevel = level;
   questChallengeArticle = null;
   questProgress = { reading: false, quiz: false, writing: false };
+
+  mascotCall(
+    'say',
+    level.level === 'L0'
+      ? `來挑戰 Lv ${level.id} 單字訓練吧！答對全部就能通關～`
+      : `準備好挑戰 Lv ${level.id}「${level.title}」了嗎？我們一起加油！`
+  );
 
   const current = getQuestCurrentSubject();
   questSubjectBackupId = current?.id || '';
@@ -1330,6 +1352,7 @@ async function handleQuestGenerateArticle() {
   }
   if (genBtn) genBtn.disabled = true;
   if (root) root.innerHTML = '';
+  mascotCall('triggerThinking', '正在為本關生成文章與測驗……');
 
   try {
     const data = await apiFn({
@@ -1363,6 +1386,7 @@ async function handleQuestGenerateArticle() {
       }
       questToast('📖 文章已就緒，請完成段落測驗與寫作練習');
       syncQuestStepIndicators();
+      mascotCall('say', '文章準備好了！先讀段落，再挑戰測驗與寫作～');
     } else {
       showQuestError('無法渲染挑戰文章，請重新整理後再試。');
       if (genBtn) genBtn.disabled = false;
@@ -1410,6 +1434,7 @@ async function handleQuestL0Start() {
   }
   if (genBtn) genBtn.disabled = true;
   if (root) root.innerHTML = '';
+  mascotCall('triggerThinking', '正在幫你準備單字題目……');
 
   try {
     const wish = getWishForChapter(level.chapter);
@@ -1426,6 +1451,7 @@ async function handleQuestL0Start() {
         markQuestProgress('writing');
         syncQuestStepIndicators();
         questToast('🎉 全對！可收藏生字後通關');
+        mascotCall('triggerSuccess', '全對！可以收藏生字後通關了！');
       },
       onComplete: () => {
         completeActiveQuestLevel();
@@ -1434,6 +1460,7 @@ async function handleQuestL0Start() {
         showQuestError(message);
       }
     });
+    mascotCall('say', '題目好了！慢慢選，我會陪你～');
 
     hideQuestEl(loading);
     questChallengeArticle = { type: 'l0', id: `l0-${level.id}` };
@@ -1454,6 +1481,7 @@ async function handleQuestL0Start() {
  */
 function showQuestError(message) {
   const el = quest$('quest-challenge-error');
+  mascotCall('triggerError', '哎呀，出了點狀況。再試一次也可以！');
   if (!el) {
     questToast(`❌ ${message}`);
     return;
@@ -1478,6 +1506,10 @@ function completeActiveQuestLevel() {
   if (!ready) {
     questToast(
       isL0 ? '請先答對全部單字題目' : '請先完成閱讀、測驗與寫作練習'
+    );
+    mascotCall(
+      'triggerHint',
+      isL0 ? '還有題目沒答完喔，再加油一下！' : '閱讀、測驗、寫作都完成後就能通關～'
     );
     return;
   }
@@ -1518,6 +1550,13 @@ function completeActiveQuestLevel() {
     isChapterClear,
     chapterId: clearedLevel.chapter
   });
+
+  mascotCall(
+    'triggerSuccess',
+    isChapterClear
+      ? '章節願望達成！你太厲害了！'
+      : `「${clearedTitle}」通關！太棒了！`
+  );
 
   if (!wasAlreadyDone && typeof window.earnGem === 'function') {
     try {
