@@ -8,6 +8,8 @@
 
   const LOTTIE_VER = '6';
   const STORAGE_KEY_STAGE = 'sw_mascot_stage';
+  const STORAGE_KEY_POS = 'sw_mascot_pos';
+  const DRAG_THRESHOLD_PX = 6;
 
   /** @type {Array<{id: string, name: string, title: string, min: number, blurb: string}>} */
   const EVOLUTION_STAGES = [
@@ -229,6 +231,155 @@
   }
 
   /**
+   * @returns {{left: number, top: number}|null}
+   */
+  function loadPersistedPosition() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_POS);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const left = Number(parsed?.left);
+      const top = Number(parsed?.top);
+      if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+      return { left, top };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * @param {{left: number, top: number}} pos
+   */
+  function persistPosition(pos) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY_POS,
+        JSON.stringify({
+          left: Math.round(pos.left),
+          top: Math.round(pos.top)
+        })
+      );
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /**
+   * @param {HTMLElement} root
+   * @param {number} left
+   * @param {number} top
+   * @returns {{left: number, top: number}}
+   */
+  function clampPosition(root, left, top) {
+    const margin = 4;
+    const w = root.offsetWidth || 140;
+    const h = root.offsetHeight || 180;
+    const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+    const maxTop = Math.max(margin, window.innerHeight - h - margin);
+    return {
+      left: Math.min(Math.max(margin, left), maxLeft),
+      top: Math.min(Math.max(margin, top), maxTop)
+    };
+  }
+
+  /**
+   * @param {HTMLElement} root
+   * @param {{left: number, top: number}} pos
+   */
+  function applyPosition(root, pos) {
+    const clamped = clampPosition(root, pos.left, pos.top);
+    root.style.left = `${clamped.left}px`;
+    root.style.top = `${clamped.top}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    root.classList.add('mascot-positioned');
+    return clamped;
+  }
+
+  /**
+   * 綁定自由拖拉（拖曳超過閾值才算移動，避免誤觸台詞）
+   * @param {HTMLElement} root
+   * @param {HTMLElement} handle
+   * @param {() => void} onTap
+   */
+  function bindMascotDrag(root, handle, onTap) {
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let originLeft = 0;
+    let originTop = 0;
+    let pointerId = null;
+
+    const onPointerDown = (event) => {
+      if (event.button != null && event.button !== 0) return;
+      const rect = root.getBoundingClientRect();
+      dragging = true;
+      moved = false;
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      originLeft = rect.left;
+      originTop = rect.top;
+      root.classList.add('mascot-dragging');
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch (_) {
+        // ignore
+      }
+      event.preventDefault();
+    };
+
+    const onPointerMove = (event) => {
+      if (!dragging) return;
+      if (pointerId != null && event.pointerId !== pointerId) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      moved = true;
+      applyPosition(root, {
+        left: originLeft + dx,
+        top: originTop + dy
+      });
+    };
+
+    const endDrag = (event) => {
+      if (!dragging) return;
+      if (pointerId != null && event.pointerId !== pointerId) return;
+      dragging = false;
+      root.classList.remove('mascot-dragging');
+      try {
+        if (pointerId != null) handle.releasePointerCapture(pointerId);
+      } catch (_) {
+        // ignore
+      }
+      pointerId = null;
+
+      if (moved) {
+        const rect = root.getBoundingClientRect();
+        const saved = applyPosition(root, { left: rect.left, top: rect.top });
+        persistPosition(saved);
+        return;
+      }
+      onTap();
+    };
+
+    handle.addEventListener('pointerdown', onPointerDown);
+    handle.addEventListener('pointermove', onPointerMove);
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('resize', () => {
+      if (!root.classList.contains('mascot-positioned')) return;
+      const left = parseFloat(root.style.left);
+      const top = parseFloat(root.style.top);
+      if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+      const saved = applyPosition(root, { left, top });
+      persistPosition(saved);
+    });
+  }
+
+  /**
    * @param {string} stage
    * @returns {Record<'idle'|'success'|'thinking'|'error', string>}
    */
@@ -291,7 +442,7 @@
       MascotApp.container.dataset.stage = meta.id;
       MascotApp.container.setAttribute(
         'aria-label',
-        `學習小夥伴（${meta.title} · ${meta.name}），點擊可聽鼓勵`
+        `學習小夥伴（${meta.title} · ${meta.name}），可拖拉移動；點擊可聽鼓勵`
       );
     }
 
@@ -304,6 +455,7 @@
   }
 
   const MascotApp = {
+    root: null,
     container: null,
     bubble: null,
     currentAnimation: null,
@@ -316,6 +468,7 @@
     init() {
       this.container = document.getElementById('mascot-lottie-avatar');
       this.bubble = document.getElementById('mascot-speech-bubble');
+      this.root = document.getElementById('mascot-container');
       if (!ready()) return;
 
       if (!hasLottie()) {
@@ -337,7 +490,19 @@
         this.setState('idle', pickMessage(stageMessages('idle')));
         scheduleIdle(4000);
       };
-      this.container.addEventListener('click', onTap);
+
+      // 拖拉整個容器；輕點頭像才說話（避免與 drag 衝突）
+      if (this.root) {
+        const savedPos = loadPersistedPosition();
+        if (savedPos) {
+          requestAnimationFrame(() => {
+            const clamped = applyPosition(this.root, savedPos);
+            persistPosition(clamped);
+          });
+        }
+        bindMascotDrag(this.root, this.container, onTap);
+      }
+
       this.container.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
@@ -358,6 +523,10 @@
         });
 
       this.container.dataset.stage = this.currentStage;
+      this.container.setAttribute(
+        'aria-label',
+        '學習小夥伴，可拖拉移動；點擊可聽鼓勵'
+      );
       this.setState('idle', pickMessage(stageMessages('idle')));
       scheduleIdle(5000);
 
