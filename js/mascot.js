@@ -1,7 +1,8 @@
 /**
- * Phase 13.3–13.6：全身 Lottie 多形態學習小夥伴
+ * Phase 13.3–13.7：全身 Lottie 多形態學習小夥伴
  * 形態：baby → rookie → pro → master
  * 狀態：idle / thinking / success / error
+ * 13.7：與 PetController / web-pet 閒置漫遊整合（氣泡跟隨）
  */
 (function () {
   'use strict';
@@ -549,6 +550,7 @@
 
     /**
      * 顯示對話氣泡（可自動隱藏）
+     * Phase 13.7：若 web-pet 漫遊中，氣泡跟隨寵物正上方
      * @param {string} message
      * @param {number} [duration=4000]
      */
@@ -561,6 +563,10 @@
         idleTimer = null;
       }
       updateBubble(this.bubble, message);
+      const pet = window.PetController;
+      if (pet && pet.isActive && typeof pet.syncBubbleToPet === 'function') {
+        pet.syncBubbleToPet();
+      }
       this.hideTimeout = hideTimeout = setTimeout(() => {
         hideTimeout = null;
         this.hideTimeout = null;
@@ -792,6 +798,29 @@
           updateBubble(this.bubble, null);
         }
       }
+      const pet = window.PetController;
+      if (pet && pet.isActive && typeof pet.syncBubbleToPet === 'function') {
+        pet.syncBubbleToPet();
+      }
+    },
+
+    /**
+     * 學習提示強制召喚 web-pet（Phase 13.7）
+     * @param {number} [holdMs]
+     * @returns {Promise<void>}
+     */
+    ensurePetForTip(holdMs) {
+      const pet = window.PetController;
+      if (!pet || typeof pet.forceAppear !== 'function') {
+        return Promise.resolve();
+      }
+      if (
+        document.body.classList.contains('ebook-active') ||
+        document.body.classList.contains('ebook-reader-open')
+      ) {
+        return Promise.resolve();
+      }
+      return pet.forceAppear(holdMs);
     },
 
     triggerSuccess(message) {
@@ -801,8 +830,15 @@
     },
 
     triggerHint(hintText) {
+      const msg = hintText || '讓我想想……';
       this.setState('thinking');
-      this.speak(hintText || '讓我想想……', 6000);
+      const speakTip = () => this.speak(msg, 6000);
+      const pending = this.ensurePetForTip(6000);
+      if (pending && typeof pending.then === 'function') {
+        pending.then(speakTip).catch(speakTip);
+      } else {
+        speakTip();
+      }
     },
 
     triggerError(message) {

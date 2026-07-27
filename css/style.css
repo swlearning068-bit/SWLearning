@@ -7040,8 +7040,49 @@ body.ebook-reader-open > main.main-content {
 }
 
 /* 電子書全螢幕時隱藏小夥伴，避免干擾閱讀 */
-body:has(#ebook-reader-overlay:not(.ebook-hidden)) .mascot-floating {
+body:has(#ebook-reader-overlay:not(.ebook-hidden)) .mascot-floating,
+body.ebook-active .mascot-floating,
+body.ebook-reader-open .mascot-floating {
   display: none;
+}
+
+/* ============================================================
+   Phase 13.7：Web-Pet 閒置桌寵
+   ============================================================ */
+div.web-pet {
+  z-index: 10050;
+}
+
+.pet-paw-warp {
+  z-index: 10040;
+  pointer-events: none;
+}
+
+body.ebook-active div.web-pet,
+body.ebook-reader-open div.web-pet,
+body:has(#ebook-reader-overlay:not(.ebook-hidden)) div.web-pet,
+body.ebook-active .pet-paw-warp,
+body.ebook-reader-open .pet-paw-warp,
+body:has(#ebook-reader-overlay:not(.ebook-hidden)) .pet-paw-warp {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* 漫遊中：隱藏 Lottie 全身角色，只保留跟隨的對話氣泡 */
+body.web-pet-roaming .mascot-avatar-wrapper {
+  display: none;
+}
+
+.mascot-floating.mascot-follow-pet {
+  right: auto;
+  bottom: auto;
+  z-index: 10060;
+  pointer-events: none;
+}
+
+.mascot-floating.mascot-follow-pet .speech-bubble {
+  pointer-events: auto;
+  margin-bottom: 0;
 }
 
 /* 任務挑戰進行中：維持拖拉位置與大小，僅提高層級 */

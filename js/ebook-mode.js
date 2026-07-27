@@ -704,7 +704,11 @@ function openEbookReader(startIndex) {
 
   overlay.classList.remove('ebook-hidden');
   overlay.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('ebook-reader-open');
+  document.body.classList.add('ebook-reader-open', 'ebook-active');
+  // Phase 13.7：電子書模式強制隱藏／銷毀桌寵
+  if (window.PetController && typeof window.PetController.hidePet === 'function') {
+    window.PetController.hidePet({ destroy: true });
+  }
 
   const mainEl = document.querySelector('main.main-content');
   if (mainEl) mainEl.setAttribute('aria-hidden', 'true');
@@ -726,7 +730,7 @@ function closeEbookReader() {
     overlay.classList.add('ebook-hidden');
     overlay.setAttribute('aria-hidden', 'true');
   }
-  document.body.classList.remove('ebook-reader-open');
+  document.body.classList.remove('ebook-reader-open', 'ebook-active');
   const mainEl = document.querySelector('main.main-content');
   if (mainEl) mainEl.removeAttribute('aria-hidden');
   setEbookTocOpen(false);
