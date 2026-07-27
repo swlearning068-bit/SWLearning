@@ -42,8 +42,11 @@
   let followRaf = null;
   /** @type {number|null} */
   let roamTimer = null;
+  /** 避免 hide/show 重入造成卡死 */
+  let hideShowLock = false;
 
   function isEbookMode() {
+    if (PetController && PetController.ebookLocked) return true;
     const body = document.body;
     if (!body) return false;
     if (
@@ -412,6 +415,8 @@
     isRoaming: false,
     /** 使用者是否曾手動放置 */
     userParked: false,
+    /** 電子書模式鎖定：禁止重建／顯示桌寵 */
+    ebookLocked: false,
     _creating: false,
     _mounted: false,
 
@@ -420,12 +425,15 @@
       this.userParked = Boolean(loadSavedPos());
 
       const onUserActivity = (event) => {
+        if (this.ebookLocked || isEbookMode()) {
+          this.idleTime = 0;
+          return;
+        }
         // 拖曳進行中略過，避免干擾
         if (document.body.classList.contains('web-pet-dragging-active')) {
           return;
         }
         this.idleTime = 0;
-        if (isEbookMode()) return;
 
         // 點在寵物上：只停止漫遊，絕不強制回角落
         const onPet =
@@ -444,24 +452,14 @@
         document.addEventListener(type, onUserActivity, { passive: true });
       });
 
-      const observer = new MutationObserver(() => {
-        if (isEbookMode()) {
-          this.hidePet({ destroy: true });
-        } else if (!this.isActive) {
-          this.showPet();
-        }
-      });
-      if (document.body) {
-        observer.observe(document.body, {
-          attributes: true,
-          attributeFilter: ['class']
-        });
-      }
+      // 注意：不要用 MutationObserver 監聽 body.class 再 hide/show，
+      // 否則與 classList 變更互相重入，會造成電子書開啟時卡死。
 
       if (tickTimer) clearInterval(tickTimer);
       tickTimer = setInterval(() => this.checkIdleStatus(), 1000);
 
       setTimeout(() => {
+        if (this.ebookLocked || isEbookMode()) return;
         this.showPet().then(() => {
           console.info(
             '[pet-controller] web-pet 可拖放就緒（閒置',
@@ -472,13 +470,40 @@
       }, 0);
     },
 
-    checkIdleStatus() {
-      if (isEbookMode()) {
-        if (this.isActive || this.petInstance) {
-          this.hidePet({ destroy: true });
+    /**
+     * 進入電子書：鎖定並銷毀桌寵（由 ebook-mode 明確呼叫）
+     */
+    enterEbookMode() {
+      this.ebookLocked = true;
+      this.idleTime = 0;
+      this.isRoaming = false;
+      stopRoamLoop();
+      stopFollowLoop();
+      this.hidePet({ destroy: true });
+    },
+
+    /**
+     * 離開電子書：解除鎖定並還原桌寵
+     */
+    exitEbookMode() {
+      this.ebookLocked = false;
+      this.idleTime = 0;
+      // 下一幀再顯示，避開關閉動畫／class 切換當下
+      setTimeout(() => {
+        if (!this.ebookLocked && !isEbookMode()) {
+          this.showPet();
         }
+      }, 0);
+    },
+
+    checkIdleStatus() {
+      if (this.ebookLocked || isEbookMode()) {
         this.idleTime = 0;
         this.isRoaming = false;
+        // 僅在仍有實例時清一次，避免每秒重入 hidePet
+        if (this.isActive || this.petInstance || queryPetEl()) {
+          this.hidePet({ destroy: true });
+        }
         return;
       }
 
@@ -501,6 +526,9 @@
      * @returns {Promise<object|null>}
      */
     ensurePet() {
+      if (this.ebookLocked || isEbookMode()) {
+        return Promise.resolve(null);
+      }
       if (this.petInstance && this._mounted && queryPetEl()) {
         return Promise.resolve(this.petInstance);
       }
@@ -605,50 +633,93 @@
      * @returns {Promise<void>}
      */
     async showPet() {
-      if (isEbookMode()) {
-        this.hidePet({ destroy: true });
+      if (this.ebookLocked || isEbookMode()) {
         return;
       }
+      if (hideShowLock) return;
+      hideShowLock = true;
 
-      const pet = await this.ensurePet();
-      if (!pet) return;
+      try {
+        const pet = await this.ensurePet();
+        // await 後再確認：開啟電子書期間可能已鎖定
+        if (!pet || this.ebookLocked || isEbookMode()) {
+          if (this.ebookLocked || isEbookMode()) {
+            this.hidePet({ destroy: true });
+          }
+          return;
+        }
 
-      const el = queryPetEl();
-      if (el) {
-        el.style.display = '';
-        el.style.visibility = 'visible';
+        const el = queryPetEl();
+        if (el) {
+          el.style.display = '';
+          el.style.visibility = 'visible';
+        }
+
+        const status = pet.$status;
+        if (status === 'hide') {
+          callPetMethod('show');
+        }
+
+        this.isActive = true;
+        if (!document.body.classList.contains('web-pet-companion')) {
+          document.body.classList.add('web-pet-companion');
+        }
+        setupPetInteractions();
+        restoreSavedPos();
+        positionBubbleAbovePet();
+        startFollowLoop();
+      } finally {
+        hideShowLock = false;
       }
-
-      const status = pet.$status;
-      if (status === 'hide') {
-        callPetMethod('show');
-      }
-
-      this.isActive = true;
-      document.body.classList.add('web-pet-companion');
-      setupPetInteractions();
-      restoreSavedPos();
-      positionBubbleAbovePet();
-      startFollowLoop();
     },
 
     /**
      * @param {{destroy?: boolean}} [opts]
      */
     hidePet(opts) {
+      if (hideShowLock && !(opts && opts.destroy)) return;
       const destroy = Boolean(opts && opts.destroy);
-      this.stopRoaming({ dock: false });
-      this.isActive = false;
+      const wasRoaming = this.isRoaming;
+      this.isRoaming = false;
+      stopRoamLoop();
       stopFollowLoop();
-      document.body.classList.remove('web-pet-dragging-active');
+      this.isActive = false;
 
+      if (document.body.classList.contains('web-pet-dragging-active')) {
+        document.body.classList.remove('web-pet-dragging-active');
+      }
+      if (document.body.classList.contains('web-pet-roaming')) {
+        document.body.classList.remove('web-pet-roaming');
+      }
+
+      // 銷毀時不要走 jQuery fadeOut（易與 DOM 移除競態）；直接拆節點
       if (destroy) {
-        callPetMethod('hide', true);
+        try {
+          callPetMethod('stopMove');
+        } catch (_) {
+          // ignore
+        }
         removePetDom();
         this.petInstance = null;
         this._mounted = false;
         this._creating = false;
         return;
+      }
+
+      // 非銷毀：先停動畫並記住位置
+      if (wasRoaming) {
+        const el = queryPetEl();
+        if (el) {
+          try {
+            callPetMethod('stopMove');
+          } catch (_) {
+            // ignore
+          }
+          const rect = el.getBoundingClientRect();
+          const scroll = scrollOffset();
+          const saved = applyPos(el, rect.left + scroll.x, rect.top + scroll.y);
+          savePos(saved);
+        }
       }
 
       if (!callPetMethod('hide', true)) {
@@ -659,14 +730,16 @@
     },
 
     startRoaming() {
-      if (isEbookMode() || !this.isActive) return;
+      if (this.ebookLocked || isEbookMode() || !this.isActive) return;
       if (document.body.classList.contains('web-pet-dragging-active')) return;
       this.isRoaming = true;
-      document.body.classList.add('web-pet-roaming');
+      if (!document.body.classList.contains('web-pet-roaming')) {
+        document.body.classList.add('web-pet-roaming');
+      }
       callPetMethod('randomMove');
       stopRoamLoop();
       roamTimer = setInterval(() => {
-        if (!this.isRoaming || isEbookMode()) return;
+        if (!this.isRoaming || this.ebookLocked || isEbookMode()) return;
         if (document.body.classList.contains('web-pet-dragging-active')) return;
         callPetMethod('randomMove');
       }, 14000);
@@ -678,13 +751,16 @@
     stopRoaming(opts) {
       // 預設不停靠角落，保留使用者／漫遊當下位置
       const dock = Boolean(opts && opts.dock);
+      const wasRoaming = this.isRoaming;
       this.isRoaming = false;
       stopRoamLoop();
-      document.body.classList.remove('web-pet-roaming');
+      if (document.body.classList.contains('web-pet-roaming')) {
+        document.body.classList.remove('web-pet-roaming');
+      }
       callPetMethod('stopMove');
       document.querySelectorAll('.pet-paw-warp').forEach((node) => node.remove());
 
-      if (dock && this.isActive && !isEbookMode()) {
+      if (dock && this.isActive && !this.ebookLocked && !isEbookMode()) {
         const saved = loadSavedPos();
         const el = queryPetEl();
         if (el && saved) {
@@ -692,7 +768,7 @@
         } else if (el) {
           restoreSavedPos();
         }
-      } else {
+      } else if (wasRoaming) {
         // 漫遊中途停下：把目前座標存起來，方便下次還原
         const el = queryPetEl();
         if (el) {
@@ -721,10 +797,11 @@
      * @returns {Promise<void>}
      */
     async forceAppear(holdMs) {
-      if (isEbookMode()) return;
+      if (this.ebookLocked || isEbookMode()) return;
       const ms = holdMs == null ? 6000 : Number(holdMs);
       this.idleTime = 0;
       await this.showPet();
+      if (this.ebookLocked || isEbookMode()) return;
       // 提示時停止漫遊，留在使用者放置的位置
       this.stopRoaming({ dock: false });
       this.setMood('thinking');

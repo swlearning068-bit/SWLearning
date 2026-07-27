@@ -702,13 +702,16 @@ function openEbookReader(startIndex) {
   applyEbookTheme(getEbookTheme());
   applyEbookFontSize(getEbookFontSize());
 
+  // Phase 13.7：先鎖定並銷毀桌寵，再切 UI（避免與 pet class 互踩卡死）
+  if (window.PetController && typeof window.PetController.enterEbookMode === 'function') {
+    window.PetController.enterEbookMode();
+  } else if (window.PetController && typeof window.PetController.hidePet === 'function') {
+    window.PetController.hidePet({ destroy: true });
+  }
+
   overlay.classList.remove('ebook-hidden');
   overlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('ebook-reader-open', 'ebook-active');
-  // Phase 13.7：電子書模式強制隱藏／銷毀桌寵
-  if (window.PetController && typeof window.PetController.hidePet === 'function') {
-    window.PetController.hidePet({ destroy: true });
-  }
 
   const mainEl = document.querySelector('main.main-content');
   if (mainEl) mainEl.setAttribute('aria-hidden', 'true');
@@ -736,6 +739,11 @@ function closeEbookReader() {
   setEbookTocOpen(false);
   ebookArticles = [];
   currentEbookIndex = 0;
+
+  // Phase 13.7：解除桌寵鎖定並還原
+  if (window.PetController && typeof window.PetController.exitEbookMode === 'function') {
+    window.PetController.exitEbookMode();
+  }
 }
 
 /**
