@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  const LOTTIE_VER = '7';
+  const LOTTIE_VER = '8';
   const STORAGE_KEY_STAGE = 'sw_mascot_stage';
   const STORAGE_KEY_POS = 'sw_mascot_pos';
   const DRAG_THRESHOLD_PX = 6;

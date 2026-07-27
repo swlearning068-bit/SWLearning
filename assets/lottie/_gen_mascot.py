@@ -9,8 +9,9 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parent
 W, H = 240, 340
 FR = 30
-# 頭部相對畫布中心的垂直偏移（負值＝往上，留給身體）
-HY = -72
+# 頭部相對畫布中心的垂直偏移（須與軀幹重疊，避免頭身分離）
+# 頭橢圓高約 102 → 下緣 ≈ HY+51；軀幹上緣 ≈ torso_y-44
+HY = -38
 
 BODY = EAR = EAR_INNER = SNOUT = NOSE = EYE = CHEEK = OUTLINE = SPOT = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -370,8 +371,10 @@ def dog_head(mouth_style="smile", brow_tilt=0, eye_scale=100):
 
 
 def body_shapes():
-    """身體：回傳順序越前面越上層（手臂前層在前）。"""
-    # 由後到前收集，最後 reverse
+    """身體：回傳順序越前面越上層（手臂前層在前）。
+
+    軀幹中心約 y=46，上緣約 2，與頭部下緣（HY+51≈13）重疊銜接。
+    """
     back = []
     # 尾巴
     back.append(
@@ -379,7 +382,7 @@ def body_shapes():
             "tail",
             [ellipse(28, 46), solid(EAR), stroke(OUTLINE, 2)],
             px=-58,
-            py=70,
+            py=58,
             r=-40,
         )
     )
@@ -389,7 +392,7 @@ def body_shapes():
             "leg-l",
             [ellipse(28, 48), solid(BODY), stroke(OUTLINE, 2.5)],
             px=-28,
-            py=118,
+            py=108,
         )
     )
     back.append(
@@ -397,7 +400,7 @@ def body_shapes():
             "leg-r",
             [ellipse(28, 48), solid(BODY), stroke(OUTLINE, 2.5)],
             px=28,
-            py=118,
+            py=108,
         )
     )
     back.append(
@@ -405,7 +408,7 @@ def body_shapes():
             "foot-l",
             [ellipse(34, 18), solid(EAR), stroke(OUTLINE, 2)],
             px=-30,
-            py=142,
+            py=132,
         )
     )
     back.append(
@@ -413,16 +416,16 @@ def body_shapes():
             "foot-r",
             [ellipse(34, 18), solid(EAR), stroke(OUTLINE, 2)],
             px=30,
-            py=142,
+            py=132,
         )
     )
-    # 軀幹
+    # 軀幹（上移與頭頸銜接）
     back.append(
         shape_group(
             "torso",
             [ellipse(92, 88), solid(BODY), stroke(OUTLINE, 3)],
             px=0,
-            py=58,
+            py=46,
         )
     )
     back.append(
@@ -430,7 +433,7 @@ def body_shapes():
             "belly",
             [ellipse(58, 48), solid(SNOUT)],
             px=0,
-            py=66,
+            py=54,
         )
     )
     # 後手臂（左側）
@@ -439,7 +442,7 @@ def body_shapes():
             "arm-l",
             [ellipse(26, 44), solid(BODY), stroke(OUTLINE, 2.5)],
             px=-58,
-            py=52,
+            py=42,
             r=25,
         )
     )
@@ -448,7 +451,7 @@ def body_shapes():
             "paw-l",
             [ellipse(22, 18), solid(EAR), stroke(OUTLINE, 2)],
             px=-70,
-            py=72,
+            py=62,
         )
     )
     # 前手臂（右側，可拿道具）
@@ -457,7 +460,7 @@ def body_shapes():
             "arm-r",
             [ellipse(26, 44), solid(BODY), stroke(OUTLINE, 2.5)],
             px=58,
-            py=52,
+            py=42,
             r=-25,
         )
     )
@@ -466,7 +469,7 @@ def body_shapes():
             "paw-r",
             [ellipse(22, 18), solid(EAR), stroke(OUTLINE, 2)],
             px=70,
-            py=72,
+            py=62,
         )
     )
     return list(reversed(back))
@@ -483,39 +486,39 @@ def form_props():
                 "bottle-body",
                 [rect(26, 46, 10), solid((255, 255, 255)), stroke(OUTLINE, 2)],
                 px=78,
-                py=48,
+                py=40,
                 r=18,
             ),
             shape_group(
                 "bottle-milk",
                 [rect(20, 26, 6), solid((255, 230, 180))],
                 px=78,
-                py=54,
+                py=46,
                 r=18,
             ),
             shape_group(
                 "bottle-ring",
                 [ellipse(28, 10), solid((120, 190, 255)), stroke(OUTLINE, 1.5)],
                 px=78,
-                py=28,
+                py=20,
             ),
             shape_group(
                 "bottle-nipple",
                 [ellipse(13, 15), solid((255, 180, 190)), stroke(OUTLINE, 1.5)],
                 px=78,
-                py=16,
+                py=8,
             ),
             shape_group(
                 "bib",
                 [ellipse(64, 26), solid((255, 240, 245)), stroke((240, 160, 180), 2)],
                 px=0,
-                py=28,
+                py=16,
             ),
             shape_group(
                 "bib-dot",
                 [ellipse(9, 9), solid((255, 140, 160))],
                 px=0,
-                py=28,
+                py=16,
             ),
         ]
     elif STAGE == "rookie":
@@ -535,27 +538,27 @@ def form_props():
             ),
             shape_group(
                 "lanyard",
-                [rect(6, 50, 3), solid((40, 90, 180))],
+                [rect(6, 46, 3), solid((40, 90, 180))],
                 px=0,
-                py=40,
+                py=28,
             ),
             shape_group(
                 "badge-card",
                 [rect(34, 42, 4), solid((255, 255, 255)), stroke((40, 90, 180), 2.5)],
                 px=0,
-                py=78,
+                py=66,
             ),
             shape_group(
                 "badge-photo",
                 [ellipse(15, 15), solid((255, 200, 150)), stroke(OUTLINE, 1)],
                 px=0,
-                py=70,
+                py=58,
             ),
             shape_group(
                 "badge-bar",
                 [rect(22, 6, 2), solid((40, 90, 180))],
                 px=0,
-                py=88,
+                py=76,
             ),
         ]
     elif STAGE == "pro":
@@ -582,35 +585,35 @@ def form_props():
                 "notebook",
                 [rect(38, 50, 4), solid((70, 140, 110)), stroke(OUTLINE, 2)],
                 px=-72,
-                py=58,
+                py=48,
                 r=-12,
             ),
             shape_group(
                 "notebook-page",
                 [rect(28, 38, 2), solid((250, 250, 245))],
                 px=-72,
-                py=58,
+                py=48,
                 r=-12,
             ),
             shape_group(
                 "notebook-line1",
                 [rect(20, 2, 1), solid((180, 180, 180))],
                 px=-72,
-                py=50,
+                py=40,
                 r=-12,
             ),
             shape_group(
                 "notebook-line2",
                 [rect(20, 2, 1), solid((180, 180, 180))],
                 px=-72,
-                py=58,
+                py=48,
                 r=-12,
             ),
             shape_group(
                 "pen",
                 [rect(5, 34, 2), solid((40, 40, 50))],
                 px=-56,
-                py=42,
+                py=34,
                 r=-25,
             ),
         ]
@@ -638,13 +641,13 @@ def form_props():
                 "star-badge",
                 [ellipse(20, 20), solid((255, 205, 60)), stroke((180, 130, 20), 2.5)],
                 px=42,
-                py=48,
+                py=38,
             ),
             shape_group(
                 "star-core",
                 [ellipse(9, 9), solid((255, 245, 180))],
                 px=42,
-                py=48,
+                py=38,
             ),
         ]
     return props
@@ -654,27 +657,26 @@ def cape_back():
     """披風放最下層。"""
     if STAGE != "master":
         return []
-    # 回傳時放陣列尾端＝下層；這裡先給「由上到下」再 reverse 到尾
     cape = [
         shape_group(
             "cape-l",
             [ellipse(52, 90), solid((90, 50, 160)), stroke((60, 30, 110), 2)],
             px=-50,
-            py=70,
+            py=58,
             r=18,
         ),
         shape_group(
             "cape-r",
             [ellipse(52, 90), solid((90, 50, 160)), stroke((60, 30, 110), 2)],
             px=50,
-            py=70,
+            py=58,
             r=-18,
         ),
         shape_group(
             "cape-collar",
             [ellipse(74, 18), solid((120, 70, 190)), stroke((60, 30, 110), 2)],
             px=0,
-            py=28,
+            py=16,
         ),
     ]
     return cape
