@@ -7051,6 +7051,27 @@ body.ebook-reader-open .mascot-floating {
    ============================================================ */
 div.web-pet {
   z-index: 10050;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+div.web-pet.web-pet-draggable,
+div.web-pet.web-pet-draggable > div.pet {
+  cursor: grab;
+  touch-action: none;
+}
+
+div.web-pet.web-pet-dragging,
+div.web-pet.web-pet-dragging > div.pet,
+body.web-pet-dragging-active {
+  cursor: grabbing !important;
+}
+
+div.web-pet.web-pet-dragging {
+  z-index: 10070;
+  opacity: 0.96;
 }
 
 .pet-paw-warp {
