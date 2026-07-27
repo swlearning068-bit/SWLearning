@@ -5034,11 +5034,11 @@ body {
 /* ---------- AI 模式懸浮標籤（頭像左側，避開 Lottie 小夥伴） ---------- */
 .ai-indicator {
   position: fixed;
-  /* 與 120px Lottie 頭像同高並排，不被上方對話氣泡遮住 */
-  bottom: 48px;
-  right: 140px;
+  /* 與全身小夥伴並排，不被遮住 */
+  bottom: 56px;
+  right: 190px;
   left: auto;
-  max-width: min(280px, calc(100vw - 160px));
+  max-width: min(280px, calc(100vw - 210px));
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -6811,22 +6811,21 @@ body.ebook-reader-open > main.main-content {
 }
 
 /* ============================================================
-   Phase 13.3+：Lottie 學習小夥伴＋動態對話框
+   Phase 13.6：全身動態學習小夥伴＋對話氣泡
    ============================================================ */
 .mascot-floating {
   position: fixed;
-  bottom: 12px;
-  right: 12px;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   z-index: 10000;
   pointer-events: none;
   touch-action: none;
 }
 
 .mascot-floating.mascot-positioned {
-  /* 使用者拖拉後改以 left/top 定位 */
   right: auto;
   bottom: auto;
 }
@@ -6837,84 +6836,139 @@ body.ebook-reader-open > main.main-content {
 }
 
 .mascot-floating .speech-bubble,
-.mascot-floating .mascot-lottie-avatar {
+.mascot-floating .mascot-avatar-wrapper {
   pointer-events: auto;
 }
 
+/* 對話氣泡：置中於角色正上方 */
 .speech-bubble {
-  background: var(--surface-color);
-  border: 2px solid #2563eb;
-  border-radius: 15px;
-  padding: 12px 18px;
-  margin-bottom: 6px;
-  box-shadow: var(--shadow-md);
+  background: #ffffff;
+  border: 3px solid #ffc371;
+  border-radius: 20px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
   max-width: 250px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #4b5563;
+  text-align: center;
   line-height: 1.45;
   position: relative;
 }
 
 .speech-bubble.speech-bubble--pop {
-  animation: mascot-popIn 0.3s ease-out;
+  animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .speech-bubble::after {
   content: '';
   position: absolute;
-  bottom: -10px;
-  right: 40px;
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 10px solid #2563eb;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 12px 10px 0;
+  border-style: solid;
+  border-color: #ffc371 transparent transparent transparent;
 }
 
 .speech-bubble::before {
   content: '';
   position: absolute;
   bottom: -7px;
-  right: 42px;
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 8px solid var(--surface-color);
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 9px 8px 0;
+  border-style: solid;
+  border-color: #ffffff transparent transparent transparent;
   z-index: 1;
 }
 
-.mascot-lottie-avatar {
-  width: 132px;
-  height: 132px;
+/* 全身角色：呼吸／懸浮待機 */
+.mascot-avatar-wrapper {
+  width: 150px;
+  height: 210px;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.16));
-  transition: filter 0.2s ease;
-  outline: none;
   touch-action: none;
+  outline: none;
+  animation: idleBreathing 3s ease-in-out infinite;
+  transition: filter 0.2s ease;
 }
 
-.mascot-lottie-avatar:active,
-.mascot-dragging .mascot-lottie-avatar {
+.mascot-avatar-wrapper:focus-visible {
+  outline: 2px solid #ffc371;
+  outline-offset: 4px;
+  border-radius: 16px;
+}
+
+.mascot-avatar-wrapper:active,
+.mascot-dragging .mascot-avatar-wrapper {
   cursor: grabbing;
 }
 
-.mascot-lottie-avatar.mascot-evolving {
+.mascot-dragging .mascot-avatar-wrapper {
+  animation-play-state: paused;
+}
+
+.mascot-avatar-wrapper.mascot-evolving {
   animation: mascot-evolve-glow 1.2s ease-in-out 3;
+}
+
+.mascot-lottie-avatar {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.18));
+  pointer-events: none;
+}
+
+.mascot-lottie-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mascot-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 4.5rem;
+  line-height: 1;
+}
+
+@keyframes idleBreathing {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-8px) scaleY(1.02);
+  }
+}
+
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes mascot-evolve-glow {
   0%,
   100% {
-    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.16));
-    transform: scale(1);
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.18));
+    transform: translateY(0) scale(1);
   }
   50% {
     filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.85));
-    transform: scale(1.12);
+    transform: translateY(-4px) scale(1.08);
   }
 }
 
@@ -6941,8 +6995,8 @@ body.ebook-reader-open > main.main-content {
 }
 
 .mascot-evolution-preview {
-  width: min(220px, 56vw);
-  height: min(220px, 56vw);
+  width: min(200px, 52vw);
+  height: min(280px, 70vw);
   margin: 8px auto 12px;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.18));
 }
@@ -6967,55 +7021,21 @@ body.ebook-reader-open > main.main-content {
   line-height: 1.5;
 }
 
-.mascot-lottie-avatar:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 4px;
-  border-radius: 50%;
-}
-
-.mascot-lottie-avatar svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.mascot-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 4rem;
-  line-height: 1;
-}
-
-@keyframes mascot-popIn {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 640px) {
   .mascot-floating {
-    bottom: 8px;
-    right: 4px;
+    bottom: 16px;
+    right: 12px;
   }
 
-  /* 維持與桌面相同尺寸，不縮小 */
-  .mascot-lottie-avatar {
-    width: 132px;
-    height: 132px;
+  .mascot-avatar-wrapper {
+    width: 150px;
+    height: 210px;
   }
 
   .speech-bubble {
-    max-width: min(220px, calc(100vw - 110px));
-    font-size: 0.88rem;
-    padding: 10px 14px;
+    max-width: min(240px, calc(100vw - 48px));
+    font-size: 0.92rem;
+    padding: 12px 16px;
   }
 }
 
@@ -7024,12 +7044,12 @@ body:has(#ebook-reader-overlay:not(.ebook-hidden)) .mascot-floating {
   display: none;
 }
 
-/* 任務挑戰進行中：維持使用者拖拉位置與原本大小，僅提高層級 */
+/* 任務挑戰進行中：維持拖拉位置與大小，僅提高層級 */
 body:has(#quest-challenge-overlay:not(.hidden)) .mascot-floating {
   z-index: 10120;
 }
 
-/* AI 標籤在挑戰中改到左下，避免與上方小夥伴重疊 */
+/* AI 標籤在挑戰中改到左下 */
 body:has(#quest-challenge-overlay:not(.hidden)) .ai-indicator {
   bottom: 20px;
   right: auto;

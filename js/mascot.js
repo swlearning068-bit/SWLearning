@@ -1,12 +1,12 @@
 /**
- * Phase 13.3–13.5：Lottie 多形態學習小夥伴
+ * Phase 13.3–13.6：全身 Lottie 多形態學習小夥伴
  * 形態：baby → rookie → pro → master
  * 狀態：idle / thinking / success / error
  */
 (function () {
   'use strict';
 
-  const LOTTIE_VER = '6';
+  const LOTTIE_VER = '7';
   const STORAGE_KEY_STAGE = 'sw_mascot_stage';
   const STORAGE_KEY_POS = 'sw_mascot_pos';
   const DRAG_THRESHOLD_PX = 6;
@@ -142,6 +142,7 @@
   };
 
   let idleTimer = null;
+  let hideTimeout = null;
   let messageIndex = 0;
   let currentState = '';
   let previewAnimation = null;
@@ -171,6 +172,13 @@
     }, ms);
   }
 
+  function clearHideTimeout() {
+    if (hideTimeout) {
+      clearTimeout(hideTimeout);
+      hideTimeout = null;
+    }
+  }
+
   function pickMessage(list) {
     if (!Array.isArray(list) || !list.length) return '';
     const msg = list[messageIndex % list.length];
@@ -185,6 +193,7 @@
   }
 
   function updateBubble(el, message) {
+    if (!el) return;
     if (message) {
       el.textContent = message;
       el.classList.remove('hidden');
@@ -193,6 +202,7 @@
       el.classList.add('speech-bubble--pop');
     } else {
       el.classList.add('hidden');
+      el.classList.remove('speech-bubble--pop');
     }
   }
 
@@ -440,22 +450,23 @@
 
     if (MascotApp.container) {
       MascotApp.container.dataset.stage = meta.id;
-      MascotApp.container.setAttribute(
+    }
+    if (MascotApp.wrapper) {
+      MascotApp.wrapper.setAttribute(
         'aria-label',
         `學習小夥伴（${meta.title} · ${meta.name}），可拖拉移動；點擊可聽鼓勵`
       );
     }
 
+    MascotApp.setState('idle');
     if (message) {
-      MascotApp.setState('idle', message);
-      scheduleIdle(4500);
-    } else {
-      MascotApp.setState('idle');
+      MascotApp.speak(message, 4500);
     }
   }
 
   const MascotApp = {
     root: null,
+    wrapper: null,
     container: null,
     bubble: null,
     currentAnimation: null,
@@ -464,9 +475,11 @@
     stageTitle: '奶瓶狗 BB',
     animations: assetsFor('baby'),
     assets: mascotAssets,
+    hideTimeout: null,
 
     init() {
       this.container = document.getElementById('mascot-lottie-avatar');
+      this.wrapper = document.getElementById('mascot-avatar-wrapper');
       this.bubble = document.getElementById('mascot-speech-bubble');
       this.root = document.getElementById('mascot-container');
       if (!ready()) return;
@@ -487,12 +500,11 @@
       }
 
       const onTap = () => {
-        this.setState('idle', pickMessage(stageMessages('idle')));
-        scheduleIdle(4000);
+        this.speak(pickMessage(stageMessages('idle')), 4000);
       };
 
-      // 拖拉整個容器；輕點頭像才說話（避免與 drag 衝突）
-      if (this.root) {
+      // 拖拉整個容器；輕點全身角色才說話
+      if (this.root && this.wrapper) {
         const savedPos = loadPersistedPosition();
         if (savedPos) {
           requestAnimationFrame(() => {
@@ -500,10 +512,10 @@
             persistPosition(clamped);
           });
         }
-        bindMascotDrag(this.root, this.container, onTap);
+        bindMascotDrag(this.root, this.wrapper, onTap);
       }
 
-      this.container.addEventListener('keydown', (event) => {
+      this.wrapper?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           onTap();
@@ -522,17 +534,38 @@
           }
         });
 
-      this.container.dataset.stage = this.currentStage;
-      this.container.setAttribute(
+      if (this.container) this.container.dataset.stage = this.currentStage;
+      this.wrapper?.setAttribute(
         'aria-label',
         '學習小夥伴，可拖拉移動；點擊可聽鼓勵'
       );
-      this.setState('idle', pickMessage(stageMessages('idle')));
-      scheduleIdle(5000);
+      this.setState('idle');
+      this.speak(pickMessage(stageMessages('idle')), 5000);
 
       setTimeout(() => {
         this.syncFromQuestProgress({ announce: false });
       }, 0);
+    },
+
+    /**
+     * 顯示對話氣泡（可自動隱藏）
+     * @param {string} message
+     * @param {number} [duration=4000]
+     */
+    speak(message, duration) {
+      if (!this.bubble || !message) return;
+      const ms = duration == null ? 4000 : Number(duration);
+      clearHideTimeout();
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      updateBubble(this.bubble, message);
+      this.hideTimeout = hideTimeout = setTimeout(() => {
+        hideTimeout = null;
+        this.hideTimeout = null;
+        updateBubble(this.bubble, null);
+      }, Math.max(0, ms));
     },
 
     /**
@@ -751,20 +784,30 @@
         idleTimer = null;
       }
       this.updateMascotVisual(next);
-      updateBubble(this.bubble, message);
+      if (arguments.length >= 2) {
+        if (message) {
+          this.speak(message, 4000);
+        } else {
+          clearHideTimeout();
+          updateBubble(this.bubble, null);
+        }
+      }
     },
 
     triggerSuccess(message) {
-      this.setState('success', message || pickMessage(stageMessages('success')));
+      this.setState('success');
+      this.speak(message || pickMessage(stageMessages('success')), 3000);
       scheduleIdle(3000);
     },
 
     triggerHint(hintText) {
-      this.setState('thinking', hintText || '讓我想想……');
+      this.setState('thinking');
+      this.speak(hintText || '讓我想想……', 6000);
     },
 
     triggerError(message) {
-      this.setState('error', message || pickMessage(stageMessages('error')));
+      this.setState('error');
+      this.speak(message || pickMessage(stageMessages('error')), 3500);
       scheduleIdle(3500);
     },
 
@@ -773,8 +816,8 @@
     },
 
     say(message) {
-      this.setState('idle', message || pickMessage(stageMessages('idle')));
-      scheduleIdle(4500);
+      this.setState('idle');
+      this.speak(message || pickMessage(stageMessages('idle')), 4500);
     }
   };
 
