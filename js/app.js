@@ -91,6 +91,7 @@ window.subjectsList = subjectsList;
 
 /**
  * 依 ID 取得 DOM 元素，若找不到則在 console 警告
+ * （切勿與 jQuery 的 $ 混淆；Phase 13.7 起 jQuery 掛在 SW_JQUERY）
  * @param {string} id - 元素的 id 屬性值
  * @returns {HTMLElement|null}
  */
@@ -98,6 +99,13 @@ function $(id) {
   const el = document.getElementById(id);
   if (!el) console.warn(`[app.js] 找不到元素：#${id}`);
   return el;
+}
+
+/** 若第三方庫覆寫了全域 $，還原為本專案的 getElementById 快捷函式 */
+function ensureAppDollarHelper() {
+  if (typeof window.$ !== 'function' || window.$.fn) {
+    window.$ = $;
+  }
 }
 
 /**
@@ -436,12 +444,16 @@ function initTabs() {
    初始化：頁面載入完成後執行
    ============================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
+  // 0. 確保 $ 未被 jQuery 等第三方庫覆寫（否則科目／紀錄會初始化失敗）
+  ensureAppDollarHelper();
 
-  // 0. 確保單字卡樣式已載入
+  // 0.5 確保單字卡樣式已載入
   ensureFlashcardStyles();
 
   // 1. 載入 14 個社工科目並渲染選擇器
+  ensureAppDollarHelper();
   await initSubjectSelector();
+  ensureAppDollarHelper();
 
   // 2. 根據 API Key 狀態切換寫作區顯示
   refreshApiKeyState();

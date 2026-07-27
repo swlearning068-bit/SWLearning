@@ -1,8 +1,8 @@
 /**
- * Phase 13.3–13.7：全身 Lottie 多形態學習小夥伴
- * 形態：baby → rookie → pro → master
+ * Phase 13.3–13.7：學習小夥伴（提示／進化邏輯）
+ * 形態：baby → rookie → pro → master（進化進度仍沿用）
  * 狀態：idle / thinking / success / error
- * 13.7：與 PetController / web-pet 閒置漫遊整合（氣泡跟隨）
+ * 13.7：主視覺改為 web-pet；Lottie 僅用於進化 Modal 預覽
  */
 (function () {
   'use strict';
@@ -151,7 +151,8 @@
   let pendingEvolution = null;
 
   function ready() {
-    return Boolean(MascotApp.container && MascotApp.bubble);
+    // 主視覺改為 web-pet 後，浮動區只需氣泡即可說話
+    return Boolean(MascotApp.bubble);
   }
 
   function hasLottie() {
@@ -485,10 +486,12 @@
       this.root = document.getElementById('mascot-container');
       if (!ready()) return;
 
-      if (!hasLottie()) {
-        console.warn('[mascot.js] lottie-web 尚未載入，改用靜態後備顯示');
-        this.container.innerHTML =
-          '<span class="mascot-fallback" aria-hidden="true">🐶</span>';
+      document.body.classList.add('web-pet-companion');
+
+      // Phase 13.7：隱藏 Lottie 主視覺（進化 Modal 仍可使用 Lottie）
+      if (this.wrapper) {
+        this.wrapper.setAttribute('aria-hidden', 'true');
+        this.wrapper.tabIndex = -1;
       }
 
       const persisted = loadPersistedStage();
@@ -499,29 +502,6 @@
         this.stageTitle = meta ? meta.title : '奶瓶狗 BB';
         this.animations = assetsFor(persisted);
       }
-
-      const onTap = () => {
-        this.speak(pickMessage(stageMessages('idle')), 4000);
-      };
-
-      // 拖拉整個容器；輕點全身角色才說話
-      if (this.root && this.wrapper) {
-        const savedPos = loadPersistedPosition();
-        if (savedPos) {
-          requestAnimationFrame(() => {
-            const clamped = applyPosition(this.root, savedPos);
-            persistPosition(clamped);
-          });
-        }
-        bindMascotDrag(this.root, this.wrapper, onTap);
-      }
-
-      this.wrapper?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onTap();
-        }
-      });
 
       document
         .getElementById('btn-close-mascot-evolution')
@@ -536,12 +516,20 @@
         });
 
       if (this.container) this.container.dataset.stage = this.currentStage;
-      this.wrapper?.setAttribute(
-        'aria-label',
-        '學習小夥伴，可拖拉移動；點擊可聽鼓勵'
-      );
-      this.setState('idle');
-      this.speak(pickMessage(stageMessages('idle')), 5000);
+
+      // 開場台詞：等 web-pet 就緒後再說，氣泡才能對齊
+      const greet = () => {
+        this.setState('idle');
+        this.speak(pickMessage(stageMessages('idle')), 5000);
+      };
+      const pet = window.PetController;
+      if (pet && typeof pet.showPet === 'function') {
+        Promise.resolve(pet.showPet())
+          .then(greet)
+          .catch(greet);
+      } else {
+        greet();
+      }
 
       setTimeout(() => {
         this.syncFromQuestProgress({ announce: false });
@@ -550,7 +538,7 @@
 
     /**
      * 顯示對話氣泡（可自動隱藏）
-     * Phase 13.7：若 web-pet 漫遊中，氣泡跟隨寵物正上方
+     * Phase 13.7：氣泡永遠跟隨 web-pet 正上方
      * @param {string} message
      * @param {number} [duration=4000]
      */
@@ -564,7 +552,7 @@
       }
       updateBubble(this.bubble, message);
       const pet = window.PetController;
-      if (pet && pet.isActive && typeof pet.syncBubbleToPet === 'function') {
+      if (pet && typeof pet.syncBubbleToPet === 'function') {
         pet.syncBubbleToPet();
       }
       this.hideTimeout = hideTimeout = setTimeout(() => {
@@ -575,10 +563,15 @@
     },
 
     /**
-     * 依形態＋情緒狀態更新視覺
+     * 依情緒狀態更新視覺（web-pet 精靈圖；無 PetController 時後備 Lottie）
      * @param {'idle'|'success'|'thinking'|'error'} state
      */
     updateMascotVisual(state) {
+      const pet = window.PetController;
+      if (pet && typeof pet.setMood === 'function') {
+        pet.setMood(state);
+        return;
+      }
       this.loadAnimation(state);
     },
 
@@ -734,7 +727,8 @@
      * @param {'idle'|'thinking'|'success'|'error'} state
      */
     loadAnimation(state) {
-      if (!ready()) return;
+      // 主畫面已改用 web-pet；此處僅供進化 Modal／後備路徑
+      if (!this.container) return;
 
       const paths = this.animations || assetsFor(this.currentStage);
       const next = paths[state] ? state : 'idle';
@@ -784,7 +778,13 @@
      */
     setState(state, message) {
       if (!ready()) return;
-      const next = this.animations[state] ? state : 'idle';
+      const next =
+        state === 'idle' ||
+        state === 'thinking' ||
+        state === 'success' ||
+        state === 'error'
+          ? state
+          : 'idle';
       if (idleTimer && next !== 'idle') {
         clearTimeout(idleTimer);
         idleTimer = null;
@@ -799,13 +799,13 @@
         }
       }
       const pet = window.PetController;
-      if (pet && pet.isActive && typeof pet.syncBubbleToPet === 'function') {
+      if (pet && typeof pet.syncBubbleToPet === 'function') {
         pet.syncBubbleToPet();
       }
     },
 
     /**
-     * 學習提示強制召喚 web-pet（Phase 13.7）
+     * 確保 web-pet 在場（學習提示／答題回饋）
      * @param {number} [holdMs]
      * @returns {Promise<void>}
      */
@@ -824,15 +824,26 @@
     },
 
     triggerSuccess(message) {
-      this.setState('success');
-      this.speak(message || pickMessage(stageMessages('success')), 3000);
-      scheduleIdle(3000);
+      const msg = message || pickMessage(stageMessages('success'));
+      const run = () => {
+        this.setState('success');
+        this.speak(msg, 3000);
+        scheduleIdle(3000);
+      };
+      const pending = this.ensurePetForTip(3000);
+      if (pending && typeof pending.then === 'function') {
+        pending.then(run).catch(run);
+      } else {
+        run();
+      }
     },
 
     triggerHint(hintText) {
       const msg = hintText || '讓我想想……';
-      this.setState('thinking');
-      const speakTip = () => this.speak(msg, 6000);
+      const speakTip = () => {
+        this.setState('thinking');
+        this.speak(msg, 6000);
+      };
       const pending = this.ensurePetForTip(6000);
       if (pending && typeof pending.then === 'function') {
         pending.then(speakTip).catch(speakTip);
@@ -842,9 +853,18 @@
     },
 
     triggerError(message) {
-      this.setState('error');
-      this.speak(message || pickMessage(stageMessages('error')), 3500);
-      scheduleIdle(3500);
+      const msg = message || pickMessage(stageMessages('error'));
+      const run = () => {
+        this.setState('error');
+        this.speak(msg, 3500);
+        scheduleIdle(3500);
+      };
+      const pending = this.ensurePetForTip(3500);
+      if (pending && typeof pending.then === 'function') {
+        pending.then(run).catch(run);
+      } else {
+        run();
+      }
     },
 
     triggerThinking(message) {
@@ -852,8 +872,17 @@
     },
 
     say(message) {
-      this.setState('idle');
-      this.speak(message || pickMessage(stageMessages('idle')), 4500);
+      const msg = message || pickMessage(stageMessages('idle'));
+      const run = () => {
+        this.setState('idle');
+        this.speak(msg, 4500);
+      };
+      const pending = this.ensurePetForTip(4500);
+      if (pending && typeof pending.then === 'function') {
+        pending.then(run).catch(run);
+      } else {
+        run();
+      }
     }
   };
 

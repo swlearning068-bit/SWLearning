@@ -7047,7 +7047,7 @@ body.ebook-reader-open .mascot-floating {
 }
 
 /* ============================================================
-   Phase 13.7：Web-Pet 閒置桌寵
+   Phase 13.7：Web-Pet 取代 Lottie 主視覺
    ============================================================ */
 div.web-pet {
   z-index: 10050;
@@ -7068,9 +7068,22 @@ body:has(#ebook-reader-overlay:not(.ebook-hidden)) .pet-paw-warp {
   visibility: hidden !important;
 }
 
-/* 漫遊中：隱藏 Lottie 全身角色，只保留跟隨的對話氣泡 */
-body.web-pet-roaming .mascot-avatar-wrapper {
-  display: none;
+/* 常駐模式：徹底隱藏 Lottie 全身角色，只留對話氣泡跟隨 web-pet */
+body.web-pet-companion .mascot-avatar-wrapper,
+body.web-pet-companion .mascot-lottie-avatar {
+  display: none !important;
+}
+
+body.web-pet-companion .mascot-floating {
+  right: auto;
+  bottom: auto;
+  z-index: 10060;
+  pointer-events: none;
+}
+
+body.web-pet-companion .mascot-floating .speech-bubble {
+  pointer-events: auto;
+  margin-bottom: 0;
 }
 
 .mascot-floating.mascot-follow-pet {

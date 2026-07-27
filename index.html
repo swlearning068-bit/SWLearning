@@ -9,7 +9,7 @@
   <!-- Manus / Linear 風格：Inter 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 引入全域樣式表 -->
-  <link rel="stylesheet" href="css/style.css?v=73">
+  <link rel="stylesheet" href="css/style.css?v=74">
   <!-- 生字複習單字卡 3D 翻轉樣式 -->
   <link rel="stylesheet" href="css/flashcard.css?v=8">
 </head>
@@ -1199,17 +1199,16 @@
     </div>
   </div>
 
-  <!-- ==================== Phase 13.6–13.7：學習小夥伴（Lottie + 閒置 Web-Pet） ==================== -->
+  <!-- ==================== Phase 13.7：學習小夥伴（web-pet 主視覺 + 對話氣泡） ==================== -->
   <div id="mascot-container" class="mascot-floating" aria-live="polite">
-    <!-- 對話氣泡（角色正上方；漫遊時跟隨 web-pet） -->
+    <!-- 對話氣泡：跟隨 web-pet 正上方；提示文案仍由 MascotApp 驅動 -->
     <div id="mascot-speech-bubble" class="speech-bubble hidden"></div>
-    <!-- 全身角色容器（CSS 呼吸動畫 + 拖拉手柄） -->
+    <!-- Lottie 主視覺已停用（保留節點供進化 Modal／後備）；畫面只顯示 web-pet -->
     <div
       id="mascot-avatar-wrapper"
       class="mascot-avatar-wrapper"
-      role="button"
-      tabindex="0"
-      aria-label="學習小夥伴，可拖拉移動；點擊可聽鼓勵"
+      aria-hidden="true"
+      hidden
     >
       <div
         id="mascot-lottie-avatar"
@@ -1327,12 +1326,31 @@
   <script src="js/user-profile.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
   <!-- Phase 13.7：Web-Pet（需 jQuery）+ 閒置控制器 -->
+  <!-- 注意：必須 noConflict，否則會覆寫 app.js 的 $ = getElementById，造成科目／紀錄初始化失敗 -->
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script>
+    (function () {
+      if (window.jQuery && typeof window.jQuery.noConflict === 'function') {
+        // 釋放全域 $／jQuery，改掛到 SW_JQUERY 專用名稱
+        window.SW_JQUERY = window.jQuery.noConflict(true);
+      }
+    })();
+  </script>
   <script src="assets/web-pet/webPet.min.js"></script>
-  <script src="js/mascot.js?v=10"></script>
-  <script src="js/pet-controller.js?v=1"></script>
+  <script>
+    // web-pet UMD 會把 default 掛到 window，避免污染全域
+    try {
+      if (window.default && window.default === window.WebPet) {
+        delete window.default;
+      }
+    } catch (_) {
+      // ignore
+    }
+  </script>
+  <script src="js/mascot.js?v=12"></script>
+  <script src="js/pet-controller.js?v=3"></script>
   <script src="js/quest-mode.js?v=9"></script>
-  <script src="js/app.js?v=23"></script>
+  <script src="js/app.js?v=24"></script>
   <!-- Firebase／雲端同步：只由單一 ES module 入口載入，避免 ?v= 造成雙實例狀態錯亂 -->
   <script type="module" src="js/sync.js?v=17"></script>
 </body>
